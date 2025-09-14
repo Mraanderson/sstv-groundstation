@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+<head>
+  <title>SSTV Ground Station Config</title>
+  <style>
+    body { font-family: sans-serif; margin: 2em; background: #f4f4f4; }
+    h1, h2 { color: #333; }
+    form { background: #fff; padding: 1em; border-radius: 8px; box-shadow: 0 0 10px #ccc; }
+    label { display: block; margin-top: 1em; }
+    input, select { width: 100%; padding: 0.5em; margin-top: 0.3em; }
+    .gallery { margin-top: 2em; }
+    .img-box { display: inline-block; margin: 1em; text-align: center; }
+    .img-box img { width: 300px; border: 1px solid #ccc; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>SSTV Ground Station Configuration</h1>
+  <form method="post">
+    <label>Latitude:
+      <input type="text" name="lat" value="{{ cfg.location.lat }}">
+    </label>
+    <label>Longitude:
+      <input type="text" name="lon" value="{{ cfg.location.lon }}">
+    </label>
+    <label>Elevation (m):
+      <input type="text" name="elev_m" value="{{ cfg.location.elev_m }}">
+    </label>
+    <label>Satellite:
+      <select name="satellite">
+        <option value="{{ cfg.selected_satellite }}">{{ cfg.selected_satellite }}</option>
+        <!-- You can dynamically populate more options later -->
+      </select>
+    </label>
+    <label>TLE Group:
+      <input type="text" name="tle_group" value="{{ sat_cfg.tle_group }}">
+    </label>
+    <label>Frequency (Hz):
+      <input type="text" name="freq_hz" value="{{ sat_cfg.freq_hz }}">
+    </label>
+    <label>SSTV Mode:
+      <input type="text" name="sstv_mode" value="{{ cfg.sstv_mode }}">
+    </label>
+    <input type="submit" value="Save Configuration">
+  </form>
+
+  <div class="gallery">
+    <h2>Recent SSTV Captures</h2>
+    {% for img in images %}
+      <div class="img-box">
+        <img src="/images/{{ img }}">
+        <div>{{ img }}</div>
+      </div>
+    {% endfor %}
+  </div>
+</body>
+</html>
