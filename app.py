@@ -1,3 +1,7 @@
+@app.route("/")
+def home():
+    return redirect("/config")
+
 @app.route("/config", methods=["GET", "POST"])
 def config():
     cfg = load_config()
