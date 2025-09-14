@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, jsonify
+from flask import Flask, render_template, request, redirect, jsonify, send_from_directory
 import os, json, requests
 
 app = Flask(__name__)
@@ -52,9 +52,14 @@ def gallery():
     images = sorted([f for f in os.listdir(IMG_DIR) if f.endswith(".png")], reverse=True)
     return render_template("gallery.html", images=images)
 
+@app.route("/images/<filename>")
+def image(filename):
+    return send_from_directory(IMG_DIR, filename)
+
 @app.route("/")
 def home():
     return redirect("/config")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+    
