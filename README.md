@@ -13,7 +13,7 @@ A fully automated ground station for receiving, decoding, and displaying SSTV im
 - 🗂️ Metadata archiving for each image
 - 🛠️ Cron + `at` scheduling for autonomous operation
 
-## File/folder structure suggestion
+## File/folder structure suggestion.
 
 sstv-groundstation/
 ├── app/                  # Flask web app
