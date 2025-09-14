@@ -17,3 +17,19 @@ A fully automated ground station for receiving, decoding, and displaying SSTV im
 
 ```bash
 bash -c "$(curl -fsSL https://github.com/Mraanderson/SSTV-Ground-station-/blob/main/install_sstv_groundstation.sh)"
+
+
+SSTV-Ground-station/
+├── app/                  # Flask web app
+│   ├── app.py            # Main Flask app
+│   ├── config.json       # User settings
+│   ├── templates/        # HTML templates
+│   └── static/           # CSS, JS, etc.
+├── images/               # SSTV decoded images
+├── tle/                  # Satellite TLE files
+├── passes/               # Scheduled pass data
+├── decoder/              # SSTV decoding logic
+├── scripts/              # Utility scripts (e.g. record, schedule)
+├── README.md
+├── requirements.txt
+└── .gitignore
