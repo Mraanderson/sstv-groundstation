@@ -13,23 +13,22 @@ A fully automated ground station for receiving, decoding, and displaying SSTV im
 - 🗂️ Metadata archiving for each image
 - 🛠️ Cron + `at` scheduling for autonomous operation
 
-## Quick Install
+## File/folder structure suggestion
 
-```bash
-bash -c "$(curl -fsSL https://github.com/Mraanderson/SSTV-Ground-station-/blob/main/install_sstv_groundstation.sh)"
-
-
-SSTV-Ground-station/
+sstv-groundstation/
 ├── app/                  # Flask web app
-│   ├── app.py            # Main Flask app
+│   ├── app.py            # Main Flask application
 │   ├── config.json       # User settings
 │   ├── templates/        # HTML templates
-│   └── static/           # CSS, JS, etc.
-├── images/               # SSTV decoded images
+│   │   ├── config.html
+│   │   └── gallery.html
+│   └── static/           # CSS, JS, images for the UI
+├── images/               # SSTV decoded images (empty in repo, .gitkeep inside)
 ├── tle/                  # Satellite TLE files
 ├── passes/               # Scheduled pass data
 ├── decoder/              # SSTV decoding logic
-├── scripts/              # Utility scripts (e.g. record, schedule)
-├── README.md
-├── requirements.txt
-└── .gitignore
+├── scripts/              # Utility scripts (recording, scheduling, etc.)
+├── requirements.txt      # Python dependencies
+├── README.md             # Project overview & setup instructions
+├── .gitignore            # Ignore rules
+└── LICENSE               # License file
