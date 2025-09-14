@@ -1,4 +1,5 @@
-# 🛰️ SSTV Ground Station (Headless Debian)
+# 🛰️ SSTV Ground Station
+(Headless Debian)
 
 A fully automated ground station for receiving, decoding, and displaying SSTV images from amateur satellites like the ISS. Runs on a headless Debian system using RTL-SDR, Python, and Flask. 
 
