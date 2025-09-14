@@ -13,4 +13,4 @@ A fully automated ground station for receiving, decoding, and displaying SSTV im
 ## Quick Install
 
 ```bash
-bash -c "$(curl -fsSL https://yourdomain.com/install_sstv_groundstation.sh)"
+bash -c "$(curl -fsSL https://github.com/Mraanderson/SSTV-Ground-station-/blob/main/install_sstv_groundstation.sh)"
