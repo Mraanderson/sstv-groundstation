@@ -5,10 +5,14 @@ set -e
 APP_DIR="/opt/sstv-groundstation"
 APP_USER="${SUDO_USER:-$USER}"
 
+if [ -z "$APP_USER" ]; then
+  echo "❌ APP_USER is not set. Run this script with sudo from a regular user account."
+  exit 1
+fi
+
 # === Install dependencies ===
 sudo apt-get update
-sudo apt-get install -y rtl-sdr ffmpeg python3-pip python3-venv at cron git
-sudo pip3 install flask skyfield pytz
+sudo apt-get install -y rtl-sdr ffmpeg python3-pip python3-venv at cron git rxsstv
 
 # === Create app structure ===
 sudo mkdir -p "$APP_DIR"/{app/scripts,app/templates,app/static/images,images,logs}
@@ -42,7 +46,7 @@ cat > "$APP_DIR/app/config.json" <<EOF
 }
 EOF
 
-# === Web app ===
+# === Flask app ===
 cat > "$APP_DIR/app/app.py" <<EOF
 from flask import Flask, render_template, request, redirect, send_from_directory
 import os, json, subprocess
@@ -51,7 +55,6 @@ app = Flask(__name__)
 ROOT = os.path.dirname(os.path.abspath(__file__))
 IMG_DIR = os.path.join(ROOT, "../images")
 CONFIG_PATH = os.path.join(ROOT, "config.json")
-UPCOMING_PATH = os.path.join(ROOT, "upcoming_passes.json")
 
 def load_config():
     with open(CONFIG_PATH) as f:
@@ -65,7 +68,10 @@ def index():
 
 @app.route("/images/<filename>")
 def image(filename):
-    return send_from_directory(IMG_DIR, filename)
+    safe_path = os.path.join(IMG_DIR, filename)
+    if os.path.isfile(safe_path):
+        return send_from_directory(IMG_DIR, filename)
+    return "File not found", 404
 
 @app.route("/set-satellite", methods=["POST"])
 def set_satellite():
@@ -89,10 +95,12 @@ def record_now():
         freq, dur, mode, sat, aos
     ])
     return redirect("/")
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
 EOF
 
 # === Templates ===
-mkdir -p "$APP_DIR/app/templates"
 cat > "$APP_DIR/app/templates/index.html" <<EOF
 <!doctype html>
 <html>
@@ -138,14 +146,21 @@ fi
 EOF
 chmod +x "$APP_DIR/app/scripts/record_sstv.sh"
 
-# === Pass scheduler ===
+# === Pass scheduler placeholder ===
 cat > "$APP_DIR/app/scripts/pass_scheduler.py" <<EOF
 # Placeholder for pass prediction logic using Skyfield
-# You can expand this later to schedule recordings via 'at'
 print("Pass prediction not yet implemented.")
 EOF
 
-# === Start Flask app ===
+# === Wrapper for systemd ===
+cat > "$APP_DIR/start_web.sh" <<EOF
+#!/bin/bash
+source "$APP_DIR/venv/bin/activate"
+exec python "$APP_DIR/app/app.py"
+EOF
+chmod +x "$APP_DIR/start_web.sh"
+
+# === Systemd service ===
 cat > /etc/systemd/system/sstv-web.service <<EOF
 [Unit]
 Description=SSTV Ground Station Web UI
@@ -154,8 +169,8 @@ After=network.target
 [Service]
 Type=simple
 User=$APP_USER
-WorkingDirectory=$APP_DIR/app
-ExecStart=$APP_DIR/venv/bin/python $APP_DIR/app/app.py
+WorkingDirectory=$APP_DIR
+ExecStart=$APP_DIR/start_web.sh
 Restart=on-failure
 
 [Install]
@@ -167,4 +182,3 @@ sudo systemctl enable --now sstv-web.service
 
 echo "✅ SSTV Ground Station installed."
 echo "🌐 Visit: http://$(hostname -I | awk '{print $1}'):5000"
-
