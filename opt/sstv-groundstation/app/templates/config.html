@@ -1,0 +1,101 @@
+<!doctype html>
+<html>
+<head>
+  <title>SSTV Ground Station Config</title>
+  <style>
+    body { font-family: sans-serif; margin: 2em; background: #f4f4f4; }
+    h1, h2 { color: #333; }
+    nav {
+      background: #333;
+      padding: 0.5em;
+      border-radius: 6px;
+      margin-bottom: 1em;
+    }
+    nav a {
+      color: white;
+      text-decoration: none;
+      margin-right: 1em;
+      font-weight: bold;
+    }
+    nav a:hover {
+      text-decoration: underline;
+    }
+    form { background: #fff; padding: 1em; border-radius: 8px; box-shadow: 0 0 10px #ccc; }
+    label { display: block; margin-top: 1em; }
+    input, select { width: 100%; padding: 0.5em; margin-top: 0.3em; }
+    .gallery { margin-top: 2em; }
+    .img-box { display: inline-block; margin: 1em; text-align: center; }
+    .img-box img { width: 300px; border: 1px solid #ccc; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/config">Configuration</a>
+    <a href="#gallery">Gallery</a>
+    <!-- Future: <a href="/passes">Pass Schedule</a> -->
+  </nav>
+
+  <h1>SSTV Ground Station Configuration</h1>
+  <form method="post">
+    <label>Latitude:
+      <input type="text" name="lat" value="{{ cfg.location.lat }}">
+    </label>
+    <label>Longitude:
+      <input type="text" name="lon" value="{{ cfg.location.lon }}">
+    </label>
+    <label>Elevation (m):
+      <input type="text" name="elev_m" value="{{ cfg.location.elev_m }}">
+    </label>
+    <label>Satellite:
+      <select name="satellite" id="satelliteSelect">
+        <option value="{{ cfg.selected_satellite }}">{{ cfg.selected_satellite }}</option>
+      </select>
+    </label>
+    <label>TLE Group:
+      <input type="text" name="tle_group" id="tleGroup" value="{{ sat_cfg.tle_group }}">
+    </label>
+    <label>Frequency (Hz):
+      <input type="text" name="freq_hz" value="{{ sat_cfg.freq_hz }}">
+    </label>
+    <label>SSTV Mode:
+      <input type="text" name="sstv_mode" value="{{ cfg.sstv_mode }}">
+    </label>
+    <input type="submit" value="Save Configuration">
+  </form>
+
+  <div class="gallery" id="gallery">
+    <h2>Recent SSTV Captures</h2>
+    {% for img in images %}
+      <div class="img-box">
+        <img src="/images/{{ img }}">
+        <div>{{ img }}</div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <script>
+    async function loadSatellites() {
+      const group = document.getElementById('tleGroup').value;
+      try {
+        const res = await fetch(`/get-satellites?group=${group}`);
+        const data = await res.json();
+        const select = document.getElementById('satelliteSelect');
+        select.innerHTML = '';
+        if (Array.isArray(data)) {
+          data.forEach(name => {
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name;
+            if (name === "{{ cfg.selected_satellite }}") opt.selected = true;
+            select.appendChild(opt);
+          });
+        }
+      } catch (err) {
+        console.error('Error loading satellites', err);
+      }
+    }
+    loadSatellites();
+  </script>
+</body>
+</html>
