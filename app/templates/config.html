@@ -4,38 +4,14 @@
 
 {% block content %}
 <h1>Configuration</h1>
-
-<form method="POST" action="/config">
-    <label for="latitude">Latitude:</label>
-    <input type="text" id="latitude" name="latitude" value="{{ config.latitude }}"><br><br>
-
-    <label for="longitude">Longitude:</label>
-    <input type="text" id="longitude" name="longitude" value="{{ config.longitude }}"><br><br>
-
-    <label for="elevation">Elevation:</label>
-    <input type="text" id="elevation" name="elevation" value="{{ config.elevation }}"><br><br>
-
-    <label for="satellite">Satellite:</label>
-    <input type="text" id="satellite" name="satellite" value="{{ config.satellite }}"><br><br>
-
-    <label for="tle_group">TLE Group:</label>
-    <input type="text" id="tle_group" name="tle_group" value="{{ config.tle_group }}"><br><br>
-
-    <label for="frequency">Frequency (Hz):</label>
-    <input type="text" id="frequency" name="frequency" value="{{ config.frequency }}"><br><br>
-
-    <label for="sstv_mode">SSTV Mode:</label>
-    <input type="text" id="sstv_mode" name="sstv_mode" value="{{ config.sstv_mode }}"><br><br>
-
+<form method="post">
+    {% for key, value in config_data.items() %}
+        <label for="{{ key }}">{{ key }}</label><br>
+        <input type="text" id="{{ key }}" name="{{ key }}" value="{{ value }}"><br><br>
+    {% endfor %}
     <button type="submit">Save</button>
 </form>
-
-<h2>Recent Images</h2>
-<div>
-    {% for image in recent_images %}
-        <a href="/images/{{ image }}"><img src="/images/{{ image }}" alt="{{ image }}"></a>
-    {% else %}
-        <p>No images found.</p>
-    {% endfor %}
-</div>
+{% if message %}
+    <p style="color:lime;">{{ message }}</p>
+{% endif %}
 {% endblock %}
