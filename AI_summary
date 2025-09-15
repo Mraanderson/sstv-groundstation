@@ -1,3 +1,4 @@
+```markdown
 PROJECT SUMMARY — SSTV Groundstation Web Interface
 
 Overview:
@@ -64,165 +65,94 @@ Current Routes:
 
 app.py (latest working version):
 
-from flask import Flask, render_template, send_from_directory, request
-import os
-import json
-import time
-import subprocess
-
-app = Flask(__name__)
-
-# --- Paths ---
-IMAGES_DIR = os.path.abspath(os.path.join(app.root_path, '..', 'images'))
-TLE_DIR = os.path.abspath(os.path.join(app.root_path, '..', 'tle'))
-CONFIG_FILE = os.path.join(app.root_path, 'config.json')
-
-# --- Gallery helpers ---
-def get_all_images():
-    image_files = []
-    for root, dirs, files in os.walk(IMAGES_DIR):
-        for file in files:
-            if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp')):
-                rel_dir = os.path.relpath(root, IMAGES_DIR)
-                rel_path = os.path.join(rel_dir, file) if rel_dir != '.' else file
-                image_files.append(rel_path.replace("\\", "/"))
-    return sorted(image_files)
-
-# --- Routes: Gallery ---
-@app.route("/images/<path:filename>")
-def serve_image(filename):
-    return send_from_directory(IMAGES_DIR, filename)
-
-@app.route("/")
-@app.route("/gallery")
-def gallery():
-    return render_template("gallery.html", image_names=get_all_images())
-
-# --- Routes: Config ---
-@app.route("/config", methods=["GET", "POST"])
-def config_page():
-    message = None
-    if request.method == "POST":
-        new_config = {key: request.form[key] for key in request.form}
-        with open(CONFIG_FILE, "w") as f:
-            json.dump(new_config, f, indent=4)
-        message = "Configuration updated successfully."
-    if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE) as f:
-            config_data = json.load(f)
-    else:
-        config_data = {}
-    return render_template("config.html", config_data=config_data, message=message)
-
-# --- TLE viewer helpers ---
-def get_tle_files():
-    tle_files = []
-    if os.path.exists(TLE_DIR):
-        for filename in sorted(os.listdir(TLE_DIR)):
-            if filename.lower().endswith(".txt"):
-                file_path = os.path.join(TLE_DIR, filename)
-                with open(file_path) as f:
-                    contents = f.read().strip()
-                last_updated = time.strftime('%Y-%m-%d %H:%M:%S',
-                                              time.localtime(os.path.getmtime(file_path)))
-                tle_files.append({
-                    "name": filename,
-                    "last_updated": last_updated,
-                    "contents": contents
-                })
-    return tle_files
-
-def tle_view_with_message(message=None):
-    return render_template("tle_view.html", tle_files=get_tle_files(), message=message)
-
-# --- Routes: TLE viewer ---
-@app.route("/tle")
-def tle_view():
-    return tle_view_with_message()
-
-# --- Routes: Update All TLEs ---
-@app.route("/tle/update-all", methods=["POST"])
-def update_all_tles():
-    try:
-        script_path = os.path.abspath(os.path.join(app.root_path, "update_all_tles.py"))
-        subprocess.run(["python3", script_path], check=True)
-        message = "All TLEs updated successfully."
-    except subprocess.CalledProcessError as e:
-        message = f"Error updating TLEs: {e}"
-    return tle_view_with_message(message)
-
-# --- Routes: Install Cron Job ---
-@app.route("/tle/install-cron", methods=["POST"])
-def install_tle_cron():
-    try:
-        script_path = os.path.abspath(os.path.join(app.root_path, "update_all_tles.py"))
-        cron_line = f"0 6 * * * /usr/bin/python3 {script_path} >> /tmp/tle_update.log 2>&1"
-        subprocess.run(f'(crontab -l; echo "{cron_line}") | crontab -', shell=True, check=True)
-        message = "Cron job installed to update TLEs daily at 06:00."
-    except subprocess.CalledProcessError as e:
-        message = f"Error installing cron job: {e}"
-    return tle_view_with_message(message)
-
-# --- Placeholder for TLE management ---
-@app.route("/tle/manage")
-def tle_manage():
-    return "<h1>TLE management page coming soon</h1>"
-
-if __name__ == "__main__":
-    print("Looking for images in:", IMAGES_DIR)
-    print("Looking for TLE files in:", TLE_DIR)
-    app.run(host="0.0.0.0", port=5000, debug=True)
+[full app.py code here — as in your current AI_summary]
 
 ---
 
 update_all_tles.py (latest version):
 
-import requests
-import os
-
-TLE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'tle'))
-os.makedirs(TLE_DIR, exist_ok=True)
-
-TLE_SOURCES = {
-    "iss.txt": "https://celestrak.org/NORAD/elements/stations.txt",
-    "noaa19.txt": "https://celestrak.org/NORAD/elements/noaa.txt",
-    "metopb.txt": "https://celestrak.org/NORAD/elements/metop.txt",
-}
-
-def fetch_tle(url, sat_name=None):
-    print(f"Fetching from {url} ...")
-    r = requests.get(url, timeout=10)
-    r.raise_for_status()
-    lines = r.text.strip().splitlines()
-    if sat_name:
-        for i, line in enumerate(lines):
-            if line.strip().upper().startswith(sat_name.upper()):
-                return "\n".join(lines[i:i+3]) + "\n"
-        raise ValueError(f"Satellite '{sat_name}' not found in {url}")
-    else:
-        return "\n".join(lines) + "\n"
-
-def update_all():
-    for filename, url in TLE_SOURCES.items():
-        try:
-            content = fetch_tle(url)
-            file_path = os.path.join(TLE_DIR, filename)
-            with open(file_path, "w") as f:
-                f.write(content)
-            print(f"Updated {file_path}")
-        except Exception as e:
-            print(f"Error updating {filename}: {e}")
-
-if __name__ == "__main__":
-    try:
-        update_all()
-        print("All TLEs updated successfully.")
-    except Exception as e:
-        print(f"Error updating TLEs: {e}")
+[full update_all_tles.py code here — as in your current AI_summary]
 
 ---
 
-templates/tle_view.html (latest version):
+templates/base.html:
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}SSTV Groundstation{% endblock %}</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #111; color: #eee; margin: 0; padding: 0; }
+        nav { background: #222; padding: 10px; }
+        nav a { color: #0f0; margin-right: 15px; text-decoration: none; }
+        nav a:hover { text-decoration: underline; }
+        .container { padding: 20px; }
+        button { background: #0f0; color: #000; border: none; padding: 6px 12px; cursor: pointer; }
+        button:hover { background: #0c0; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="{{ url_for('gallery') }}">Gallery</a>
+        <a href="{{ url_for('config_page') }}">Config</a>
+        <a href="{{ url_for('tle_view') }}">TLE Info</a>
+        <a href="{{ url_for('tle_manage') }}">TLE Manage</a>
+    </nav>
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>
+
+---
+
+templates/gallery.html:
+
+{% extends "base.html" %}
+
+{% block title %}Gallery{% endblock %}
+
+{% block content %}
+<h1>Image Gallery</h1>
+{% if image_names %}
+    <div style="display:flex; flex-wrap:wrap; gap:10px;">
+    {% for image in image_names %}
+        <div>
+            <img src="{{ url_for('serve_image', filename=image) }}" alt="{{ image }}" style="max-width:200px; border:1px solid #444;">
+        </div>
+    {% endfor %}
+    </div>
+{% else %}
+    <p>No images found in the <code>images/</code> folder.</p>
+{% endif %}
+{% endblock %}
+
+---
+
+templates/config.html:
+
+{% extends "base.html" %}
+
+{% block title %}Configuration{% endblock %}
+
+{% block content %}
+<h1>Configuration</h1>
+{% if message %}
+    <p style="color:lime;">{{ message }}</p>
+{% endif %}
+<form method="post">
+    {% for key, value in config_data.items() %}
+        <label>{{ key }}:</label>
+        <input type="text" name="{{ key }}" value="{{ value }}"><br><br>
+    {% endfor %}
+    <button type="submit">Save</button>
+</form>
+{% endblock %}
+
+---
+
+templates/tle_view.html:
 
 {% extends "base.html" %}
 
@@ -263,3 +193,52 @@ templates/tle_view.html (latest version):
     <p style="color:lime; margin-top: 1em;">{{ message }}</p>
 {% endif %}
 {% endblock %}
+
+---
+
+requirements.txt:
+
+flask
+requests
+
+---
+
+Quick‑Start Guide:
+
+1. **Clone the repository**  
+   ```bash
+   git clone https://github.com/<your-username>/sstv-groundstation.git
+   cd sstv-groundstation/app
+   ```
+
+2. **Create and activate a virtual environment**  
+   ```bash
+   python3 -m venv ../venv
+   source ../venv/bin/activate   # Linux/Mac
+   # or
+   ..\venv\Scripts\activate      # Windows
+   ```
+
+3. **Install dependencies**  
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Ensure folder structure exists**  
+   - `../images/` → for SSTV images (can have subfolders)  
+   - `../tle/` → for TLE `.txt` files  
+   - `config.json` in `app/` (can be empty `{}` initially)
+
+5. **Run the Flask app**  
+   ```bash
+   python app.py
+   ```
+   Access it in your browser at: `http://localhost:5000`
+
+6. **Using the TLE Viewer**  
+   - `/tle` → View all `.txt` files in `tle/`  
+   - **Update All TLEs** → Fetches latest data from CelesTrak for all satellites in `update_all_tles.py`  
+   - **Install Cron Job** → Schedules daily updates at 06:00 (requires system crontab access)
+
+7. **Adding a new satellite**  
+   - Edit `update_all_tles.py` → Add a
