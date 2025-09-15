@@ -1,15 +1,9 @@
 {
-  "location": { "lat": 50.0, "lon": -2.0, "elev_m": 50 },
-  "selected_satellite": "ISS (ZARYA)",
-  "sstv_mode": "PD120",
-  "satellites": {
-    "ISS (ZARYA)": {
-      "tle_group": "stations",
-      "freq_hz": 145800000,
-      "nominal_mode": "PD120"
-    }
-  },
-  "elevation_min_deg": 10,
-  "prediction_horizon_hours": 12,
-  "record_margin_sec": 20
+  "latitude": 50.0,
+  "longitude": -2.0,
+  "elevation": 50,
+  "satellite": "ISS (ZARYA)",
+  "tle_group": "stations",
+  "frequency": 145800000,
+  "sstv_mode": "PD120"
 }
