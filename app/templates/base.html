@@ -1,41 +1,61 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>{% block title %}SSTV Ground Station{% endblock %}</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-        nav {
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #ccc;
-        }
-        nav a {
-            margin-right: 15px;
-            text-decoration: none;
-            color: #007BFF;
-        }
-        nav a:hover {
-            text-decoration: underline;
-        }
-        h1 {
-            margin-top: 0;
-        }
-        img {
-            max-width: 200px;
-            margin: 5px;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <title>{% block title %}SSTV Ground Station{% endblock %}</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f8f9fa;
+    }
+    nav {
+      background-color: #343a40;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      border-bottom: 3px solid #007BFF;
+    }
+    nav a {
+      color: #f8f9fa;
+      text-decoration: none;
+      margin-right: 15px;
+      padding: 6px 12px;
+      border-radius: 4px;
+      transition: background-color 0.2s ease;
+    }
+    nav a:hover {
+      background-color: #007BFF;
+    }
+    h1 {
+      margin-top: 20px;
+      color: #343a40;
+    }
+    .container {
+      padding: 20px;
+    }
+    img {
+      max-width: 200px;
+      margin: 5px;
+      border: 2px solid #ddd;
+      border-radius: 4px;
+      transition: transform 0.2s ease;
+    }
+    img:hover {
+      transform: scale(1.05);
+      border-color: #007BFF;
+    }
+  </style>
 </head>
 <body>
-    <nav>
-        <a href="/config">Config</a>
-        <a href="/gallery">Gallery</a>
-    </nav>
+  <nav>
+    <a href="/config">⚙ Config</a>
+    <a href="/gallery">🖼 Gallery</a>
+  </nav>
 
+  <div class="container">
     {% block content %}{% endblock %}
+  </div>
 </body>
 </html>
