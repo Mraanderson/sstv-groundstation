@@ -1,25 +1,90 @@
-# 🛰️ SSTV Ground Station
-(Headless Debian)
+# SSTV Ground Station
 
-A fully automated ground station for receiving, decoding, and displaying SSTV images from amateur satellites like the ISS. Runs on a headless Debian system using RTL-SDR, Python, and Flask. 
+A Python/Flask-based ground station for receiving, decoding, and managing Slow Scan Television (SSTV) images from satellites such as the ISS.  
+Includes a web interface for configuration, viewing recent captures, and browsing your full image gallery.
 
-⚠️ Warning this is working in progress and completely AI generated based on prompts. I am testing and troubleshooting using a Mac Mini 2009 and Debian 12 headless.
+---
 
-## Features
-
-- 📡 Satellite pass prediction via Skyfield
-- 🎙️ Automated recording and SSTV decoding
-- 🌐 Web interface for control and image gallery
-- 🗂️ Metadata archiving for each image
-- 🛠️ Cron + `at` scheduling for autonomous operation
-
-## Quick start (WIP)
+## 📂 Project Structure
 
 ```
+sstv-groundstation/
+├── app/                  # Flask web app
+│   ├── app.py            # Main Flask application
+│   ├── config.json       # User settings
+│   └── templates/        # HTML templates
+│       ├── config.html   # Configuration page
+│       └── gallery.html  # Full gallery page
+├── images/               # SSTV decoded images (ignored in Git)
+├── passes/               # Scheduled pass data
+├── tle/                  # Satellite TLE files
+├── decoder/              # SSTV decoding logic
+├── scripts/              # Utility scripts
+├── requirements.txt      # Python dependencies
+├── README.md             # This file
+└── .gitignore            # Ignore rules
+```
+
+---
+
+## 🚀 Quick Start
+
+### 1. Clone the repository
+```bash
 git clone https://github.com/Mraanderson/sstv-groundstation.git
 cd sstv-groundstation
+```
+
+### 2. Create a virtual environment
+```bash
 python3 -m venv venv
 source venv/bin/activate
+```
+
+### 3. Install dependencies
+```bash
 pip install -r requirements.txt
+```
+
+### 4. Run the Flask app
+```bash
 python3 app/app.py
 ```
+
+By default, the app runs on `http://127.0.0.1:5000`.
+
+---
+
+## ⚙️ Configuration
+
+Edit `app/config.json` to set:
+- **Latitude / Longitude / Elevation**
+- **Selected satellite**
+- **TLE group**
+- **Frequency (Hz)**
+- **SSTV mode**
+
+---
+
+## 🌐 Web Interface
+
+- **Configuration Page** (`/config`) — adjust station settings and view the latest 8 SSTV images.
+- **Gallery Page** (`/gallery`) — browse all decoded SSTV images in `images/`.
+
+---
+
+## 📦 Requirements
+
+Minimal dependencies:
+```
+flask
+requests
+```
+
+These are already listed in `requirements.txt`.
+
+---
+
+## 📝 License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
