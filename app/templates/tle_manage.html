@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Manage TLE Sources{% endblock %}
+
+{% block content %}
+<h1>Manage TLE Sources</h1>
+<form method="post">
+    <p>Select the TLE sources you want to keep enabled. Selecting creates/updates a file in tle/, deselecting removes it.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;">
+        {% for key, src in sources.items() %}
+        <label style="display:block;background:#1c1c1c;padding:12px;border-radius:8px;">
+            <input type="checkbox" name="enabled" value="{{ key }}" {% if key in enabled %}checked{% endif %}>
+            <strong>{{ src.label }}</strong><br>
+            <span style="color:#aaa;font-size:0.9em;">File: {{ src.filename }}</span><br>
+            {% if key in enabled %}
+                <span style="color:#0f0;font-size:0.9em;">Enabled — last updated: {{ src.last_updated }}</span>
+            {% else %}
+                <span style="color:#888;font-size:0.9em;">Disabled</span>
+            {% endif %}
+        </label>
+        {% endfor %}
+    </div>
+    <div style="margin-top:16px;">
+        <button type="submit">Save changes</button>
+    </div>
+</form>
+
+{% if message %}
+<p style="margin-top:12px;color:lime;">{{ message }}</p>
+{% endif %}
+{% endblock %}
