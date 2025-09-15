@@ -4,6 +4,17 @@
 
 {% block content %}
 <h1>TLE Files</h1>
+
+<form method="post" action="{{ url_for('update_all_tles') }}" style="display:inline;">
+    <button type="submit">Update All TLEs</button>
+</form>
+
+<form method="post" action="{{ url_for('install_tle_cron') }}" style="display:inline; margin-left:10px;">
+    <button type="submit">Install Cron Job</button>
+</form>
+
+<hr>
+
 {% if tle_files %}
     {% for tle in tle_files %}
         <details style="margin-bottom: 1em; background:#1c1c1c; padding:10px; border-radius:6px;">
@@ -15,5 +26,9 @@
     {% endfor %}
 {% else %}
     <p>No TLE files found in the <code>tle/</code> folder.</p>
+{% endif %}
+
+{% if message %}
+    <p style="color:lime;">{{ message }}</p>
 {% endif %}
 {% endblock %}
