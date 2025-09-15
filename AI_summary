@@ -1,0 +1,227 @@
+PROJECT SUMMARY — SSTV Groundstation Web Interface
+
+Overview:
+A Flask-based web interface for an SSTV groundstation project. It provides:
+1. A live image gallery for decoded SSTV images.
+2. A configuration page to edit `config.json`.
+3. A TLE (Two-Line Element) viewer for multiple satellites, with update and cron scheduling features.
+
+Folder Structure (root-level):
+sstv-groundstation/
+│
+├── app/                      # Flask app folder
+│   ├── app.py                 # Main Flask application
+│   ├── update_all_tles.py     # Script to update all TLE files
+│   ├── templates/             # HTML templates
+│   │   ├── base.html          # Shared layout with nav menu
+│   │   ├── gallery.html       # Image gallery page
+│   │   ├── config.html        # Config editor page
+│   │   └── tle_view.html      # TLE viewer with update/cron buttons
+│   └── static/                # (Optional) CSS/JS
+│
+├── images/                    # Root-level folder for SSTV images
+├── tle/                       # Root-level folder for TLE text files
+│   ├── iss.txt
+│   ├── noaa19.txt
+│   └── metopb.txt
+└── config.json                # Config file edited via web UI
+
+Key Features:
+1. **Gallery**
+   - Scans `images/` (including subfolders) for image files.
+   - Displays them in a grid with clickable thumbnails.
+   - Path handling fixed to point to root-level `images/`.
+
+2. **Config Page**
+   - Reads/writes `config.json` in `app/` folder.
+   - Simple form to update key-value pairs.
+
+3. **TLE Viewer**
+   - Lists all `.txt` files in `tle/` folder.
+   - Shows last updated timestamp and file contents in collapsible sections.
+   - Two buttons:
+     - **Update All TLEs** → Runs `update_all_tles.py` to fetch latest data from CelesTrak.
+     - **Install Cron Job** → Adds a daily cron job (06:00) to run `update_all_tles.py`.
+
+4. **update_all_tles.py**
+   - Contains `TLE_SOURCES` dict mapping filenames to CelesTrak URLs.
+   - Fetches and saves each TLE file to `tle/`.
+   - Can be extended to filter specific satellites from multi-satellite feeds.
+
+5. **Placeholder TLE Management**
+   - `/tle/manage` route exists but is not yet implemented.
+   - Future plan: Web UI to select/deselect satellites and auto-create/remove TLE files.
+
+Current Routes:
+- `/` or `/gallery` → Image gallery
+- `/config` → Config editor
+- `/tle` → TLE viewer
+- `/tle/update-all` (POST) → Update all TLEs
+- `/tle/install-cron` (POST) → Install cron job
+- `/tle/manage` → Placeholder management page
+
+---
+
+app.py (latest working version):
+
+from flask import Flask, render_template, send_from_directory, request
+import os
+import json
+import time
+import subprocess
+
+app = Flask(__name__)
+
+# --- Paths ---
+IMAGES_DIR = os.path.abspath(os.path.join(app.root_path, '..', 'images'))
+TLE_DIR = os.path.abspath(os.path.join(app.root_path, '..', 'tle'))
+CONFIG_FILE = os.path.join(app.root_path, 'config.json')
+
+# --- Gallery helpers ---
+def get_all_images():
+    image_files = []
+    for root, dirs, files in os.walk(IMAGES_DIR):
+        for file in files:
+            if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp')):
+                rel_dir = os.path.relpath(root, IMAGES_DIR)
+                rel_path = os.path.join(rel_dir, file) if rel_dir != '.' else file
+                image_files.append(rel_path.replace("\\", "/"))
+    return sorted(image_files)
+
+# --- Routes: Gallery ---
+@app.route("/images/<path:filename>")
+def serve_image(filename):
+    return send_from_directory(IMAGES_DIR, filename)
+
+@app.route("/")
+@app.route("/gallery")
+def gallery():
+    return render_template("gallery.html", image_names=get_all_images())
+
+# --- Routes: Config ---
+@app.route("/config", methods=["GET", "POST"])
+def config_page():
+    message = None
+    if request.method == "POST":
+        new_config = {key: request.form[key] for key in request.form}
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(new_config, f, indent=4)
+        message = "Configuration updated successfully."
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE) as f:
+            config_data = json.load(f)
+    else:
+        config_data = {}
+    return render_template("config.html", config_data=config_data, message=message)
+
+# --- TLE viewer helpers ---
+def get_tle_files():
+    tle_files = []
+    if os.path.exists(TLE_DIR):
+        for filename in sorted(os.listdir(TLE_DIR)):
+            if filename.lower().endswith(".txt"):
+                file_path = os.path.join(TLE_DIR, filename)
+                with open(file_path) as f:
+                    contents = f.read().strip()
+                last_updated = time.strftime('%Y-%m-%d %H:%M:%S',
+                                              time.localtime(os.path.getmtime(file_path)))
+                tle_files.append({
+                    "name": filename,
+                    "last_updated": last_updated,
+                    "contents": contents
+                })
+    return tle_files
+
+def tle_view_with_message(message=None):
+    return render_template("tle_view.html", tle_files=get_tle_files(), message=message)
+
+# --- Routes: TLE viewer ---
+@app.route("/tle")
+def tle_view():
+    return tle_view_with_message()
+
+# --- Routes: Update All TLEs ---
+@app.route("/tle/update-all", methods=["POST"])
+def update_all_tles():
+    try:
+        script_path = os.path.abspath(os.path.join(app.root_path, "update_all_tles.py"))
+        subprocess.run(["python3", script_path], check=True)
+        message = "All TLEs updated successfully."
+    except subprocess.CalledProcessError as e:
+        message = f"Error updating TLEs: {e}"
+    return tle_view_with_message(message)
+
+# --- Routes: Install Cron Job ---
+@app.route("/tle/install-cron", methods=["POST"])
+def install_tle_cron():
+    try:
+        script_path = os.path.abspath(os.path.join(app.root_path, "update_all_tles.py"))
+        cron_line = f"0 6 * * * /usr/bin/python3 {script_path} >> /tmp/tle_update.log 2>&1"
+        subprocess.run(f'(crontab -l; echo "{cron_line}") | crontab -', shell=True, check=True)
+        message = "Cron job installed to update TLEs daily at 06:00."
+    except subprocess.CalledProcessError as e:
+        message = f"Error installing cron job: {e}"
+    return tle_view_with_message(message)
+
+# --- Placeholder for TLE management ---
+@app.route("/tle/manage")
+def tle_manage():
+    return "<h1>TLE management page coming soon</h1>"
+
+if __name__ == "__main__":
+    print("Looking for images in:", IMAGES_DIR)
+    print("Looking for TLE files in:", TLE_DIR)
+    app.run(host="0.0.0.0", port=5000, debug=True)
+
+---
+
+update_all_tles.py (latest version):
+
+import requests
+import os
+
+TLE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'tle'))
+os.makedirs(TLE_DIR, exist_ok=True)
+
+TLE_SOURCES = {
+    "iss.txt": "https://celestrak.org/NORAD/elements/stations.txt",
+    "noaa19.txt": "https://celestrak.org/NORAD/elements/noaa.txt",
+    "metopb.txt": "https://celestrak.org/NORAD/elements/metop.txt",
+}
+
+def fetch_tle(url, sat_name=None):
+    print(f"Fetching from {url} ...")
+    r = requests.get(url, timeout=10)
+    r.raise_for_status()
+    lines = r.text.strip().splitlines()
+    if sat_name:
+        for i, line in enumerate(lines):
+            if line.strip().upper().startswith(sat_name.upper()):
+                return "\n".join(lines[i:i+3]) + "\n"
+        raise ValueError(f"Satellite '{sat_name}' not found in {url}")
+    else:
+        return "\n".join(lines) + "\n"
+
+def update_all():
+    for filename, url in TLE_SOURCES.items():
+        try:
+            content = fetch_tle(url)
+            file_path = os.path.join(TLE_DIR, filename)
+            with open(file_path, "w") as f:
+                f.write(content)
+            print(f"Updated {file_path}")
+        except Exception as e:
+            print(f"Error updating {filename}: {e}")
+
+if __name__ == "__main__":
+    try:
+        update_all()
+        print("All TLEs updated successfully.")
+    except Exception as e:
+        print(f"Error updating TLEs: {e}")
+
+---
+
+templates/tle_view.html (latest version):
+
+{% extends
