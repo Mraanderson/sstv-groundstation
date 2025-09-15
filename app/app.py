@@ -1,5 +1,8 @@
 from flask import Flask, render_template, send_from_directory, request
-import os, json, time, subprocess
+import os
+import json
+import time
+import subprocess
 
 app = Flask(__name__)
 
@@ -37,4 +40,71 @@ def config_page():
         new_config = {key: request.form[key] for key in request.form}
         with open(CONFIG_FILE, "w") as f:
             json.dump(new_config, f, indent=4)
-        message = "Configuration updated successfully
+        message = "Configuration updated successfully."
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE) as f:
+            config_data = json.load(f)
+    else:
+        config_data = {}
+    return render_template("config.html", config_data=config_data, message=message)
+
+# --- TLE viewer helpers ---
+def get_tle_files():
+    tle_files = []
+    if os.path.exists(TLE_DIR):
+        for filename in sorted(os.listdir(TLE_DIR)):
+            if filename.lower().endswith(".txt"):
+                file_path = os.path.join(TLE_DIR, filename)
+                with open(file_path) as f:
+                    contents = f.read().strip()
+                last_updated = time.strftime('%Y-%m-%d %H:%M:%S',
+                                              time.localtime(os.path.getmtime(file_path)))
+                tle_files.append({
+                    "name": filename,
+                    "last_updated": last_updated,
+                    "contents": contents
+                })
+    return tle_files
+
+def tle_view_with_message(message=None):
+    return render_template("tle_view.html", tle_files=get_tle_files(), message=message)
+
+# --- Routes: TLE viewer ---
+@app.route("/tle")
+def tle_view():
+    return tle_view_with_message()
+
+# --- Routes: Update All TLEs ---
+@app.route("/tle/update-all", methods=["POST"])
+def update_all_tles():
+    try:
+        # Run the universal update script
+        script_path = os.path.abspath(os.path.join(app.root_path, "update_all_tles.py"))
+        subprocess.run(["python3", script_path], check=True)
+        message = "All TLEs updated successfully."
+    except subprocess.CalledProcessError as e:
+        message = f"Error updating TLEs: {e}"
+    return tle_view_with_message(message)
+
+# --- Routes: Install Cron Job ---
+@app.route("/tle/install-cron", methods=["POST"])
+def install_tle_cron():
+    try:
+        script_path = os.path.abspath(os.path.join(app.root_path, "update_all_tles.py"))
+        cron_line = f"0 6 * * * /usr/bin/python3 {script_path} >> /tmp/tle_update.log 2>&1"
+        subprocess.run(f'(crontab -l; echo "{cron_line}") | crontab -', shell=True, check=True)
+        message = "Cron job installed to update TLEs daily at 06:00."
+    except subprocess.CalledProcessError as e:
+        message = f"Error installing cron job: {e}"
+    return tle_view_with_message(message)
+
+# --- Placeholder for TLE management ---
+@app.route("/tle/manage")
+def tle_manage():
+    return "<h1>TLE management page coming soon</h1>"
+
+if __name__ == "__main__":
+    print("Looking for images in:", IMAGES_DIR)
+    print("Looking for TLE files in:", TLE_DIR)
+    app.run(host="0.0.0.0", port=5000, debug=True)
+    
