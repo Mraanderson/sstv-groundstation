@@ -1,9 +1,10 @@
-from flask import Flask, render_template, send_from_directory, request, redirect, url_for
+from flask import Flask, render_template, send_from_directory, request
 import os, json
 
 app = Flask(__name__)
 
-IMAGES_DIR = os.path.join(app.root_path, 'images')
+# Point to the root-level images folder (one level up from app/)
+IMAGES_DIR = os.path.abspath(os.path.join(app.root_path, '..', 'images'))
 CONFIG_FILE = os.path.join(app.root_path, 'config.json')
 
 def get_all_images():
@@ -29,9 +30,7 @@ def gallery():
 def config_page():
     message = None
     if request.method == "POST":
-        new_config = {}
-        for key in request.form:
-            new_config[key] = request.form[key]
+        new_config = {key: request.form[key] for key in request.form}
         with open(CONFIG_FILE, "w") as f:
             json.dump(new_config, f, indent=4)
         message = "Configuration updated successfully."
@@ -43,5 +42,5 @@ def config_page():
     return render_template("config.html", config_data=config_data, message=message)
 
 if __name__ == "__main__":
+    print("Looking for images in:", IMAGES_DIR)  # Debugging helper
     app.run(host="0.0.0.0", port=5000, debug=True)
-    
