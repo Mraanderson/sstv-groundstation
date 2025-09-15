@@ -85,6 +85,18 @@ These are already listed in `requirements.txt`.
 
 ---
 
+## 🙌 Credits
+
+This project’s structure, Flask application code, HTML templates, and documentation were developed with the assistance of **Microsoft Copilot**, an AI companion created by Microsoft.  
+Copilot provided:
+- Full `app.py` with `/config` and `/gallery` routes
+- HTML templates for configuration and gallery pages
+- Repository structure recommendations
+- `.gitignore` and `requirements.txt` setup
+- This `README.md` file
+
+---
+
 ## 📝 License
 
 This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
