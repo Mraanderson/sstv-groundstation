@@ -1,4 +1,4 @@
-sudo mkdir -p /opt/sstv-groundstation/{app/templates,app/static/images,images,logs} && sudo chown -R $USER:$USER /opt/sstv-groundstation && cd /opt/sstv-groundstation && python3 -m venv venv && source venv/bin/activate && pip install flask skyfield pytz && cat > app/config.json <<'EOF'
+sudo mkdir -p /sstv-groundstation/{app/templates,app/static/images,images,logs} && sudo chown -R $USER:$USER /sstv-groundstation && cd /sstv-groundstation && python3 -m venv venv && source venv/bin/activate && pip install flask skyfield pytz && cat > app/config.json <<'EOF'
 {
   "location": { "lat": 50.0, "lon": -2.0, "elev_m": 50 },
   "selected_satellite": "ISS",
