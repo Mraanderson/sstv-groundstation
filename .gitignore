@@ -1,0 +1,6 @@
+__pycach__/
+*.pyc
+*.log
+vnuv/
+.env
+images
