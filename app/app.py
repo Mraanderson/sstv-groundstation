@@ -26,6 +26,10 @@ def serve_image(filename):
 def gallery():
     return render_template("gallery.html", image_names=get_all_images())
 
+@app.route("/tle/manage")
+def tle_manage():
+    return "<h1>TLE management page coming soon</h1>"
+
 @app.route("/config", methods=["GET", "POST"])
 def config_page():
     message = None
