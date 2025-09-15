@@ -1,43 +1,16 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Image Gallery</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: #111;
-            color: #fff;
-            margin: 0;
-            padding: 0;
-        }
-        h1 {
-            text-align: center;
-            padding: 20px;
-        }
-        .gallery {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 10px;
-            padding: 10px;
-        }
-        .gallery img {
-            width: 100%;
-            height: auto;
-            border-radius: 6px;
-            transition: transform 0.2s;
-        }
-        .gallery img:hover {
-            transform: scale(1.05);
-        }
-    </style>
-</head>
-<body>
-    <h1>Image Gallery</h1>
-    <div class="gallery">
-        {% for image in image_names %}
-            <img src="{{ url_for('serve_image', filename=image) }}" alt="{{ image }}">
-        {% endfor %}
-    </div>
-</body>
-</html>
+{% extends "base.html" %}
+
+{% block title %}Gallery{% endblock %}
+
+{% block content %}
+<h1>Image Gallery</h1>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;">
+    {% for image in image_names %}
+        <a href="{{ url_for('serve_image', filename=image) }}" target="_blank">
+            <img src="{{ url_for('serve_image', filename=image) }}" alt="{{ image }}" style="width:100%;border-radius:6px;">
+        </a>
+    {% else %}
+        <p>No images found.</p>
+    {% endfor %}
+</div>
+{% endblock %}
