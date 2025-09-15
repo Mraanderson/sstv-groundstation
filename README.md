@@ -15,11 +15,11 @@ A fully automated ground station for receiving, decoding, and displaying SSTV im
 
 ## Quick start (WIP)
 
-'''
+```
 git clone https://github.com/Mraanderson/sstv-groundstation.git
 cd sstv-groundstation
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 python3 app/app.py
-'''
+```
