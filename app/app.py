@@ -3,10 +3,15 @@ import os, json, time
 
 app = Flask(__name__)
 
-# Point to the root-level images folder (one level up from app/)
+# --- Paths ---
+# Root-level images folder (one level up from app/)
 IMAGES_DIR = os.path.abspath(os.path.join(app.root_path, '..', 'images'))
+# Root-level tle folder
+TLE_DIR = os.path.abspath(os.path.join(app.root_path, '..', 'tle'))
+# Config file (inside app/ folder)
 CONFIG_FILE = os.path.join(app.root_path, 'config.json')
 
+# --- Gallery helpers ---
 def get_all_images():
     image_files = []
     for root, dirs, files in os.walk(IMAGES_DIR):
@@ -17,6 +22,7 @@ def get_all_images():
                 image_files.append(rel_path.replace("\\", "/"))
     return sorted(image_files)
 
+# --- Routes ---
 @app.route("/images/<path:filename>")
 def serve_image(filename):
     return send_from_directory(IMAGES_DIR, filename)
@@ -25,10 +31,6 @@ def serve_image(filename):
 @app.route("/gallery")
 def gallery():
     return render_template("gallery.html", image_names=get_all_images())
-
-@app.route("/tle/manage")
-def tle_manage():
-    return "<h1>TLE management page coming soon</h1>"
 
 @app.route("/config", methods=["GET", "POST"])
 def config_page():
@@ -45,7 +47,32 @@ def config_page():
         config_data = {}
     return render_template("config.html", config_data=config_data, message=message)
 
+# --- TLE viewer ---
+@app.route("/tle")
+def tle_view():
+    tle_files = []
+    if os.path.exists(TLE_DIR):
+        for filename in sorted(os.listdir(TLE_DIR)):
+            if filename.lower().endswith(".txt"):
+                file_path = os.path.join(TLE_DIR, filename)
+                with open(file_path) as f:
+                    contents = f.read().strip()
+                last_updated = time.strftime('%Y-%m-%d %H:%M:%S',
+                                              time.localtime(os.path.getmtime(file_path)))
+                tle_files.append({
+                    "name": filename,
+                    "last_updated": last_updated,
+                    "contents": contents
+                })
+    return render_template("tle_view.html", tle_files=tle_files)
+
+# --- Placeholder for TLE management ---
+@app.route("/tle/manage")
+def tle_manage():
+    return "<h1>TLE management page coming soon</h1>"
+
 if __name__ == "__main__":
-    print("Looking for images in:", IMAGES_DIR)  # Debugging helper
+    print("Looking for images in:", IMAGES_DIR)
+    print("Looking for TLE files in:", TLE_DIR)
     app.run(host="0.0.0.0", port=5000, debug=True)
     
