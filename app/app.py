@@ -1,64 +1,66 @@
-from flask import Flask, render_template, request, redirect, jsonify, send_from_directory
-import os, json, requests
+import os
+import json
+from flask import Flask, render_template, request, send_from_directory, jsonify
+import requests
 
 app = Flask(__name__)
+
 ROOT = os.path.dirname(os.path.abspath(__file__))
 IMG_DIR = os.path.join(ROOT, "../images")
 CONFIG_PATH = os.path.join(ROOT, "config.json")
 
+# Ensure images folder exists
+os.makedirs(IMG_DIR, exist_ok=True)
+
 def load_config():
-    with open(CONFIG_PATH) as f:
-        return json.load(f)
+    if os.path.exists(CONFIG_PATH):
+        with open(CONFIG_PATH, "r") as f:
+            return json.load(f)
+    return {
+        "latitude": "",
+        "longitude": "",
+        "elevation": "",
+        "satellite": "",
+        "tle_group": "",
+        "frequency": "",
+        "sstv_mode": ""
+    }
+
+def save_config(config):
+    with open(CONFIG_PATH, "w") as f:
+        json.dump(config, f, indent=4)
 
 @app.route("/config", methods=["GET", "POST"])
 def config():
-    cfg = load_config()
-    sat_cfg = cfg["satellites"].get(cfg["selected_satellite"], {})
-    images = sorted([f for f in os.listdir(IMG_DIR) if f.endswith(".png")], reverse=True)
-
+    config = load_config()
     if request.method == "POST":
-        cfg["location"]["lat"] = float(request.form.get("lat", 0))
-        cfg["location"]["lon"] = float(request.form.get("lon", 0))
-        cfg["location"]["elev_m"] = int(request.form.get("elev_m", 0))
-        cfg["selected_satellite"] = request.form.get("satellite", cfg["selected_satellite"])
-        cfg["sstv_mode"] = request.form.get("sstv_mode", "PD120")
-        sat_name = cfg["selected_satellite"]
-        cfg["satellites"][sat_name] = {
-            "tle_group": request.form.get("tle_group", "stations"),
-            "freq_hz": int(request.form.get("freq_hz", 145800000)),
-            "nominal_mode": cfg["sstv_mode"]
-        }
-        with open(CONFIG_PATH, "w") as f:
-            json.dump(cfg, f, indent=2)
-        return redirect("/config")
+        for key in config.keys():
+            if key in request.form:
+                config[key] = request.form[key]
+        save_config(config)
 
-    return render_template("config.html", cfg=cfg, sat_cfg=sat_cfg, images=images[:8])
+    # Get the 8 most recent images
+    images = sorted(os.listdir(IMG_DIR), reverse=True)
+    recent_images = [img for img in images if img.lower().endswith((".png", ".jpg", ".jpeg"))][:8]
 
-@app.route("/get-satellites")
-def get_satellites():
-    tle_group = request.args.get("group", "stations")
-    url = f"https://celestrak.org/NORAD/elements/{tle_group}.txt"
-    try:
-        r = requests.get(url, timeout=10)
-        r.raise_for_status()
-        lines = r.text.strip().splitlines()
-        names = [lines[i].strip() for i in range(0, len(lines), 3)]
-        return jsonify(names)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return render_template("config.html", config=config, recent_images=recent_images)
 
 @app.route("/gallery")
 def gallery():
-    images = sorted([f for f in os.listdir(IMG_DIR) if f.endswith(".png")], reverse=True)
-    return render_template("gallery.html", images=images)
+    images = sorted(os.listdir(IMG_DIR), reverse=True)
+    all_images = [img for img in images if img.lower().endswith((".png", ".jpg", ".jpeg"))]
+    return render_template("gallery.html", all_images=all_images)
 
-@app.route("/images/<filename>")
-def image(filename):
+@app.route("/images/<path:filename>")
+def serve_image(filename):
     return send_from_directory(IMG_DIR, filename)
 
-@app.route("/")
-def home():
-    return redirect("/config")
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+@app.route("/get-satellites")
+def get_satellites():
+    tle_group = request.args.get("tle_group", "amateur")
+    url = f"https://celestrak.org/NORAD/elements/{tle_group}.txt"
+    try:
+        response = requests.get(url, timeout=5)
+        response.raise_for_status()
+        lines = response.text.strip().split("\n")
+        satellites = [lines[i].strip() for i in range
