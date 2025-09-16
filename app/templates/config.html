@@ -83,6 +83,14 @@ document.addEventListener("DOMContentLoaded", function() {
             console.warn("Geolocation permission denied or unavailable.");
         });
     }
+
+    // Auto-fill timezone from browser
+    try {
+        var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        document.getElementById('timezone').value = tz;
+    } catch (e) {
+        console.warn("Could not detect timezone:", e);
+    }
 });
 </script>
 {% endblock %}
