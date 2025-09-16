@@ -34,4 +34,15 @@
             <td>{{ p.aos.strftime('%Y-%m-%d %H:%M:%S') }}</td>
             <td>{{ p.los.strftime('%Y-%m-%d %H:%M:%S') }}</td>
             <td>{{ '%.1f'|format(p.max_elev) }}</td>
-            <td
+            <td>{{ p.duration }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <button type="submit" class="btn btn-warning">Update Status</button>
+    </form>
+  {% else %}
+    <p class="text-muted">No ISS passes found in the next 24 hours.</p>
+  {% endif %}
+</div>
+{% endblock %}
