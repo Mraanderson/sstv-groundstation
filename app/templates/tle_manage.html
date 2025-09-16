@@ -6,4 +6,39 @@
 <h1>Satellite Selection</h1>
 
 <!-- Refresh from CelesTrak -->
-<form
+<form method="post" action="{{ url_for('refresh_satellite_list') }}">
+    <button type="submit">Refresh from CelesTrak</button>
+</form>
+<br>
+
+<form method="post">
+    <!-- Known SSTV Satellites -->
+    <fieldset style="border:2px solid lime; padding:10px; margin-bottom:20px;">
+        <legend style="color:lime; font-weight:bold;">Known SSTV Satellites</legend>
+        {% for name, info in sstv_sats.items() %}
+            <label>
+                <input type="checkbox" name="{{ name }}" {% if info.enabled %}checked{% endif %}>
+                {{ info.display_name }}
+            </label><br>
+        {% endfor %}
+    </fieldset>
+
+    <!-- All Other Satellites -->
+    <fieldset style="border:1px solid #ccc; padding:10px;">
+        <legend>Other Satellites</legend>
+        {% for name, info in other_sats.items() %}
+            <label>
+                <input type="checkbox" name="{{ name }}" {% if info.enabled %}checked{% endif %}>
+                {{ info.display_name }}
+            </label><br>
+        {% endfor %}
+    </fieldset>
+
+    <br>
+    <button type="submit">Save Selection</button>
+</form>
+
+{% if message %}
+    <p style="color:lime; margin-top:1em;">{{ message }}</p>
+{% endif %}
+{% endblock %}
