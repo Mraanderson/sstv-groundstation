@@ -4,9 +4,29 @@
     "tle_url": "https://celestrak.org/NORAD/elements/stations.txt",
     "filename": "iss.txt"
   },
-  "RS-44": {
+  "ArcticSat-1 (RS74S)": {
+    "enabled": true,
+    "tle_url": "https://celestrak.org/NORAD/elements/amateur.txt",
+    "filename": "arcticsat1.txt"
+  },
+  "UmKA-1 (RS40S)": {
+    "enabled": true,
+    "tle_url": "https://celestrak.org/NORAD/elements/amateur.txt",
+    "filename": "umka1.txt"
+  },
+  "SONATE-2": {
     "enabled": false,
     "tle_url": "https://celestrak.org/NORAD/elements/amateur.txt",
-    "filename": "rs44.txt"
+    "filename": "sonate2.txt"
+  },
+  "Fram2Ham": {
+    "enabled": false,
+    "tle_url": "https://celestrak.org/NORAD/elements/amateur.txt",
+    "filename": "fram2ham.txt"
+  },
+  "ARISS Event Placeholder": {
+    "enabled": false,
+    "tle_url": "https://celestrak.org/NORAD/elements/stations.txt",
+    "filename": "ariss_event.txt"
   }
 }
