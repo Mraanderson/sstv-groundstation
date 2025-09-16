@@ -73,10 +73,13 @@ def config_page():
 def passes_page():
     ignored = load_ignored()
 
-    # Handle form submission to ignore passes
+    # Handle form submission to update ignore list
     if request.method == "POST":
-        to_ignore = request.form.getlist("ignore_pass")
-        ignored = list(set(ignored + to_ignore))
+        # Passes not in form are considered ignored
+        submitted = request.form.getlist("ignore_pass")
+        # We store ignored passes as those NOT checked
+        all_aos = [p["aos"].isoformat() for p in getattr(app, "_last_passes", [])]
+        ignored = [aos for aos in all_aos if aos not in submitted]
         save_ignored(ignored)
 
     sat_name = "ISS (ZARYA)"
@@ -133,10 +136,15 @@ def passes_page():
                 passes.append(current_pass)
             current_pass = {}
 
-    # Filter out ignored passes
-    passes = [p for p in passes if p["aos"].isoformat() not in ignored]
+    # Mark passes as ignored or not
+    for p in passes:
+        p["ignored"] = p["aos"].isoformat() in ignored
 
     passes.sort(key=lambda p: p["aos"])
+
+    # Store passes for POST processing
+    app._last_passes = passes
+
     return render_template("passes.html", passes=passes, message=None)
 
 # --- Import settings ---
@@ -176,4 +184,4 @@ def export_settings_page():
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0")
-    
+        
