@@ -1,37 +1,35 @@
 {% extends "base.html" %}
-{% block title %}Upcoming Passes{% endblock %}
+{% block title %}Upcoming ISS Passes{% endblock %}
+
 {% block content %}
-<div class="card p-3">
-  <h2 class="mb-3">Upcoming Passes (Next 24 Hours)</h2>
+<div class="card p-3 bg-secondary text-light">
+  <h2 class="mb-3">Upcoming ISS Passes (Next 24 Hours)</h2>
+
   {% if message %}
-    <p class="instruction-text">{{ message }}</p>
+    <div class="alert alert-warning">{{ message }}</div>
   {% elif passes %}
-    <div class="table-responsive">
-      <table class="table table-dark table-striped align-middle">
-        <thead>
-          <tr>
-            <th>Satellite</th>
-            <th>AOS (UTC)</th>
-            <th>LOS (UTC)</th>
-            <th>Max Elev (°)</th>
-            <th>Duration (s)</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for p in passes %}
-          <tr>
-            <td>{{ p.satellite }}</td>
-            <td>{{ p.aos.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-            <td>{{ p.los.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-            <td>{{ '%.1f'|format(p.max_elev) if p.max_elev else '' }}</td>
-            <td>{{ p.duration }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+    <table class="table table-dark table-striped table-hover align-middle">
+      <thead>
+        <tr>
+          <th scope="col">AOS (UTC)</th>
+          <th scope="col">LOS (UTC)</th>
+          <th scope="col">Max Elev (°)</th>
+          <th scope="col">Duration (s)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in passes %}
+        <tr>
+          <td>{{ p.aos.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+          <td>{{ p.los.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+          <td>{{ '%.1f'|format(p.max_elev) }}</td>
+          <td>{{ p.duration }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
   {% else %}
-    <p class="instruction-text">No passes found in the next 24 hours.</p>
+    <p class="text-muted">No ISS passes found in the next 24 hours.</p>
   {% endif %}
 </div>
 {% endblock %}
