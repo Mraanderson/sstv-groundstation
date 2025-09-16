@@ -11,6 +11,21 @@ app = Flask(__name__)
 IMAGES_DIR = os.path.abspath(os.path.join(app.root_path, '..', 'images'))
 TLE_DIR = os.path.abspath(os.path.join(app.root_path, '..', 'tle'))
 CONFIG_FILE = os.path.join(app.root_path, 'config.json')
+IGNORED_FILE = os.path.join(app.root_path, 'ignored_passes.json')
+
+# --- Helpers for ignored passes ---
+def load_ignored():
+    if os.path.exists(IGNORED_FILE):
+        with open(IGNORED_FILE) as f:
+            try:
+                return json.load(f).get("ignored", [])
+            except Exception:
+                return []
+    return []
+
+def save_ignored(ignored_list):
+    with open(IGNORED_FILE, "w") as f:
+        json.dump({"ignored": ignored_list}, f, indent=4)
 
 # --- Gallery helpers ---
 def get_all_images():
@@ -54,8 +69,16 @@ def config_page():
     return render_template("config.html", config_data=config_data, message=message)
 
 # --- Routes: Pass prediction for ISS ---
-@app.route("/passes")
+@app.route("/passes", methods=["GET", "POST"])
 def passes_page():
+    ignored = load_ignored()
+
+    # Handle form submission to ignore passes
+    if request.method == "POST":
+        to_ignore = request.form.getlist("ignore_pass")
+        ignored = list(set(ignored + to_ignore))
+        save_ignored(ignored)
+
     sat_name = "ISS (ZARYA)"
     safe_name = re.sub(r"[^A-Za-z0-9_\-]", "_", sat_name.lower())
     tle_path = os.path.join(TLE_DIR, f"{safe_name}.txt")
@@ -100,7 +123,6 @@ def passes_page():
         if event == 0:
             current_pass = {"satellite": sat_name, "aos": ti.utc_datetime()}
         elif event == 1:
-            # FIX: compute from observer to avoid 'rotation_at' error
             topocentric = (sat - observer).at(ti)
             alt, az, distance = topocentric.altaz()
             current_pass["max_elev"] = alt.degrees
@@ -110,6 +132,9 @@ def passes_page():
                 current_pass["duration"] = (current_pass["los"] - current_pass["aos"]).seconds
                 passes.append(current_pass)
             current_pass = {}
+
+    # Filter out ignored passes
+    passes = [p for p in passes if p["aos"].isoformat() not in ignored]
 
     passes.sort(key=lambda p: p["aos"])
     return render_template("passes.html", passes=passes, message=None)
@@ -151,4 +176,4 @@ def export_settings_page():
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0")
-        
+    
