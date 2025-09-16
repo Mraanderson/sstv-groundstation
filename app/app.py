@@ -240,14 +240,21 @@ def passes_page():
     passes = []
 
     for sat_name in enabled_sats:
-        tle_path = os.path.join(TLE_DIR, f"{re.sub(r'[^A-Za-z0-9_\\-]', '_', sat_name.lower())}.txt")
+        # ✅ FIX: precompute safe_name to avoid backslash in f-string
+        safe_name = re.sub(r"[^A-Za-z0-9_\-]", "_", sat_name.lower())
+        tle_path = os.path.join(TLE_DIR, f"{safe_name}.txt")
+
         if not os.path.exists(tle_path):
+            print(f"TLE file not found for {sat_name}: {tle_path}")
             continue
+
         with open(tle_path) as f:
             lines = f.read().strip().splitlines()
             if len(lines) < 3:
+                print(f"TLE file for {sat_name} is incomplete")
                 continue
             name, l1, l2 = lines[0], lines[1], lines[2]
+
         sat = load.tle(name, l1, l2)
 
         try:
