@@ -1,30 +1,36 @@
 {
   "ISS (ZARYA)": {
+    "display_name": "ISS (ZARYA) — ARISS SSTV",
     "enabled": true,
     "tle_url": "https://celestrak.org/NORAD/elements/stations.txt",
     "filename": "iss.txt"
   },
-  "ArcticSat-1 (RS74S)": {
+  "ARCTICSAT 1": {
+    "display_name": "ArcticSat-1 (RS74S)",
     "enabled": true,
     "tle_url": "https://celestrak.org/NORAD/elements/amateur.txt",
     "filename": "arcticsat1.txt"
   },
-  "UmKA-1 (RS40S)": {
+  "UMKA 1": {
+    "display_name": "UmKA-1 (RS40S)",
     "enabled": true,
     "tle_url": "https://celestrak.org/NORAD/elements/amateur.txt",
     "filename": "umka1.txt"
   },
-  "SONATE-2": {
+  "SONATE 2": {
+    "display_name": "SONATE-2",
     "enabled": false,
     "tle_url": "https://celestrak.org/NORAD/elements/amateur.txt",
     "filename": "sonate2.txt"
   },
-  "Fram2Ham": {
+  "FRAM2HAM": {
+    "display_name": "Fram2Ham",
     "enabled": false,
     "tle_url": "https://celestrak.org/NORAD/elements/amateur.txt",
     "filename": "fram2ham.txt"
   },
-  "ARISS Event Placeholder": {
+  "ISS (ZARYA) ARISS EVENT": {
+    "display_name": "ARISS Event Placeholder",
     "enabled": false,
     "tle_url": "https://celestrak.org/NORAD/elements/stations.txt",
     "filename": "ariss_event.txt"
