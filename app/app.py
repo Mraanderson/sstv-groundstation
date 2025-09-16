@@ -100,7 +100,10 @@ def passes_page():
         if event == 0:
             current_pass = {"satellite": sat_name, "aos": ti.utc_datetime()}
         elif event == 1:
-            current_pass["max_elev"] = sat.at(ti).altaz()[0].degrees
+            # FIX: compute from observer to avoid 'rotation_at' error
+            topocentric = (sat - observer).at(ti)
+            alt, az, distance = topocentric.altaz()
+            current_pass["max_elev"] = alt.degrees
         elif event == 2:
             current_pass["los"] = ti.utc_datetime()
             if "aos" in current_pass and "los" in current_pass:
@@ -148,4 +151,4 @@ def export_settings_page():
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0")
-    
+        
