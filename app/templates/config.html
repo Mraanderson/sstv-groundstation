@@ -5,7 +5,7 @@
 {% block content %}
 <h1>Station Configuration</h1>
 
-<form method="post">
+<form method="post" id="configForm">
     <label for="location_lat">Latitude (°)</label><br>
     <input type="text" id="location_lat" name="location_lat" value="{{ config_data.location_lat }}"><br><br>
 
@@ -22,7 +22,7 @@
     <p>Click on the map to set your location. Altitude will be fetched automatically.</p>
 
     <br>
-    <button type="submit">Save</button>
+    <button type="submit" id="saveBtn" disabled>Save</button>
 </form>
 
 {% if message %}
@@ -35,6 +35,12 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", function() {
+    var latField = document.getElementById('location_lat');
+    var lonField = document.getElementById('location_lon');
+    var altField = document.getElementById('location_alt');
+    var tzField  = document.getElementById('timezone');
+    var saveBtn  = document.getElementById('saveBtn');
+
     // Default map center (0,0) until we get location
     var map = L.map('map').setView([0, 0], 2);
 
@@ -45,17 +51,32 @@ document.addEventListener("DOMContentLoaded", function() {
 
     var marker;
 
+    function validateForm() {
+        const lat = parseFloat(latField.value);
+        const lon = parseFloat(lonField.value);
+        const alt = parseFloat(altField.value);
+        const tz  = tzField.value.trim();
+
+        const validLat = !isNaN(lat) && lat >= -90 && lat <= 90;
+        const validLon = !isNaN(lon) && lon >= -180 && lon <= 180;
+        const validAlt = !isNaN(alt);
+        const validTz  = tz.length > 0;
+
+        saveBtn.disabled = !(validLat && validLon && validAlt && validTz);
+    }
+
     // Function to update form fields and marker
     function setLocation(lat, lon) {
-        document.getElementById('location_lat').value = lat.toFixed(6);
-        document.getElementById('location_lon').value = lon.toFixed(6);
+        latField.value = lat.toFixed(6);
+        lonField.value = lon.toFixed(6);
 
         // Fetch altitude from Open-Elevation
         fetch(`https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lon}`)
             .then(response => response.json())
             .then(data => {
                 if (data.results && data.results.length > 0) {
-                    document.getElementById('location_alt').value = data.results[0].elevation;
+                    altField.value = data.results[0].elevation;
+                    validateForm();
                 }
             })
             .catch(err => console.error("Altitude fetch error:", err));
@@ -65,6 +86,7 @@ document.addEventListener("DOMContentLoaded", function() {
         } else {
             marker = L.marker([lat, lon]).addTo(map);
         }
+        validateForm();
     }
 
     // On map click
@@ -87,10 +109,18 @@ document.addEventListener("DOMContentLoaded", function() {
     // Auto-fill timezone from browser
     try {
         var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        document.getElementById('timezone').value = tz;
+        tzField.value = tz;
     } catch (e) {
         console.warn("Could not detect timezone:", e);
     }
+
+    // Validate on manual edits
+    [latField, lonField, altField, tzField].forEach(field => {
+        field.addEventListener('input', validateForm);
+    });
+
+    // Initial validation
+    validateForm();
 });
 </script>
 {% endblock %}
