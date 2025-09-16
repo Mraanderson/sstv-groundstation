@@ -14,6 +14,10 @@ def load_satellite_config():
         return json.load(f)
 
 def fetch_tle(url, sat_name=None):
+    """
+    Fetches TLE data from a URL.
+    If sat_name is provided, extracts only that satellite's 3-line TLE.
+    """
     print(f"Fetching from {url} ...")
     r = requests.get(url, timeout=10)
     r.raise_for_status()
@@ -33,7 +37,8 @@ def update_all():
         if not info.get("enabled"):
             continue
         try:
-            content = fetch_tle(info["tle_url"], name if "stations" in info["tle_url"] else None)
+            # If the TLE source is a multi-satellite file, filter by name
+            content = fetch_tle(info["tle_url"], name if info["tle_url"].endswith("amateur.txt") or info["tle_url"].endswith("stations.txt") else None)
             file_path = os.path.join(TLE_DIR, info["filename"])
             with open(file_path, "w") as f:
                 f.write(content)
