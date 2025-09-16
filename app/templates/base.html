@@ -8,7 +8,6 @@
 </head>
 <body class="bg-dark text-light">
 
-<!-- Top Navigation -->
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
   <div class="container-fluid">
     <a class="navbar-brand" href="{{ url_for('gallery') }}">SSTV Groundstation</a>
@@ -17,27 +16,16 @@
     </button>
     <div class="collapse navbar-collapse" id="navbarNav">
       <ul class="navbar-nav me-auto">
-        <li class="nav-item">
-          <a class="nav-link {% if request.endpoint == 'gallery' %}active{% endif %}" href="{{ url_for('gallery') }}">Gallery</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if request.endpoint == 'passes_page' %}active{% endif %}" href="{{ url_for('passes_page') }}">ISS Passes</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if request.endpoint == 'config_page' %}active{% endif %}" href="{{ url_for('config_page') }}">Config</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if request.endpoint == 'import_settings' %}active{% endif %}" href="{{ url_for('import_settings') }}">Import</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if request.endpoint == 'export_settings_page' %}active{% endif %}" href="{{ url_for('export_settings_page') }}">Export</a>
-        </li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint == 'gallery' %}active{% endif %}" href="{{ url_for('gallery') }}">Gallery</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint == 'passes_page' %}active{% endif %}" href="{{ url_for('passes_page') }}">ISS Passes</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint == 'config_page' %}active{% endif %}" href="{{ url_for('config_page') }}">Config</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint == 'import_settings' %}active{% endif %}" href="{{ url_for('import_settings') }}">Import</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint == 'export_settings_page' %}active{% endif %}" href="{{ url_for('export_settings_page') }}">Export</a></li>
       </ul>
     </div>
   </div>
 </nav>
 
-<!-- Page Content -->
 <div class="container">
   {% block content %}{% endblock %}
 </div>
