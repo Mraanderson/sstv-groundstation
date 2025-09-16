@@ -35,20 +35,24 @@ def serve_image(filename):
 def gallery():
     return render_template("gallery.html", image_names=get_all_images())
 
-# --- Routes: Config ---
+# --- Routes: Config (lat/lon/alt/timezone only) ---
 @app.route("/config", methods=["GET", "POST"])
 def config_page():
+    allowed_keys = ["location_lat", "location_lon", "location_alt", "timezone"]
     message = None
+
     if request.method == "POST":
-        new_config = {key: request.form[key] for key in request.form}
+        new_config = {key: request.form.get(key, "") for key in allowed_keys}
         with open(CONFIG_FILE, "w") as f:
             json.dump(new_config, f, indent=4)
         message = "Configuration updated successfully."
+
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE) as f:
             config_data = json.load(f)
     else:
-        config_data = {}
+        config_data = {key: "" for key in allowed_keys}
+
     return render_template("config.html", config_data=config_data, message=message)
 
 # --- TLE viewer helpers ---
@@ -132,7 +136,6 @@ def refresh_satellite_list():
     with open(SATELLITES_FILE, "w") as f:
         json.dump(satellites, f, indent=4)
     message = f"Satellite list refreshed from CelesTrak ({len(satellites)} entries)."
-    # Split for display
     sstv_sats = {k: v for k, v in satellites.items() if k in AUTO_ENABLE}
     other_sats = {k: v for k, v in satellites.items() if k not in AUTO_ENABLE}
     return render_template("tle_manage.html", sstv_sats=sstv_sats, other_sats=other_sats, message=message)
@@ -204,4 +207,4 @@ if __name__ == "__main__":
     print("Looking for images in:", IMAGES_DIR)
     print("Looking for TLE files in:", TLE_DIR)
     app.run(host="0.0.0.0", port=5000, debug=True)
-           
+    
