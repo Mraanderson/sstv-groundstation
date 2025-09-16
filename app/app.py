@@ -132,7 +132,10 @@ def refresh_satellite_list():
     with open(SATELLITES_FILE, "w") as f:
         json.dump(satellites, f, indent=4)
     message = f"Satellite list refreshed from CelesTrak ({len(satellites)} entries)."
-    return render_template("tle_manage.html", satellites=satellites, message=message)
+    # Split for display
+    sstv_sats = {k: v for k, v in satellites.items() if k in AUTO_ENABLE}
+    other_sats = {k: v for k, v in satellites.items() if k not in AUTO_ENABLE}
+    return render_template("tle_manage.html", sstv_sats=sstv_sats, other_sats=other_sats, message=message)
 
 # --- Routes: Satellite Selector ---
 @app.route("/tle/manage", methods=["GET", "POST"])
@@ -151,7 +154,10 @@ def tle_manage():
             json.dump(satellites, f, indent=4)
         message = "Satellite selection updated."
 
-    return render_template("tle_manage.html", satellites=satellites, message=message)
+    sstv_sats = {k: v for k, v in satellites.items() if k in AUTO_ENABLE}
+    other_sats = {k: v for k, v in satellites.items() if k not in AUTO_ENABLE}
+
+    return render_template("tle_manage.html", sstv_sats=sstv_sats, other_sats=other_sats, message=message)
 
 # --- Route: Export Settings ---
 @app.route("/settings/export")
@@ -198,3 +204,4 @@ if __name__ == "__main__":
     print("Looking for images in:", IMAGES_DIR)
     print("Looking for TLE files in:", TLE_DIR)
     app.run(host="0.0.0.0", port=5000, debug=True)
+           
