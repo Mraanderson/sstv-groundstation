@@ -3,7 +3,7 @@ import os
 import json
 import re
 from datetime import datetime, timedelta, timezone
-from skyfield.api import Loader, wgs84
+from skyfield.api import Loader, wgs84, EarthSatellite
 
 app = Flask(__name__)
 
@@ -84,14 +84,14 @@ def passes_page():
     load = Loader('./skyfield_data')
     ts = load.timescale()
     observer = wgs84.latlon(lat, lon, alt)
-    sat = load.tle(name, l1, l2)
+    sat = EarthSatellite(l1, l2, name, ts)
 
     now = datetime.now(timezone.utc)
     end_time = now + timedelta(hours=24)
 
     passes = []
     try:
-        t, events = sat.find_events(observer, ts.from_datetime(now), ts.from_datetime(end_time), altitude_degrees=10.0)
+        t, events = sat.find_events(observer, ts.from_datetime(now), ts.from_datetime(end_time), altitude_degrees=0.0)
     except Exception as e:
         return render_template("passes.html", passes=[], message=f"Error finding passes: {e}")
 
