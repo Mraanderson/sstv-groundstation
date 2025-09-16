@@ -1,10 +1,7 @@
-from flask import Flask, render_template, send_from_directory, request, redirect, url_for
+from flask import Flask, render_template, send_from_directory, request
 import os
 import json
-import time
-import subprocess
 import re
-import requests
 from datetime import datetime, timedelta, timezone
 from skyfield.api import Loader, wgs84
 
@@ -14,7 +11,6 @@ app = Flask(__name__)
 IMAGES_DIR = os.path.abspath(os.path.join(app.root_path, '..', 'images'))
 TLE_DIR = os.path.abspath(os.path.join(app.root_path, '..', 'tle'))
 CONFIG_FILE = os.path.join(app.root_path, 'config.json')
-SATELLITES_FILE = os.path.join(app.root_path, 'satellites.json')
 
 # --- Gallery helpers ---
 def get_all_images():
@@ -57,103 +53,63 @@ def config_page():
 
     return render_template("config.html", config_data=config_data, message=message)
 
-# --- TLE viewer helpers ---
-def get_tle_files():
-    tle_files = []
-    if os.path.exists(TLE_DIR):
-        for filename in sorted(os.listdir(TLE_DIR)):
-            if filename.lower().endswith(".txt"):
-                file_path = os.path.join(TLE_DIR, filename)
-                with open(file_path) as f:
-                    contents = f.read().strip()
-                last_updated = time.strftime('%Y-%m-%d %H:%M:%S',
-                                              time.localtime(os.path.getmtime(file_path)))
-                tle_files.append({
-                    "name": filename,
-                    "last_updated": last_updated,
-                    "contents": contents
-                })
-    return tle_files
+# --- Routes: Pass prediction for ISS ---
+@app.route("/passes")
+def passes_page():
+    sat_name = "ISS (ZARYA)"
+    safe_name = re.sub(r"[^A-Za-z0-9_\-]", "_", sat_name.lower())
+    tle_path = os.path.join(TLE_DIR, f"{safe_name}.txt")
 
-def tle_view_with_message(message=None):
-    return render_template("tle_view.html", tle_files=get_tle_files(), message=message)
+    if not os.path.exists(tle_path):
+        return render_template("passes.html", passes=[], message="ISS TLE file not found.")
 
-# --- Routes: TLE viewer ---
-@app.route("/tle")
-def tle_view():
-    return tle_view_with_message()
+    if not os.path.exists(CONFIG_FILE):
+        return render_template("passes.html", passes=[], message="Station location not configured.")
 
-# --- Routes: Update All TLEs ---
-@app.route("/tle/update-all", methods=["POST"])
-def update_all_tles():
+    with open(CONFIG_FILE) as f:
+        cfg = json.load(f)
     try:
-        script_path = os.path.abspath(os.path.join(app.root_path, "update_all_tles.py"))
-        subprocess.run(["python3", script_path], check=True)
-        message = "All TLEs updated successfully."
-    except subprocess.CalledProcessError as e:
-        message = f"Error updating TLEs: {e}"
-    return tle_view_with_message(message)
+        lat = float(cfg.get("location_lat", 0))
+        lon = float(cfg.get("location_lon", 0))
+        alt = float(cfg.get("location_alt", 0))
+    except ValueError:
+        return render_template("passes.html", passes=[], message="Invalid station coordinates.")
 
+    with open(tle_path) as f:
+        lines = f.read().strip().splitlines()
+        if len(lines) < 3:
+            return render_template("passes.html", passes=[], message="ISS TLE file incomplete.")
+        name, l1, l2 = lines[0], lines[1], lines[2]
 
-@app.route("/tle/manage")
-def tle_manage():
-    return "<h1>Satellite management disabled in ISS-only mode.</h1>"
-    
+    load = Loader('./skyfield_data')
+    ts = load.timescale()
+    observer = wgs84.latlon(lat, lon, alt)
+    sat = load.tle(name, l1, l2)
 
+    now = datetime.now(timezone.utc)
+    end_time = now + timedelta(hours=24)
 
-# --- Routes: Install Cron Job ---
-@app.route("/tle/install-cron", methods=["POST"])
-def install_tle_cron():
+    passes = []
     try:
-        script_path = os.path.abspath(os.path.join(app.root_path, "update_all_tles.py"))
-        cron_line = f"0 6 * * * /usr/bin/python3 {script_path} >> /tmp/tle_update.log 2>&1"
-        subprocess.run(f'(crontab -l; echo "{cron_line}") | crontab -', shell=True, check=True)
-        message = "Cron job installed to update TLEs daily at 06:00."
-    except subprocess.CalledProcessError as e:
-        message = f"Error installing cron job: {e}"
-    return tle_view_with_message(message)
-    # --- Refresh satellite list from CelesTrak ---
-@app.route("/tle/refresh-list", methods=["POST"])
-def refresh_satellite_list():
-    existing = {}
-    if os.path.exists(SATELLITES_FILE):
-        with open(SATELLITES_FILE) as f:
-            existing = json.load(f)
+        t, events = sat.find_events(observer, ts.from_datetime(now), ts.from_datetime(end_time), altitude_degrees=10.0)
+    except Exception as e:
+        return render_template("passes.html", passes=[], message=f"Error finding passes: {e}")
 
-    satellites = {}
-    for source_name, url in SOURCES.items():
-        names = fetch_satellite_names(url)
-        for name in names:
-            satellites[name] = {
-                "display_name": name,
-                # Preserve enabled state if it exists, else use AUTO_ENABLE default
-                "enabled": existing.get(name, {}).get("enabled", name in AUTO_ENABLE),
-                "tle_url": url,
-                "filename": safe_filename(name)
-            }
-    with open(SATELLITES_FILE, "w") as f:
-        json.dump(satellites, f, indent=4)
-    return redirect(url_for('tle_manage'))
+    current_pass = {}
+    for ti, event in zip(t, events):
+        if event == 0:
+            current_pass = {"satellite": sat_name, "aos": ti.utc_datetime()}
+        elif event == 1:
+            current_pass["max_elev"] = sat.at(ti).altaz()[0].degrees
+        elif event == 2:
+            current_pass["los"] = ti.utc_datetime()
+            if "aos" in current_pass and "los" in current_pass:
+                current_pass["duration"] = (current_pass["los"] - current_pass["aos"]).seconds
+                passes.append(current_pass)
+            current_pass = {}
 
-# --- Helper: Generate satellites.json from CelesTrak ---
-SOURCES = {
-    "stations": "https://celestrak.org/NORAD/elements/stations.txt",
-    "amateur": "https://celestrak.org/NORAD/elements/amateur.txt"
-}
-
-# ✅ Restored constant so tle_manage() can use it
-AUTO_ENABLE = {"ISS (ZARYA)", "ARCTICSAT 1", "UMKA 1", "SONATE 2", "FRAM2HAM"}
-
-def fetch_satellite_names(url):
-    r = requests.get(url, timeout=10)
-    r.raise_for_status()
-    lines = r.text.strip().splitlines()
-    return [lines[i].strip() for i in range(0, len(lines), 3)]
-
-def safe_filename(name):
-    return re.sub(r'[^A-Za-z0-9_\-]', '_', name.lower()) + ".txt"
-
-
+    passes.sort(key=lambda p: p["aos"])
+    return render_template("passes.html", passes=passes, message=None)
 
 # --- Import settings ---
 @app.route("/import-settings", methods=["GET", "POST"])
@@ -166,8 +122,6 @@ def import_settings():
                 data = json.load(file)
                 with open(CONFIG_FILE, "w") as f:
                     json.dump(data.get("config", {}), f, indent=4)
-                with open(SATELLITES_FILE, "w") as f:
-                    json.dump(data.get("satellites", {}), f, indent=4)
                 message = "Settings imported successfully."
             except Exception as e:
                 message = f"Error importing settings: {e}"
@@ -178,13 +132,10 @@ def import_settings():
 # --- Export settings ---
 @app.route("/export-settings")
 def export_settings():
-    data = {"config": {}, "satellites": {}}
+    data = {"config": {}}
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE) as f:
             data["config"] = json.load(f)
-    if os.path.exists(SATELLITES_FILE):
-        with open(SATELLITES_FILE) as f:
-            data["satellites"] = json.load(f)
     return app.response_class(
         json.dumps(data, indent=4),
         mimetype="application/json",
@@ -195,122 +146,6 @@ def export_settings():
 def export_settings_page():
     return render_template("export_settings.html")
 
-@app.route("/passes")
-def passes_page():
-    show_passes = request.args.get("enabled", "true").lower() == "true"
-    if not show_passes:
-        return render_template("passes.html", passes=[], message="Pass prediction disabled.")
-
-    # Load observer location
-    with open(CONFIG_FILE) as f:
-        cfg = json.load(f)
-    lat = float(cfg.get("location_lat", 0))
-    lon = float(cfg.get("location_lon", 0))
-    alt = float(cfg.get("location_alt", 0))
-
-    # Load enabled satellites from satellites_list.txt
-    sat_list_file = os.path.join(TLE_DIR, "satellites_list.txt")
-    if not os.path.exists(sat_list_file):
-        return render_template("passes.html", passes=[], message="No satellites_list.txt found.")
-
-    with open(sat_list_file) as f:
-        enabled_sats = [line.strip() for line in f if line.strip()]
-
-    load = Loader('./skyfield_data')
-    ts = load.timescale()
-    observer = wgs84.latlon(lat, lon, alt)
-
-    now = datetime.now(timezone.utc)
-    end_time = now + timedelta(hours=24)
-
-    passes = []
-
-    for sat_name in enabled_sats:
-        # ✅ FIX: precompute safe_name to avoid backslash in f-string
-        safe_name = re.sub(r"[^A-Za-z0-9_\-]", "_", sat_name.lower())
-        tle_path = os.path.join(TLE_DIR, f"{safe_name}.txt")
-
-        if not os.path.exists(tle_path):
-            print(f"TLE file not found for {sat_name}: {tle_path}")
-            continue
-
-        with open(tle_path) as f:
-            lines = f.read().strip().splitlines()
-            if len(lines) < 3:
-                print(f"TLE file for {sat_name} is incomplete")
-                continue
-            name, l1, l2 = lines[0], lines[1], lines[2]
-
-        sat = load.tle(name, l1, l2)
-
-        try:
-            t, events = sat.find_events(observer, ts.from_datetime(now), ts.from_datetime(end_time), altitude_degrees=10.0)
-        except Exception as e:
-            print(f"Error with {sat_name}: {e}")
-            continue
-
-        current_pass = {}
-        for ti, event in zip(t, events):
-            if event == 0:
-                current_pass = {"satellite": sat_name, "aos": ti.utc_datetime()}
-            elif event == 1:
-                current_pass["max_elev"] = sat.at(ti).altaz()[0].degrees
-            elif event == 2:
-                current_pass["los"] = ti.utc_datetime()
-                if "aos" in current_pass and "los" in current_pass:
-                    current_pass["duration"] = (current_pass["los"] - current_pass["aos"]).seconds
-                    passes.append(current_pass)
-                current_pass = {}
-
-    passes.sort(key=lambda p: p["aos"])
-    return render_template("passes.html", passes=passes, message=None)
-
-    # Skyfield setup
-    load = Loader('./skyfield_data')
-    ts = load.timescale()
-    observer = wgs84.latlon(lat, lon, alt)
-
-    now = datetime.now(timezone.utc)
-    end_time = now + timedelta(hours=24)
-
-    passes = []
-
-    for sat_name in enabled:
-        tle_file = os.path.join(TLE_DIR, sats[sat_name]["filename"])
-        if not os.path.exists(tle_file):
-            continue
-        with open(tle_file) as f:
-            lines = f.read().strip().splitlines()
-            if len(lines) < 3:
-                continue
-            name, l1, l2 = lines[0], lines[1], lines[2]
-        sat = load.tle(name, l1, l2)
-
-        # Find passes
-        t0 = ts.from_datetime(now)
-        t1 = ts.from_datetime(end_time)
-        try:
-            t, events = sat.find_events(observer, t0, t1, altitude_degrees=10.0)
-        except Exception:
-            continue
-
-        current_pass = {}
-        for ti, event in zip(t, events):
-            if event == 0:  # rise
-                current_pass = {"satellite": sat_name, "aos": ti.utc_datetime()}
-            elif event == 1:  # culminate
-                current_pass["max_elev"] = sat.at(ti).altaz()[0].degrees
-            elif event == 2:  # set
-                current_pass["los"] = ti.utc_datetime()
-                if "aos" in current_pass and "los" in current_pass:
-                    current_pass["duration"] = (current_pass["los"] - current_pass["aos"]).seconds
-                    passes.append(current_pass)
-                current_pass = {}
-
-    passes.sort(key=lambda p: p["aos"])
-    return render_template("passes.html", passes=passes, message=None)
-
-# --- Run the app ---
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0")
     
