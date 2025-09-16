@@ -3,42 +3,53 @@
 {% block title %}Manage Satellites{% endblock %}
 
 {% block content %}
-<h1>Satellite Selection</h1>
+<h1 class="mb-4 text-success">Satellite Selection</h1>
 
 <!-- Refresh from CelesTrak -->
-<form method="post" action="{{ url_for('refresh_satellite_list') }}">
-    <button type="submit">Refresh from CelesTrak</button>
+<form method="post" action="{{ url_for('refresh_satellite_list') }}" class="mb-3">
+    <button type="submit" class="btn btn-primary w-100">Refresh from CelesTrak</button>
 </form>
-<br>
 
 <form method="post">
     <!-- Known SSTV Satellites -->
-    <fieldset style="border:2px solid lime; padding:10px; margin-bottom:20px;">
-        <legend style="color:lime; font-weight:bold;">Known SSTV Satellites</legend>
-        {% for name, info in sstv_sats.items() %}
-            <label>
-                <input type="checkbox" name="{{ name }}" {% if info.enabled %}checked{% endif %}>
-                {{ info.display_name }}
-            </label><br>
-        {% endfor %}
-    </fieldset>
+    <div class="card p-3 mb-4 border-success">
+        <h5 class="mb-3 text-success">Known SSTV Satellites</h5>
+        {% if sstv_sats %}
+            {% for name, info in sstv_sats.items() %}
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" name="{{ name }}" id="{{ name }}" {% if info.enabled %}checked{% endif %}>
+                    <label class="form-check-label" for="{{ name }}">
+                        {{ info.display_name }}
+                    </label>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p class="text-muted">No SSTV satellites found in the current list.</p>
+        {% endif %}
+    </div>
 
     <!-- All Other Satellites -->
-    <fieldset style="border:1px solid #ccc; padding:10px;">
-        <legend>Other Satellites</legend>
-        {% for name, info in other_sats.items() %}
-            <label>
-                <input type="checkbox" name="{{ name }}" {% if info.enabled %}checked{% endif %}>
-                {{ info.display_name }}
-            </label><br>
-        {% endfor %}
-    </fieldset>
+    <div class="card p-3 border-secondary">
+        <h5 class="mb-3">Other Satellites</h5>
+        {% if other_sats %}
+            {% for name, info in other_sats.items() %}
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" name="{{ name }}" id="{{ name }}" {% if info.enabled %}checked{% endif %}>
+                    <label class="form-check-label" for="{{ name }}">
+                        {{ info.display_name }}
+                    </label>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p class="text-muted">No other satellites found in the current list.</p>
+        {% endif %}
+    </div>
 
     <br>
-    <button type="submit">Save Selection</button>
+    <button type="submit" class="btn btn-primary w-100">Save Selection</button>
 </form>
 
 {% if message %}
-    <p style="color:lime; margin-top:1em;">{{ message }}</p>
+    <div class="alert alert-success mt-3">{{ message }}</div>
 {% endif %}
 {% endblock %}
