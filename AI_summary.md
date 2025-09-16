@@ -49,19 +49,19 @@ UI/UX Enhancements:
 
 File Structure (Key Files):
 app/
-├── app.py                  # Flask app routes and logic
+├── app.py
 ├── templates/
-│   ├── base.html           # Shared layout, header, bottom nav
-│   ├── gallery.html        # Image gallery
-│   ├── config.html         # Station config with map/timezone auto-fill
-│   ├── tle_manage.html     # Satellite selection UI
-│   ├── tle_view.html       # TLE viewer
-│   ├── import_settings.html# Import settings page
-│   ├── export_settings.html# Export settings page
-images/                     # Received SSTV images
-tle/                        # TLE text files
-config.json                 # Station config
-satellites.json             # Satellite list and settings
+│   ├── base.html
+│   ├── gallery.html
+│   ├── config.html
+│   ├── tle_manage.html
+│   ├── tle_view.html
+│   ├── import_settings.html
+│   ├── export_settings.html
+images/
+tle/
+config.json
+satellites.json
 
 Known SSTV Auto‑Enable List:
 ISS (ZARYA)
@@ -128,7 +128,7 @@ templates/base.html:
 </html>
 
 app/app.py:
-from flask import Flask, render_template, send_from_directory, request
+from flask import Flask, render_template, send_from_directory, request, redirect, url_for
 import os, json, time, subprocess, re, requests
 
 app = Flask(__name__)
@@ -195,4 +195,6 @@ def tle_view_with_message(message=None):
 
 @app.route("/tle")
 def tle_view():
-    return tle_view_with_message
+    return tle_view_with_message()
+
+@app.route("/tle/update-all
