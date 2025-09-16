@@ -5,6 +5,8 @@ import time
 import subprocess
 import re
 import requests
+from datetime import datetime, timedelta, timezone
+from skyfield.api import Loader, wgs84
 
 app = Flask(__name__)
 
@@ -35,7 +37,7 @@ def serve_image(filename):
 def gallery():
     return render_template("gallery.html", image_names=get_all_images())
 
-# --- Routes: Config (lat/lon/alt/timezone only) ---
+# --- Routes: Config ---
 @app.route("/config", methods=["GET", "POST"])
 def config_page():
     allowed_keys = ["location_lat", "location_lon", "location_alt", "timezone"]
@@ -123,13 +125,18 @@ def safe_filename(name):
 
 @app.route("/tle/refresh-list", methods=["POST"])
 def refresh_satellite_list():
+    existing = {}
+    if os.path.exists(SATELLITES_FILE):
+        with open(SATELLITES_FILE) as f:
+            existing = json.load(f)
+
     satellites = {}
     for source_name, url in SOURCES.items():
         names = fetch_satellite_names(url)
         for name in names:
             satellites[name] = {
                 "display_name": name,
-                "enabled": name in AUTO_ENABLE,
+                "enabled": existing.get(name, {}).get("enabled", name in AUTO_ENABLE),
                 "tle_url": url,
                 "filename": safe_filename(name)
             }
@@ -196,6 +203,19 @@ def export_settings():
 def export_settings_page():
     return render_template("export_settings.html")
 
-if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0")
-    
+# --- Pass prediction route ---
+@app.route("/passes")
+def passes_page():
+    if not os.path.exists(CONFIG_FILE):
+        return render_template("passes.html", passes=[], message="No station config found.")
+    with open(CONFIG_FILE) as f:
+        cfg = json.load(f)
+    try:
+        lat = float(cfg.get("location_lat", 0))
+        lon = float(cfg.get("location_lon", 0))
+        alt = float(cfg.get("location_alt", 0))
+    except ValueError:
+        return render_template("passes.html", passes=[], message="Invalid station coordinates.")
+
+    if not os.path.exists(SATELLITES_FILE):
+        return render_template
