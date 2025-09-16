@@ -133,4 +133,69 @@ def refresh_satellite_list():
                 "tle_url": url,
                 "filename": safe_filename(name)
             }
-    with open(SATELLITES_FILE, "
+    with open(SATELLITES_FILE, "w") as f:
+        json.dump(satellites, f, indent=4)
+    return redirect(url_for('tle_manage'))
+
+@app.route("/tle/manage", methods=["GET", "POST"])
+def tle_manage():
+    message = None
+    if request.method == "POST":
+        if os.path.exists(SATELLITES_FILE):
+            with open(SATELLITES_FILE) as f:
+                satellites = json.load(f)
+            for sat in satellites:
+                satellites[sat]["enabled"] = sat in request.form
+            with open(SATELLITES_FILE, "w") as f:
+                json.dump(satellites, f, indent=4)
+            message = "Satellite selection updated."
+    if os.path.exists(SATELLITES_FILE):
+        with open(SATELLITES_FILE) as f:
+            satellites = json.load(f)
+    else:
+        satellites = {}
+    sstv_sats = {k: v for k, v in satellites.items() if k in AUTO_ENABLE}
+    other_sats = {k: v for k, v in satellites.items() if k not in AUTO_ENABLE}
+    return render_template("tle_manage.html", sstv_sats=sstv_sats, other_sats=other_sats, message=message)
+
+@app.route("/import-settings", methods=["GET", "POST"])
+def import_settings():
+    message = None
+    if request.method == "POST":
+        file = request.files.get("settings_file")
+        if file and file.filename.endswith(".json"):
+            try:
+                data = json.load(file)
+                with open(CONFIG_FILE, "w") as f:
+                    json.dump(data.get("config", {}), f, indent=4)
+                with open(SATELLITES_FILE, "w") as f:
+                    json.dump(data.get("satellites", {}), f, indent=4)
+                message = "Settings imported successfully."
+            except Exception as e:
+                message = f"Error importing settings: {e}"
+        else:
+            message = "Please upload a valid .json file."
+    return render_template("import_settings.html", message=message)
+
+@app.route("/export-settings")
+def export_settings():
+    data = {"config": {}, "satellites": {}}
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE) as f:
+            data["config"] = json.load(f)
+    if os.path.exists(SATELLITES_FILE):
+        with open(SATELLITES_FILE) as f:
+            data["satellites"] = json.load(f)
+    return app.response_class(
+        json.dumps(data, indent=4),
+        mimetype="application/json",
+        headers={"Content-Disposition": "attachment;filename=settings.json"}
+    )
+
+@app.route("/export-settings-page")
+def export_settings_page():
+    return render_template("export_settings.html")
+
+if __name__ == "__main__":
+    app.run(debug=True, host="0.0.0.0")
+
