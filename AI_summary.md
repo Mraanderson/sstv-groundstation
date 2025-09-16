@@ -35,4 +35,3 @@ sstv-groundstation/
 - Integrate SSTV decoding
 - Pass filtering (min elevation, daylight/night)
 - Auto‑refresh TLEs
-- 
