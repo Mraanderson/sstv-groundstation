@@ -1,24 +1,19 @@
 import requests
 import os
+import json
 
-# Root-level tle/ folder
-TLE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'tle'))
+# Paths
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+TLE_DIR = os.path.join(BASE_DIR, 'tle')
+CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'satellites.json')
+
 os.makedirs(TLE_DIR, exist_ok=True)
 
-# Define your satellites and their CelesTrak URLs
-# You can add or remove entries here as needed
-TLE_SOURCES = {
-    "iss.txt": "https://celestrak.org/NORAD/elements/stations.txt",   # ISS (ZARYA)
-    "noaa19.txt": "https://celestrak.org/NORAD/elements/noaa.txt",    # NOAA-19
-    "metopb.txt": "https://celestrak.org/NORAD/elements/metop.txt",   # MetOp-B
-    # Add more satellites here...
-}
+def load_satellite_config():
+    with open(CONFIG_FILE) as f:
+        return json.load(f)
 
 def fetch_tle(url, sat_name=None):
-    """
-    Fetch TLE from URL.
-    If sat_name is given, extract only that satellite's block.
-    """
     print(f"Fetching from {url} ...")
     r = requests.get(url, timeout=10)
     r.raise_for_status()
@@ -33,22 +28,23 @@ def fetch_tle(url, sat_name=None):
         return "\n".join(lines) + "\n"
 
 def update_all():
-    for filename, url in TLE_SOURCES.items():
+    satellites = load_satellite_config()
+    for name, info in satellites.items():
+        if not info.get("enabled"):
+            continue
         try:
-            # If you want to filter for a specific satellite in a multi-sat file, pass sat_name here
-            # Example: content = fetch_tle(url, "ISS (ZARYA)")
-            content = fetch_tle(url)
-            file_path = os.path.join(TLE_DIR, filename)
+            content = fetch_tle(info["tle_url"], name if "stations" in info["tle_url"] else None)
+            file_path = os.path.join(TLE_DIR, info["filename"])
             with open(file_path, "w") as f:
                 f.write(content)
             print(f"Updated {file_path}")
         except Exception as e:
-            print(f"Error updating {filename}: {e}")
+            print(f"Error updating {name}: {e}")
 
 if __name__ == "__main__":
     try:
         update_all()
-        print("All TLEs updated successfully.")
+        print("All enabled satellites updated successfully.")
     except Exception as e:
         print(f"Error updating TLEs: {e}")
         
