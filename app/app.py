@@ -209,28 +209,68 @@ def export_settings():
 def export_settings_page():
     return render_template("export_settings.html")
 
-# --- Pass prediction route ---
 @app.route("/passes")
 def passes_page():
-    if not os.path.exists(CONFIG_FILE):
-        return render_template("passes.html", passes=[], message="No station config found.")
+    show_passes = request.args.get("enabled", "true").lower() == "true"
+    if not show_passes:
+        return render_template("passes.html", passes=[], message="Pass prediction disabled.")
+
+    # Load observer location
     with open(CONFIG_FILE) as f:
         cfg = json.load(f)
-    try:
-        lat = float(cfg.get("location_lat", 0))
-        lon = float(cfg.get("location_lon", 0))
-        alt = float(cfg.get("location_alt", 0))
-    except ValueError:
-        return render_template("passes.html", passes=[], message="Invalid station coordinates.")
+    lat = float(cfg.get("location_lat", 0))
+    lon = float(cfg.get("location_lon", 0))
+    alt = float(cfg.get("location_alt", 0))
 
-    if not os.path.exists(SATELLITES_FILE):
-        return render_template("passes.html", passes=[], message="No satellites.json found.")
-    with open(SATELLITES_FILE) as f:
-        sats = json.load(f)
-    enabled = [name for name, data in sats.items() if data.get("enabled")]
+    # Load enabled satellites from satellites_list.txt
+    sat_list_file = os.path.join(TLE_DIR, "satellites_list.txt")
+    if not os.path.exists(sat_list_file):
+        return render_template("passes.html", passes=[], message="No satellites_list.txt found.")
 
-    if not enabled:
-        return render_template("passes.html", passes=[], message="No satellites enabled.")
+    with open(sat_list_file) as f:
+        enabled_sats = [line.strip() for line in f if line.strip()]
+
+    load = Loader('./skyfield_data')
+    ts = load.timescale()
+    observer = wgs84.latlon(lat, lon, alt)
+
+    now = datetime.now(timezone.utc)
+    end_time = now + timedelta(hours=24)
+
+    passes = []
+
+    for sat_name in enabled_sats:
+        tle_path = os.path.join(TLE_DIR, f"{re.sub(r'[^A-Za-z0-9_\\-]', '_', sat_name.lower())}.txt")
+        if not os.path.exists(tle_path):
+            continue
+        with open(tle_path) as f:
+            lines = f.read().strip().splitlines()
+            if len(lines) < 3:
+                continue
+            name, l1, l2 = lines[0], lines[1], lines[2]
+        sat = load.tle(name, l1, l2)
+
+        try:
+            t, events = sat.find_events(observer, ts.from_datetime(now), ts.from_datetime(end_time), altitude_degrees=10.0)
+        except Exception as e:
+            print(f"Error with {sat_name}: {e}")
+            continue
+
+        current_pass = {}
+        for ti, event in zip(t, events):
+            if event == 0:
+                current_pass = {"satellite": sat_name, "aos": ti.utc_datetime()}
+            elif event == 1:
+                current_pass["max_elev"] = sat.at(ti).altaz()[0].degrees
+            elif event == 2:
+                current_pass["los"] = ti.utc_datetime()
+                if "aos" in current_pass and "los" in current_pass:
+                    current_pass["duration"] = (current_pass["los"] - current_pass["aos"]).seconds
+                    passes.append(current_pass)
+                current_pass = {}
+
+    passes.sort(key=lambda p: p["aos"])
+    return render_template("passes.html", passes=passes, message=None)
 
     # Skyfield setup
     load = Loader('./skyfield_data')
