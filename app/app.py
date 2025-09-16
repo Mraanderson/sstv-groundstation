@@ -105,24 +105,7 @@ def install_tle_cron():
     except subprocess.CalledProcessError as e:
         message = f"Error installing cron job: {e}"
     return tle_view_with_message(message)
-
-# --- Helper: Generate satellites.json from CelesTrak ---
-SOURCES = {
-    "stations": "https://celestrak.org/NORAD/elements/stations.txt",
-    "amateur": "https://celestrak.org/NORAD/elements/amateur.txt"
-}
-
-AUTO_ENABLE = {"ISS (ZARYA)", "ARCTICSAT 1", "UMKA 1", "SONATE 2", "FRAM2HAM"}
-
-def fetch_satellite_names(url):
-    r = requests.get(url, timeout=10)
-    r.raise_for_status()
-    lines = r.text.strip().splitlines()
-    return [lines[i].strip() for i in range(0, len(lines), 3)]
-
-def safe_filename(name):
-    return re.sub(r'[^A-Za-z0-9_\-]', '_', name.lower()) + ".txt"
-
+    # --- Refresh satellite list from CelesTrak ---
 @app.route("/tle/refresh-list", methods=["POST"])
 def refresh_satellite_list():
     existing = {}
@@ -136,6 +119,7 @@ def refresh_satellite_list():
         for name in names:
             satellites[name] = {
                 "display_name": name,
+                # Preserve enabled state if it exists, else use AUTO_ENABLE default
                 "enabled": existing.get(name, {}).get("enabled", name in AUTO_ENABLE),
                 "tle_url": url,
                 "filename": safe_filename(name)
@@ -144,6 +128,7 @@ def refresh_satellite_list():
         json.dump(satellites, f, indent=4)
     return redirect(url_for('tle_manage'))
 
+# --- Manage satellites ---
 @app.route("/tle/manage", methods=["GET", "POST"])
 def tle_manage():
     message = None
@@ -165,6 +150,7 @@ def tle_manage():
     other_sats = {k: v for k, v in satellites.items() if k not in AUTO_ENABLE}
     return render_template("tle_manage.html", sstv_sats=sstv_sats, other_sats=other_sats, message=message)
 
+# --- Import settings ---
 @app.route("/import-settings", methods=["GET", "POST"])
 def import_settings():
     message = None
@@ -184,6 +170,7 @@ def import_settings():
             message = "Please upload a valid .json file."
     return render_template("import_settings.html", message=message)
 
+# --- Export settings ---
 @app.route("/export-settings")
 def export_settings():
     data = {"config": {}, "satellites": {}}
@@ -218,4 +205,60 @@ def passes_page():
         return render_template("passes.html", passes=[], message="Invalid station coordinates.")
 
     if not os.path.exists(SATELLITES_FILE):
-        return render_template
+        return render_template("passes.html", passes=[], message="No satellites.json found.")
+    with open(SATELLITES_FILE) as f:
+        sats = json.load(f)
+    enabled = [name for name, data in sats.items() if data.get("enabled")]
+
+    if not enabled:
+        return render_template("passes.html", passes=[], message="No satellites enabled.")
+
+    # Skyfield setup
+    load = Loader('./skyfield_data')
+    ts = load.timescale()
+    observer = wgs84.latlon(lat, lon, alt)
+
+    now = datetime.now(timezone.utc)
+    end_time = now + timedelta(hours=24)
+
+    passes = []
+
+    for sat_name in enabled:
+        tle_file = os.path.join(TLE_DIR, sats[sat_name]["filename"])
+        if not os.path.exists(tle_file):
+            continue
+        with open(tle_file) as f:
+            lines = f.read().strip().splitlines()
+            if len(lines) < 3:
+                continue
+            name, l1, l2 = lines[0], lines[1], lines[2]
+        sat = load.tle(name, l1, l2)
+
+        # Find passes
+        t0 = ts.from_datetime(now)
+        t1 = ts.from_datetime(end_time)
+        try:
+            t, events = sat.find_events(observer, t0, t1, altitude_degrees=10.0)
+        except Exception:
+            continue
+
+        current_pass = {}
+        for ti, event in zip(t, events):
+            if event == 0:  # rise
+                current_pass = {"satellite": sat_name, "aos": ti.utc_datetime()}
+            elif event == 1:  # culminate
+                current_pass["max_elev"] = sat.at(ti).altaz()[0].degrees
+            elif event == 2:  # set
+                current_pass["los"] = ti.utc_datetime()
+                if "aos" in current_pass and "los" in current_pass:
+                    current_pass["duration"] = (current_pass["los"] - current_pass["aos"]).seconds
+                    passes.append(current_pass)
+                current_pass = {}
+
+    passes.sort(key=lambda p: p["aos"])
+    return render_template("passes.html", passes=passes, message=None)
+
+# --- Run the app ---
+if __name__ == "__main__":
+    app.run(debug=True, host="0.0.0.0")
+    
