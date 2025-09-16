@@ -3,30 +3,37 @@
 {% block title %}Configuration{% endblock %}
 
 {% block content %}
-<h1>Station Configuration</h1>
+<h1 class="mb-4 text-success">Station Configuration</h1>
 
-<form method="post" id="configForm">
-    <label for="location_lat">Latitude (°)</label><br>
-    <input type="text" id="location_lat" name="location_lat" value="{{ config_data.location_lat }}"><br><br>
+<form method="post" id="configForm" class="card p-3 border-success">
+    <div class="mb-3">
+        <label for="location_lat" class="form-label">Latitude (°)</label>
+        <input type="text" class="form-control" id="location_lat" name="location_lat" value="{{ config_data.location_lat }}">
+    </div>
 
-    <label for="location_lon">Longitude (°)</label><br>
-    <input type="text" id="location_lon" name="location_lon" value="{{ config_data.location_lon }}"><br><br>
+    <div class="mb-3">
+        <label for="location_lon" class="form-label">Longitude (°)</label>
+        <input type="text" class="form-control" id="location_lon" name="location_lon" value="{{ config_data.location_lon }}">
+    </div>
 
-    <label for="location_alt">Altitude (m)</label><br>
-    <input type="text" id="location_alt" name="location_alt" value="{{ config_data.location_alt }}"><br><br>
+    <div class="mb-3">
+        <label for="location_alt" class="form-label">Altitude (m)</label>
+        <input type="text" class="form-control" id="location_alt" name="location_alt" value="{{ config_data.location_alt }}">
+    </div>
 
-    <label for="timezone">Timezone (e.g., Europe/London)</label><br>
-    <input type="text" id="timezone" name="timezone" value="{{ config_data.timezone }}"><br><br>
+    <div class="mb-3">
+        <label for="timezone" class="form-label">Timezone (e.g., Europe/London)</label>
+        <input type="text" class="form-control" id="timezone" name="timezone" value="{{ config_data.timezone }}">
+    </div>
 
-    <div id="map" style="height: 400px; border: 1px solid #ccc;"></div>
-    <p>Click on the map to set your location. Altitude will be fetched automatically.</p>
+    <div id="map" style="height: 300px; border: 1px solid #333; border-radius: 0.5rem;" class="mb-3"></div>
+    <p class="small text-muted">Click on the map to set your location. Altitude will be fetched automatically.</p>
 
-    <br>
-    <button type="submit" id="saveBtn" disabled>Save</button>
+    <button type="submit" id="saveBtn" class="btn btn-primary w-100" disabled>Save</button>
 </form>
 
 {% if message %}
-    <p style="color:lime;">{{ message }}</p>
+    <div class="alert alert-success mt-3">{{ message }}</div>
 {% endif %}
 
 <!-- Leaflet CSS & JS -->
@@ -41,10 +48,7 @@ document.addEventListener("DOMContentLoaded", function() {
     var tzField  = document.getElementById('timezone');
     var saveBtn  = document.getElementById('saveBtn');
 
-    // Default map center (0,0) until we get location
     var map = L.map('map').setView([0, 0], 2);
-
-    // Add OpenStreetMap tiles
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
@@ -65,12 +69,10 @@ document.addEventListener("DOMContentLoaded", function() {
         saveBtn.disabled = !(validLat && validLon && validAlt && validTz);
     }
 
-    // Function to update form fields and marker
     function setLocation(lat, lon) {
         latField.value = lat.toFixed(6);
         lonField.value = lon.toFixed(6);
 
-        // Fetch altitude from Open-Elevation
         fetch(`https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lon}`)
             .then(response => response.json())
             .then(data => {
@@ -89,12 +91,10 @@ document.addEventListener("DOMContentLoaded", function() {
         validateForm();
     }
 
-    // On map click
     map.on('click', function(e) {
         setLocation(e.latlng.lat, e.latlng.lng);
     });
 
-    // Try to get browser location
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(function(pos) {
             var lat = pos.coords.latitude;
@@ -106,7 +106,6 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
-    // Auto-fill timezone from browser
     try {
         var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
         tzField.value = tz;
@@ -114,12 +113,10 @@ document.addEventListener("DOMContentLoaded", function() {
         console.warn("Could not detect timezone:", e);
     }
 
-    // Validate on manual edits
     [latField, lonField, altField, tzField].forEach(field => {
         field.addEventListener('input', validateForm);
     });
 
-    // Initial validation
     validateForm();
 });
 </script>
