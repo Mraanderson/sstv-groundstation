@@ -1,55 +1,9 @@
 {% extends "base.html" %}
-
 {% block title %}Manage Satellites{% endblock %}
-
 {% block content %}
-<h1 class="mb-4 text-success">Satellite Selection</h1>
-
-<!-- Refresh from CelesTrak -->
-<form method="post" action="{{ url_for('refresh_satellite_list') }}" class="mb-3">
-    <button type="submit" class="btn btn-primary w-100">Refresh from CelesTrak</button>
-</form>
-
-<form method="post">
-    <!-- Known SSTV Satellites -->
-    <div class="card p-3 mb-4 border-success">
-        <h5 class="mb-3 text-success">Known SSTV Satellites</h5>
-        {% if sstv_sats %}
-            {% for name, info in sstv_sats.items() %}
-                <div class="form-check mb-2">
-                    <input class="form-check-input" type="checkbox" name="{{ name }}" id="{{ name }}" {% if info.enabled %}checked{% endif %}>
-                    <label class="form-check-label" for="{{ name }}">
-                        {{ info.display_name }}
-                    </label>
-                </div>
-            {% endfor %}
-        {% else %}
-            <p class="text-muted">No SSTV satellites found in the current list.</p>
-        {% endif %}
-    </div>
-
-    <!-- All Other Satellites -->
-    <div class="card p-3 border-secondary">
-        <h5 class="mb-3">Other Satellites</h5>
-        {% if other_sats %}
-            {% for name, info in other_sats.items() %}
-                <div class="form-check mb-2">
-                    <input class="form-check-input" type="checkbox" name="{{ name }}" id="{{ name }}" {% if info.enabled %}checked{% endif %}>
-                    <label class="form-check-label" for="{{ name }}">
-                        {{ info.display_name }}
-                    </label>
-                </div>
-            {% endfor %}
-        {% else %}
-            <p class="text-muted">No other satellites found in the current list.</p>
-        {% endif %}
-    </div>
-
-    <br>
-    <button type="submit" class="btn btn-primary w-100">Save Selection</button>
-</form>
-
-{% if message %}
-    <div class="alert alert-success mt-3">{{ message }}</div>
-{% endif %}
+<h1 class="mb-4 text-success">Satellite Tracking</h1>
+<div class="card p-3 border-success">
+    <h5 class="mb-3 text-success">Currently Tracking</h5>
+    <p>ISS (ZARYA)</p>
+</div>
 {% endblock %}
