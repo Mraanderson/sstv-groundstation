@@ -8,26 +8,33 @@
   {% if message %}
     <div class="alert alert-warning">{{ message }}</div>
   {% elif passes %}
-    <table class="table table-dark table-striped table-hover align-middle">
-      <thead>
-        <tr>
-          <th scope="col">AOS (UTC)</th>
-          <th scope="col">LOS (UTC)</th>
-          <th scope="col">Max Elev (°)</th>
-          <th scope="col">Duration (s)</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for p in passes %}
-        <tr>
-          <td>{{ p.aos.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-          <td>{{ p.los.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-          <td>{{ '%.1f'|format(p.max_elev) }}</td>
-          <td>{{ p.duration }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    <form method="post">
+      <table class="table table-dark table-striped table-hover align-middle">
+        <thead>
+          <tr>
+            <th scope="col">Ignore</th>
+            <th scope="col">AOS (UTC)</th>
+            <th scope="col">LOS (UTC)</th>
+            <th scope="col">Max Elev (°)</th>
+            <th scope="col">Duration (s)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in passes %}
+          <tr>
+            <td>
+              <input type="checkbox" name="ignore_pass" value="{{ p.aos.isoformat() }}">
+            </td>
+            <td>{{ p.aos.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+            <td>{{ p.los.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+            <td>{{ '%.1f'|format(p.max_elev) }}</td>
+            <td>{{ p.duration }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <button type="submit" class="btn btn-warning">Ignore Selected</button>
+    </form>
   {% else %}
     <p class="text-muted">No ISS passes found in the next 24 hours.</p>
   {% endif %}
