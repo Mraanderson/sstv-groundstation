@@ -94,6 +94,13 @@ def update_all_tles():
         message = f"Error updating TLEs: {e}"
     return tle_view_with_message(message)
 
+
+@app.route("/tle/manage")
+def tle_manage():
+    return "<h1>Satellite management disabled in ISS-only mode.</h1>"
+    
+
+
 # --- Routes: Install Cron Job ---
 @app.route("/tle/install-cron", methods=["POST"])
 def install_tle_cron():
