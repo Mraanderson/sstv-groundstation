@@ -5,18 +5,17 @@
 {% block content %}
 <h1>Satellite Selection</h1>
 
+<!-- Refresh from CelesTrak -->
+<form method="post" action="{{ url_for('refresh_satellite_list') }}">
+    <button type="submit">Refresh from CelesTrak</button>
+</form>
+<br>
+
+<!-- Satellite checkboxes -->
 <form method="post">
     {% for name, info in satellites.items() %}
         <label>
             <input type="checkbox" name="{{ name }}" {% if info.enabled %}checked{% endif %}>
-            {{ name }}
+            {{ info.display_name }}
         </label><br>
-    {% endfor %}
-    <br>
-    <button type="submit">Save Selection</button>
-</form>
-
-{% if message %}
-    <p style="color:lime; margin-top:1em;">{{ message }}</p>
-{% endif %}
-{% endblock %}
+    {% endfor
