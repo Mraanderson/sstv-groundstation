@@ -99,9 +99,25 @@ def install_tle_cron():
     return tle_view_with_message(message)
 
 # --- Placeholder for TLE management ---
-@app.route("/tle/manage")
+@app.route("/tle/manage", methods=["GET", "POST"])
 def tle_manage():
-    return "<h1>TLE management page coming soon</h1>"
+    config_path = os.path.join(app.root_path, "satellites.json")
+    message = None
+
+    # Load current config
+    with open(config_path) as f:
+        satellites = json.load(f)
+
+    if request.method == "POST":
+        # Update enabled status based on form
+        for name in satellites:
+            satellites[name]["enabled"] = name in request.form
+        with open(config_path, "w") as f:
+            json.dump(satellites, f, indent=4)
+        message = "Satellite selection updated."
+
+    return render_template("tle_manage.html", satellites=satellites, message=message)
+
 
 if __name__ == "__main__":
     print("Looking for images in:", IMAGES_DIR)
