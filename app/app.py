@@ -154,20 +154,40 @@ def tle_manage():
         if os.path.exists(SATELLITES_FILE):
             with open(SATELLITES_FILE) as f:
                 satellites = json.load(f)
+
+            # Update enabled/disabled status from form
             for sat in satellites:
                 satellites[sat]["enabled"] = sat in request.form
+
+            # Save updated satellites.json
             with open(SATELLITES_FILE, "w") as f:
                 json.dump(satellites, f, indent=4)
+
+            # ✅ NEW: Write enabled satellites to satellites_list.txt
+            enabled_names = [name for name, data in satellites.items() if data.get("enabled")]
+            sat_list_file = os.path.join(TLE_DIR, "satellites_list.txt")
+            with open(sat_list_file, "w") as f:
+                for sat_name in enabled_names:
+                    f.write(sat_name + "\n")
+
             message = "Satellite selection updated."
+
+    # Load satellites for display
     if os.path.exists(SATELLITES_FILE):
         with open(SATELLITES_FILE) as f:
             satellites = json.load(f)
     else:
         satellites = {}
+
     sstv_sats = {k: v for k, v in satellites.items() if k in AUTO_ENABLE}
     other_sats = {k: v for k, v in satellites.items() if k not in AUTO_ENABLE}
-    return render_template("tle_manage.html", sstv_sats=sstv_sats, other_sats=other_sats, message=message)
 
+    return render_template(
+        "tle_manage.html",
+        sstv_sats=sstv_sats,
+        other_sats=other_sats,
+        message=message
+    )
 
 # --- Import settings ---
 @app.route("/import-settings", methods=["GET", "POST"])
