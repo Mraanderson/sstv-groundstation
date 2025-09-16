@@ -3,6 +3,8 @@ import os
 import json
 import time
 import subprocess
+import re
+import requests
 
 app = Flask(__name__)
 
@@ -98,12 +100,49 @@ def install_tle_cron():
         message = f"Error installing cron job: {e}"
     return tle_view_with_message(message)
 
+# --- Helper: Generate satellites.json from CelesTrak ---
+SOURCES = {
+    "stations": "https://celestrak.org/NORAD/elements/stations.txt",
+    "amateur": "https://celestrak.org/NORAD/elements/amateur.txt"
+}
+
+AUTO_ENABLE = {"ISS (ZARYA)", "ARCTICSAT 1", "UMKA 1", "SONATE 2", "FRAM2HAM"}
+
+def fetch_satellite_names(url):
+    r = requests.get(url, timeout=10)
+    r.raise_for_status()
+    lines = r.text.strip().splitlines()
+    return [lines[i].strip() for i in range(0, len(lines), 3)]
+
+def safe_filename(name):
+    return re.sub(r'[^A-Za-z0-9_\-]', '_', name.lower()) + ".txt"
+
+@app.route("/tle/refresh-list", methods=["POST"])
+def refresh_satellite_list():
+    satellites = {}
+    for source_name, url in SOURCES.items():
+        names = fetch_satellite_names(url)
+        for name in names:
+            satellites[name] = {
+                "display_name": name,
+                "enabled": name in AUTO_ENABLE,
+                "tle_url": url,
+                "filename": safe_filename(name)
+            }
+    with open(SATELLITES_FILE, "w") as f:
+        json.dump(satellites, f, indent=4)
+    message = f"Satellite list refreshed from CelesTrak ({len(satellites)} entries)."
+    return render_template("tle_manage.html", satellites=satellites, message=message)
+
 # --- Routes: Satellite Selector ---
 @app.route("/tle/manage", methods=["GET", "POST"])
 def tle_manage():
     message = None
-    with open(SATELLITES_FILE) as f:
-        satellites = json.load(f)
+    if os.path.exists(SATELLITES_FILE):
+        with open(SATELLITES_FILE) as f:
+            satellites = json.load(f)
+    else:
+        satellites = {}
 
     if request.method == "POST":
         for name in satellites:
