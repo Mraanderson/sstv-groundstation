@@ -10,6 +10,7 @@ app = Flask(__name__)
 IMAGES_DIR = os.path.abspath(os.path.join(app.root_path, '..', 'images'))
 TLE_DIR = os.path.abspath(os.path.join(app.root_path, '..', 'tle'))
 CONFIG_FILE = os.path.join(app.root_path, 'config.json')
+SATELLITES_FILE = os.path.join(app.root_path, 'satellites.json')
 
 # --- Gallery helpers ---
 def get_all_images():
@@ -78,7 +79,6 @@ def tle_view():
 @app.route("/tle/update-all", methods=["POST"])
 def update_all_tles():
     try:
-        # Run the universal update script
         script_path = os.path.abspath(os.path.join(app.root_path, "update_all_tles.py"))
         subprocess.run(["python3", script_path], check=True)
         message = "All TLEs updated successfully."
@@ -98,29 +98,64 @@ def install_tle_cron():
         message = f"Error installing cron job: {e}"
     return tle_view_with_message(message)
 
-# --- Placeholder for TLE management ---
+# --- Routes: Satellite Selector ---
 @app.route("/tle/manage", methods=["GET", "POST"])
 def tle_manage():
-    config_path = os.path.join(app.root_path, "satellites.json")
     message = None
-
-    # Load current config
-    with open(config_path) as f:
+    with open(SATELLITES_FILE) as f:
         satellites = json.load(f)
 
     if request.method == "POST":
-        # Update enabled status based on form
         for name in satellites:
             satellites[name]["enabled"] = name in request.form
-        with open(config_path, "w") as f:
+        with open(SATELLITES_FILE, "w") as f:
             json.dump(satellites, f, indent=4)
         message = "Satellite selection updated."
 
     return render_template("tle_manage.html", satellites=satellites, message=message)
 
+# --- Route: Export Settings ---
+@app.route("/settings/export")
+def export_settings():
+    export_data = {}
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE) as f:
+            export_data["config"] = json.load(f)
+    if os.path.exists(SATELLITES_FILE):
+        with open(SATELLITES_FILE) as f:
+            export_data["satellites"] = json.load(f)
+
+    response = app.response_class(
+        response=json.dumps(export_data, indent=4),
+        mimetype='application/json'
+    )
+    response.headers["Content-Disposition"] = "attachment; filename=groundstation_settings.json"
+    return response
+
+# --- Route: Import Settings ---
+@app.route("/settings/import", methods=["GET", "POST"])
+def import_settings():
+    message = None
+    if request.method == "POST":
+        uploaded_file = request.files.get("settings_file")
+        if uploaded_file and uploaded_file.filename.endswith(".json"):
+            try:
+                data = json.load(uploaded_file)
+                if "config" in data:
+                    with open(CONFIG_FILE, "w") as f:
+                        json.dump(data["config"], f, indent=4)
+                if "satellites" in data:
+                    with open(SATELLITES_FILE, "w") as f:
+                        json.dump(data["satellites"], f, indent=4)
+                message = "Settings imported successfully."
+            except Exception as e:
+                message = f"Error importing settings: {e}"
+        else:
+            message = "Please upload a valid .json settings file."
+
+    return render_template("import_settings.html", message=message)
 
 if __name__ == "__main__":
     print("Looking for images in:", IMAGES_DIR)
     print("Looking for TLE files in:", TLE_DIR)
     app.run(host="0.0.0.0", port=5000, debug=True)
-    
