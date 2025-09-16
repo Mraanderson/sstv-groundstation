@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Import Settings{% endblock %}
+
+{% block content %}
+<h1>Import Groundstation Settings</h1>
+
+<form method="post" enctype="multipart/form-data">
+    <input type="file" name="settings_file" accept=".json">
+    <button type="submit">Import</button>
+</form>
+
+{% if message %}
+    <p style="color:lime; margin-top:1em;">{{ message }}</p>
+{% endif %}
+{% endblock %}
