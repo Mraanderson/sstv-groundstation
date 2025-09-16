@@ -24,7 +24,7 @@
           <tr>
             <td>
               <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" name="ignore_pass" value="{{ p.aos.isoformat() }}"
+                <input class="form-check-input" type="checkbox" name="record_pass" value="{{ p.aos.isoformat() }}"
                   {% if not p.ignored %}checked{% endif %}>
                 <label class="form-check-label">
                   {% if not p.ignored %}Record{% else %}Ignore{% endif %}
@@ -34,15 +34,4 @@
             <td>{{ p.aos.strftime('%Y-%m-%d %H:%M:%S') }}</td>
             <td>{{ p.los.strftime('%Y-%m-%d %H:%M:%S') }}</td>
             <td>{{ '%.1f'|format(p.max_elev) }}</td>
-            <td>{{ p.duration }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      <button type="submit" class="btn btn-warning">Update Status</button>
-    </form>
-  {% else %}
-    <p class="text-muted">No ISS passes found in the next 24 hours.</p>
-  {% endif %}
-</div>
-{% endblock %}
+            <td
