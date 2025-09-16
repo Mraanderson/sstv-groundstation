@@ -3,14 +3,23 @@
 {% block title %}Configuration{% endblock %}
 
 {% block content %}
-<h1>Configuration</h1>
+<h1>Station Configuration</h1>
 <form method="post">
-    {% for key, value in config_data.items() %}
-        <label for="{{ key }}">{{ key }}</label><br>
-        <input type="text" id="{{ key }}" name="{{ key }}" value="{{ value }}"><br><br>
-    {% endfor %}
+    <label for="location_lat">Latitude (°)</label><br>
+    <input type="text" id="location_lat" name="location_lat" value="{{ config_data.location_lat }}"><br><br>
+
+    <label for="location_lon">Longitude (°)</label><br>
+    <input type="text" id="location_lon" name="location_lon" value="{{ config_data.location_lon }}"><br><br>
+
+    <label for="location_alt">Altitude (m)</label><br>
+    <input type="text" id="location_alt" name="location_alt" value="{{ config_data.location_alt }}"><br><br>
+
+    <label for="timezone">Timezone (e.g., Europe/London)</label><br>
+    <input type="text" id="timezone" name="timezone" value="{{ config_data.timezone }}"><br><br>
+
     <button type="submit">Save</button>
 </form>
+
 {% if message %}
     <p style="color:lime;">{{ message }}</p>
 {% endif %}
