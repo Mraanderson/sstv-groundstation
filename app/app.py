@@ -128,6 +128,24 @@ def refresh_satellite_list():
         json.dump(satellites, f, indent=4)
     return redirect(url_for('tle_manage'))
 
+# --- Helper: Generate satellites.json from CelesTrak ---
+SOURCES = {
+    "stations": "https://celestrak.org/NORAD/elements/stations.txt",
+    "amateur": "https://celestrak.org/NORAD/elements/amateur.txt"
+}
+
+# ✅ Restored constant so tle_manage() can use it
+AUTO_ENABLE = {"ISS (ZARYA)", "ARCTICSAT 1", "UMKA 1", "SONATE 2", "FRAM2HAM"}
+
+def fetch_satellite_names(url):
+    r = requests.get(url, timeout=10)
+    r.raise_for_status()
+    lines = r.text.strip().splitlines()
+    return [lines[i].strip() for i in range(0, len(lines), 3)]
+
+def safe_filename(name):
+    return re.sub(r'[^A-Za-z0-9_\-]', '_', name.lower()) + ".txt"
+
 # --- Manage satellites ---
 @app.route("/tle/manage", methods=["GET", "POST"])
 def tle_manage():
@@ -149,6 +167,7 @@ def tle_manage():
     sstv_sats = {k: v for k, v in satellites.items() if k in AUTO_ENABLE}
     other_sats = {k: v for k, v in satellites.items() if k not in AUTO_ENABLE}
     return render_template("tle_manage.html", sstv_sats=sstv_sats, other_sats=other_sats, message=message)
+
 
 # --- Import settings ---
 @app.route("/import-settings", methods=["GET", "POST"])
