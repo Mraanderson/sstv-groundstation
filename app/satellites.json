@@ -1,0 +1,12 @@
+{
+  "ISS (ZARYA)": {
+    "enabled": true,
+    "tle_url": "https://celestrak.org/NORAD/elements/stations.txt",
+    "filename": "iss.txt"
+  },
+  "RS-44": {
+    "enabled": false,
+    "tle_url": "https://celestrak.org/NORAD/elements/amateur.txt",
+    "filename": "rs44.txt"
+  }
+}
