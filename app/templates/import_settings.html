@@ -5,8 +5,10 @@
 {% block content %}
 <h1>Import Groundstation Settings</h1>
 
+<p>Upload a <code>.json</code> file containing your saved configuration and satellite list.</p>
+
 <form method="post" enctype="multipart/form-data">
-    <input type="file" name="settings_file" accept=".json">
+    <input type="file" name="settings_file" accept=".json" required>
     <button type="submit">Import</button>
 </form>
 
