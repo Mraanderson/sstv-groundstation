@@ -64,6 +64,8 @@
             <a class="nav-link {% if request.endpoint == 'gallery' %}active{% endif %}" href="{{ url_for('gallery') }}">Gallery</a>
             <a class="nav-link {% if request.endpoint == 'tle_manage' %}active{% endif %}" href="{{ url_for('tle_manage') }}">Satellites</a>
             <a class="nav-link {% if request.endpoint == 'config_page' %}active{% endif %}" href="{{ url_for('config_page') }}">Config</a>
+            <a class="nav-link {% if request.endpoint == 'import_settings' %}active{% endif %}" href="{{ url_for('import_settings') }}">Import</a>
+            <a class="nav-link {% if request.endpoint == 'export_settings_page' %}active{% endif %}" href="{{ url_for('export_settings_page') }}">Export</a>
         </div>
     </nav>
 
