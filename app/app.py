@@ -11,21 +11,6 @@ app = Flask(__name__)
 IMAGES_DIR = os.path.abspath(os.path.join(app.root_path, '..', 'images'))
 TLE_DIR = os.path.abspath(os.path.join(app.root_path, '..', 'tle'))
 CONFIG_FILE = os.path.join(app.root_path, 'config.json')
-IGNORED_FILE = os.path.join(app.root_path, 'ignored_passes.json')
-
-# --- Helpers for ignored passes ---
-def load_ignored():
-    if os.path.exists(IGNORED_FILE):
-        with open(IGNORED_FILE) as f:
-            try:
-                return json.load(f).get("ignored", [])
-            except Exception:
-                return []
-    return []
-
-def save_ignored(ignored_list):
-    with open(IGNORED_FILE, "w") as f:
-        json.dump({"ignored": ignored_list}, f, indent=4)
 
 # --- Gallery helpers ---
 def get_all_images():
@@ -69,19 +54,8 @@ def config_page():
     return render_template("config.html", config_data=config_data, message=message)
 
 # --- Routes: Pass prediction for ISS ---
-@app.route("/passes", methods=["GET", "POST"])
+@app.route("/passes")
 def passes_page():
-    ignored = load_ignored()
-
-    # Handle form submission to update ignore list
-    if request.method == "POST":
-        # Passes with slider ON are sent in form as "record_pass"
-        record_list = request.form.getlist("record_pass")
-        all_aos = [p["aos"].isoformat() for p in getattr(app, "_last_passes", [])]
-        # Ignored = all passes not in record_list
-        ignored = [aos for aos in all_aos if aos not in record_list]
-        save_ignored(ignored)
-
     sat_name = "ISS (ZARYA)"
     safe_name = re.sub(r"[^A-Za-z0-9_\-]", "_", sat_name.lower())
     tle_path = os.path.join(TLE_DIR, f"{safe_name}.txt")
@@ -136,13 +110,7 @@ def passes_page():
                 passes.append(current_pass)
             current_pass = {}
 
-    # Mark passes as ignored or not
-    for p in passes:
-        p["ignored"] = p["aos"].isoformat() in ignored
-
     passes.sort(key=lambda p: p["aos"])
-    app._last_passes = passes
-
     return render_template("passes.html", passes=passes, message=None)
 
 # --- Import settings ---
