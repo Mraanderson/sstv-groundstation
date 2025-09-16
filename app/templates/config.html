@@ -4,6 +4,7 @@
 
 {% block content %}
 <h1>Station Configuration</h1>
+
 <form method="post">
     <label for="location_lat">Latitude (°)</label><br>
     <input type="text" id="location_lat" name="location_lat" value="{{ config_data.location_lat }}"><br><br>
@@ -17,10 +18,71 @@
     <label for="timezone">Timezone (e.g., Europe/London)</label><br>
     <input type="text" id="timezone" name="timezone" value="{{ config_data.timezone }}"><br><br>
 
+    <div id="map" style="height: 400px; border: 1px solid #ccc;"></div>
+    <p>Click on the map to set your location. Altitude will be fetched automatically.</p>
+
+    <br>
     <button type="submit">Save</button>
 </form>
 
 {% if message %}
     <p style="color:lime;">{{ message }}</p>
 {% endif %}
+
+<!-- Leaflet CSS & JS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // Default map center (0,0) until we get location
+    var map = L.map('map').setView([0, 0], 2);
+
+    // Add OpenStreetMap tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    var marker;
+
+    // Function to update form fields and marker
+    function setLocation(lat, lon) {
+        document.getElementById('location_lat').value = lat.toFixed(6);
+        document.getElementById('location_lon').value = lon.toFixed(6);
+
+        // Fetch altitude from Open-Elevation
+        fetch(`https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lon}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.results && data.results.length > 0) {
+                    document.getElementById('location_alt').value = data.results[0].elevation;
+                }
+            })
+            .catch(err => console.error("Altitude fetch error:", err));
+
+        if (marker) {
+            marker.setLatLng([lat, lon]);
+        } else {
+            marker = L.marker([lat, lon]).addTo(map);
+        }
+    }
+
+    // On map click
+    map.on('click', function(e) {
+        setLocation(e.latlng.lat, e.latlng.lng);
+    });
+
+    // Try to get browser location
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(pos) {
+            var lat = pos.coords.latitude;
+            var lon = pos.coords.longitude;
+            map.setView([lat, lon], 13);
+            setLocation(lat, lon);
+        }, function() {
+            console.warn("Geolocation permission denied or unavailable.");
+        });
+    }
+});
+</script>
 {% endblock %}
