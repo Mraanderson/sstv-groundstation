@@ -1,39 +1,39 @@
 {% extends "base.html" %}
 
-{% block title %}TLE Information{% endblock %}
+{% block title %}TLE Viewer{% endblock %}
 
 {% block content %}
-<h1>TLE Files</h1>
+<h1 class="mb-4 text-success">TLE Files</h1>
 
 <!-- Action buttons -->
-<form method="post" action="{{ url_for('update_all_tles') }}" style="display:inline;">
-    <button type="submit">Update All TLEs</button>
-</form>
+<div class="d-flex flex-column flex-sm-row gap-2 mb-4">
+    <form method="post" action="{{ url_for('update_all_tles') }}" class="flex-fill">
+        <button type="submit" class="btn btn-primary w-100">Update All TLEs</button>
+    </form>
+    <form method="post" action="{{ url_for('install_tle_cron') }}" class="flex-fill">
+        <button type="submit" class="btn btn-outline-success w-100">Install Daily Cron</button>
+    </form>
+</div>
 
-<form method="post" action="{{ url_for('install_tle_cron') }}" style="display:inline; margin-left:10px;">
-    <button type="submit">Install Cron Job</button>
-</form>
-
-<hr>
-
-<!-- TLE file list -->
-{% if tle_files %}
-    {% for tle in tle_files %}
-        <details style="margin-bottom: 1em; background:#1c1c1c; padding:10px; border-radius:6px;">
-            <summary style="cursor:pointer; font-size:1.1em; color:#0f0;">
-                {{ tle.name }} — Last updated: {{ tle.last_updated }}
-            </summary>
-            <pre style="margin-top:10px; background:#000; padding:10px; border-radius:6px; color:#0f0;">
-{{ tle.contents }}
-            </pre>
-        </details>
-    {% endfor %}
-{% else %}
-    <p>No TLE files found in the <code>tle/</code> folder.</p>
+{% if message %}
+    <div class="alert alert-success">{{ message }}</div>
 {% endif %}
 
-<!-- Status message -->
-{% if message %}
-    <p style="color:lime; margin-top: 1em;">{{ message }}</p>
+{% if tle_files %}
+    <div class="row g-3">
+        {% for tle in tle_files %}
+        <div class="col-12 col-md-6">
+            <div class="card h-100 border-success">
+                <div class="card-body">
+                    <h5 class="card-title text-success">{{ tle.name }}</h5>
+                    <p class="card-subtitle mb-2 text-muted small">Last updated: {{ tle.last_updated }}</p>
+                    <pre class="bg-dark text-light p-2 rounded" style="font-size: 0.85rem; max-height: 200px; overflow-y: auto;">{{ tle.contents }}</pre>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="alert alert-warning">No TLE files found.</div>
 {% endif %}
 {% endblock %}
