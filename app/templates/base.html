@@ -17,6 +17,8 @@
         <a href="{{ url_for('config_page') }}">Config</a>
         <a href="{{ url_for('tle_manage') }}">TLE Manage</a>
         <a href="{{ url_for('tle_view') }}">TLE Info</a> 
+        <a href="{{ url_for('export_settings') }}">Export Settings</a>
+        <a href="{{ url_for('import_settings') }}">Import Settings</a> 
     </nav>
     <div class="content">
         {% block content %}{% endblock %}
