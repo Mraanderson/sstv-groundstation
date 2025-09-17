@@ -13,10 +13,13 @@
         <input class="form-check-input" type="checkbox" id="timeToggle" {% if not show_local_time %}checked{% endif %}>
         <label class="form-check-label" for="timeToggle">Show UTC</label>
       </div>
-      <button id="updateTleBtn" class="btn btn-sm btn-primary">Update TLE</button>
+      <form action="{{ url_for('update_tle') }}" method="post" class="m-0">
+        <button type="submit" class="btn btn-sm btn-primary">Update TLE</button>
+      </form>
     </div>
   </div>
 
+  {% if info %}
   <small class="text-muted mb-2 d-block" id="diagnosticsLine">
     🛰 <strong>TLE epoch (UTC):</strong> {{ info.tle_epoch_utc }} ·
     ⏳ <strong>TLE age:</strong> {{ info.tle_age_days }} days ·
@@ -24,6 +27,7 @@
     🎯 <strong>Min elev:</strong> {{ info.min_elev_deg }}° ·
     <span id="timeModeLabel"><strong>Time mode:</strong> {{ 'Local' if show_local_time else 'UTC' }}</span>
   </small>
+  {% endif %}
 
   {% if message %}
     <div class="alert alert-warning">{{ message }}</div>
@@ -40,13 +44,7 @@
         </thead>
         <tbody>
           {% for p in passes %}
-          {% set now = namespace(highlight='') %}
-          {% if p.aos <= current_time <= p.los %}
-            {% set now.highlight = 'table-warning' %}
-          {% elif p.aos <= current_time + timedelta(hours=1) and p.aos > current_time %}
-            {% set now.highlight = 'table-info' %}
-          {% endif %}
-          <tr class="{{ now.highlight }}">
+          <tr>
             <td data-utc="{{ p.aos.strftime('%Y-%m-%dT%H:%M:%SZ') }}">{{ p.aos.strftime('%Y-%m-%d %H:%M:%S') }}</td>
             <td data-utc="{{ p.los.strftime('%Y-%m-%dT%H:%M:%SZ') }}">{{ p.los.strftime('%Y-%m-%d %H:%M:%S') }}</td>
             <td class="text-center">{{ '%.1f'|format(p.max_elev) }}</td>
@@ -59,8 +57,6 @@
   {% else %}
     <p class="text-light">No ISS passes found in the next 24 hours.</p>
   {% endif %}
-
-  <div id="tleMessage" class="mt-3" style="display:none;"></div>
 </div>
 
 <script>
@@ -92,27 +88,5 @@ document.getElementById('timeToggle').addEventListener('change', function() {
     body: JSON.stringify({ show_local_time: !showUTC })
   });
 });
-
-document.getElementById('updateTleBtn').addEventListener('click', function() {
-  fetch("{{ url_for('update_tle') }}", { method: "POST" })
-    .then(res => {
-      if (res.ok) {
-        document.getElementById('tleMessage').className = 'alert alert-success';
-        document.getElementById('tleMessage').textContent = 'TLE updated successfully.';
-        document.getElementById('tleMessage').style.display = 'block';
-        setTimeout(() => { document.getElementById('tleMessage').style.display = 'none'; }, 5000);
-      } else {
-        document.getElementById('tleMessage').className = 'alert alert-danger';
-        document.getElementById('tleMessage').textContent = 'Error updating TLE.';
-        document.getElementById('tleMessage').style.display = 'block';
-      }
-    })
-    .catch(() => {
-      document.getElementById('tleMessage').className = 'alert alert-danger';
-      document.getElementById('tleMessage').textContent = 'Error updating TLE.';
-      document.getElementById('tleMessage').style.display = 'block';
-    });
-});
 </script>
 {% endblock %}
-            
