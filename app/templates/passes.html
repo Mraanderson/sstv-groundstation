@@ -44,14 +44,7 @@
         </thead>
         <tbody>
           {% for p in passes %}
-            {% if p.aos <= now_utc <= p.los %}
-              {% set row_class = 'table-warning' %}
-            {% elif p.aos <= now_utc + timedelta(hours=1) and p.aos > now_utc %}
-              {% set row_class = 'table-info' %}
-            {% else %}
-              {% set row_class = '' %}
-            {% endif %}
-            <tr class="{{ row_class }}">
+            <tr class="{{ p.row_class }}">
               <td data-utc="{{ p.aos.strftime('%Y-%m-%dT%H:%M:%SZ') }}">{{ p.aos.strftime('%Y-%m-%d %H:%M:%S') }}</td>
               <td data-utc="{{ p.los.strftime('%Y-%m-%dT%H:%M:%SZ') }}">{{ p.los.strftime('%Y-%m-%d %H:%M:%S') }}</td>
               <td class="text-center">{{ '%.1f'|format(p.max_elev) }}</td>
@@ -97,4 +90,3 @@ document.getElementById('timeToggle').addEventListener('change', function() {
 });
 </script>
 {% endblock %}
-              
