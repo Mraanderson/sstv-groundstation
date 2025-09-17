@@ -4,7 +4,7 @@
 {% block content %}
 <div class="card p-3 bg-secondary text-light">
 
-  <!-- Header -->
+  <!-- Heading -->
   <div class="mb-2">
     <h2 class="mb-0">Upcoming ISS Passes</h2>
     <small class="text-muted">(Next 24 Hours)</small>
@@ -12,7 +12,7 @@
 
   <!-- Show UTC slider -->
   <div class="form-check form-switch mb-3">
-    <input class="form-check-input" type="checkbox" id="timeToggle" {% if show_local_time == false %}checked{% endif %}>
+    <input class="form-check-input" type="checkbox" id="timeToggle" {% if not show_local_time %}checked{% endif %}>
     <label class="form-check-label" for="timeToggle">Show UTC</label>
   </div>
 
@@ -40,8 +40,8 @@
     <table class="table table-dark table-striped table-hover align-middle" id="passesTable">
       <thead>
         <tr>
-          <th>AOS</th>
-          <th>LOS</th>
+          <th id="aosHeader">AOS ({{ 'Local' if show_local_time else 'UTC' }})</th>
+          <th id="losHeader">LOS ({{ 'Local' if show_local_time else 'UTC' }})</th>
           <th>Max Elev (°)</th>
           <th>Duration (s)</th>
         </tr>
@@ -69,17 +69,14 @@ function setDisplayMode(showUTC) {
     row.querySelectorAll('td[data-utc]').forEach(cell => {
       const utcString = cell.getAttribute('data-utc');
       const date = new Date(utcString);
-      if (showUTC) {
-        cell.textContent = utcString.replace('T', ' ').replace('Z', '');
-      } else {
-        cell.textContent = date.toLocaleString();
-      }
+      cell.textContent = showUTC ? utcString.replace('T', ' ').replace('Z', '') : date.toLocaleString();
     });
   });
+  document.getElementById('aosHeader').textContent = `AOS (${showUTC ? 'UTC' : 'Local'})`;
+  document.getElementById('losHeader').textContent = `LOS (${showUTC ? 'UTC' : 'Local'})`;
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-  // Default to local time unless show_local_time is false
   const showUTC = document.getElementById('timeToggle').checked;
   setDisplayMode(showUTC);
 });
