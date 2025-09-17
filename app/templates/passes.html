@@ -5,12 +5,15 @@
 <div class="card p-3 bg-secondary text-light">
 
   <!-- Header -->
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2 class="mb-0">Upcoming ISS Passes (Next 24 Hours)</h2>
-    <div class="form-check form-switch">
-      <input class="form-check-input" type="checkbox" id="timeToggle" {% if show_local_time %}checked{% endif %}>
-      <label class="form-check-label" for="timeToggle">Show in local time</label>
-    </div>
+  <div class="mb-2">
+    <h2 class="mb-0">Upcoming ISS Passes</h2>
+    <small class="text-muted">(Next 24 Hours)</small>
+  </div>
+
+  <!-- Show UTC slider -->
+  <div class="form-check form-switch mb-3">
+    <input class="form-check-input" type="checkbox" id="timeToggle" {% if show_local_time == false %}checked{% endif %}>
+    <label class="form-check-label" for="timeToggle">Show UTC</label>
   </div>
 
   <!-- Update TLE button + last updated -->
@@ -46,7 +49,6 @@
       <tbody>
         {% for p in passes %}
         <tr>
-          <!-- Safe UTC format for JS parsing -->
           <td data-utc="{{ p.aos.strftime('%Y-%m-%dT%H:%M:%SZ') }}">{{ p.aos.strftime('%Y-%m-%d %H:%M:%S') }}</td>
           <td data-utc="{{ p.los.strftime('%Y-%m-%dT%H:%M:%SZ') }}">{{ p.los.strftime('%Y-%m-%d %H:%M:%S') }}</td>
           <td>{{ '%.1f'|format(p.max_elev) }}</td>
@@ -60,27 +62,35 @@
   {% endif %}
 </div>
 
-<!-- Timezone toggle script -->
 <script>
-document.getElementById('timeToggle').addEventListener('change', function() {
+function setDisplayMode(showUTC) {
   const rows = document.querySelectorAll('#passesTable tbody tr');
   rows.forEach(row => {
     row.querySelectorAll('td[data-utc]').forEach(cell => {
       const utcString = cell.getAttribute('data-utc');
       const date = new Date(utcString);
-      if (this.checked) {
-        cell.textContent = date.toLocaleString();
-      } else {
+      if (showUTC) {
         cell.textContent = utcString.replace('T', ' ').replace('Z', '');
+      } else {
+        cell.textContent = date.toLocaleString();
       }
     });
   });
+}
 
-  // Save preference to config.json via backend
+document.addEventListener('DOMContentLoaded', function() {
+  // Default to local time unless show_local_time is false
+  const showUTC = document.getElementById('timeToggle').checked;
+  setDisplayMode(showUTC);
+});
+
+document.getElementById('timeToggle').addEventListener('change', function() {
+  const showUTC = this.checked;
+  setDisplayMode(showUTC);
   fetch("{{ url_for('set_time_display') }}", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ show_local_time: this.checked })
+    body: JSON.stringify({ show_local_time: !showUTC })
   });
 });
 </script>
