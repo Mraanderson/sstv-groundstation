@@ -1,123 +1,31 @@
 {% extends "base.html" %}
-
 {% block title %}Configuration{% endblock %}
-
 {% block content %}
-<h1 class="mb-4 text-success">Station Configuration</h1>
-
-<form method="post" id="configForm" class="card p-3 border-success">
+<div class="card p-3">
+  <h2>Configuration</h2>
+  {% if message %}<div class="alert alert-info">{{ message }}</div>{% endif %}
+  <form method="post">
     <div class="mb-3">
-        <label for="location_lat" class="form-label">Latitude (°)</label>
-        <input type="text" class="form-control" id="location_lat" name="location_lat" value="{{ config_data.location_lat }}">
+      <label class="form-label">Latitude</label>
+      <input type="text" class="form-control" name="location_lat" value="{{ config_data.location_lat }}">
     </div>
-
     <div class="mb-3">
-        <label for="location_lon" class="form-label">Longitude (°)</label>
-        <input type="text" class="form-control" id="location_lon" name="location_lon" value="{{ config_data.location_lon }}">
+      <label class="form-label">Longitude</label>
+      <input type="text" class="form-control" name="location_lon" value="{{ config_data.location_lon }}">
     </div>
-
     <div class="mb-3">
-        <label for="location_alt" class="form-label">Altitude (m)</label>
-        <input type="text" class="form-control" id="location_alt" name="location_alt" value="{{ config_data.location_alt }}">
+      <label class="form-label">Altitude (m)</label>
+      <input type="text" class="form-control" name="location_alt" value="{{ config_data.location_alt }}">
     </div>
-
     <div class="mb-3">
-        <label for="timezone" class="form-label">Timezone (e.g., Europe/London)</label>
-        <input type="text" class="form-control" id="timezone" name="timezone" value="{{ config_data.timezone }}">
+      <label class="form-label">Timezone</label>
+      <input type="text" class="form-control" name="timezone" value="{{ config_data.timezone }}">
     </div>
-
-    <div id="map" style="height: 300px; border: 1px solid #333; border-radius: 0.5rem;" class="mb-3"></div>
-    <p class="small text-muted">Click on the map to set your location. Altitude will be fetched automatically.</p>
-
-    <button type="submit" id="saveBtn" class="btn btn-primary w-100" disabled>Save</button>
-</form>
-
-{% if message %}
-    <div class="alert alert-success mt-3">{{ message }}</div>
-{% endif %}
-
-<!-- Leaflet CSS & JS -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-    var latField = document.getElementById('location_lat');
-    var lonField = document.getElementById('location_lon');
-    var altField = document.getElementById('location_alt');
-    var tzField  = document.getElementById('timezone');
-    var saveBtn  = document.getElementById('saveBtn');
-
-    var map = L.map('map').setView([0, 0], 2);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
-
-    var marker;
-
-    function validateForm() {
-        const lat = parseFloat(latField.value);
-        const lon = parseFloat(lonField.value);
-        const alt = parseFloat(altField.value);
-        const tz  = tzField.value.trim();
-
-        const validLat = !isNaN(lat) && lat >= -90 && lat <= 90;
-        const validLon = !isNaN(lon) && lon >= -180 && lon <= 180;
-        const validAlt = !isNaN(alt);
-        const validTz  = tz.length > 0;
-
-        saveBtn.disabled = !(validLat && validLon && validAlt && validTz);
-    }
-
-    function setLocation(lat, lon) {
-        latField.value = lat.toFixed(6);
-        lonField.value = lon.toFixed(6);
-
-        fetch(`https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lon}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.results && data.results.length > 0) {
-                    altField.value = data.results[0].elevation;
-                    validateForm();
-                }
-            })
-            .catch(err => console.error("Altitude fetch error:", err));
-
-        if (marker) {
-            marker.setLatLng([lat, lon]);
-        } else {
-            marker = L.marker([lat, lon]).addTo(map);
-        }
-        validateForm();
-    }
-
-    map.on('click', function(e) {
-        setLocation(e.latlng.lat, e.latlng.lng);
-    });
-
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(function(pos) {
-            var lat = pos.coords.latitude;
-            var lon = pos.coords.longitude;
-            map.setView([lat, lon], 13);
-            setLocation(lat, lon);
-        }, function() {
-            console.warn("Geolocation permission denied or unavailable.");
-        });
-    }
-
-    try {
-        var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        tzField.value = tz;
-    } catch (e) {
-        console.warn("Could not detect timezone:", e);
-    }
-
-    [latField, lonField, altField, tzField].forEach(field => {
-        field.addEventListener('input', validateForm);
-    });
-
-    validateForm();
-});
-</script>
+    <div class="form-check mb-3">
+      <input class="form-check-input" type="checkbox" name="show_local_time" {% if config_data.show_local_time %}checked{% endif %}>
+      <label class="form-check-label">Show Local Time by Default</label>
+    </div>
+    <button type="submit" class="btn btn-primary">Save</button>
+  </form>
+</div>
 {% endblock %}
