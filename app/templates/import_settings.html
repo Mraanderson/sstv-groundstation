@@ -1,25 +1,15 @@
 {% extends "base.html" %}
-
 {% block title %}Import Settings{% endblock %}
-
 {% block content %}
-<h1 class="mb-4 text-success">Import Settings</h1>
-
-<div class="card p-3 border-success">
-    <form method="post" enctype="multipart/form-data">
-        <div class="mb-3">
-            <label for="settings_file" class="form-label">Select Settings File (.json)</label>
-            <input class="form-control" type="file" id="settings_file" name="settings_file" accept=".json" required>
-        </div>
-        <button type="submit" class="btn btn-primary w-100">Import</button>
-    </form>
+<div class="card p-3">
+  <h2>Import Settings</h2>
+  {% if message %}<div class="alert alert-info">{{ message }}</div>{% endif %}
+  <form method="post" enctype="multipart/form-data">
+    <div class="mb-3">
+      <label for="settingsFile" class="form-label">Select settings file (.json)</label>
+      <input class="form-control" type="file" id="settingsFile" name="settings_file" accept=".json">
+    </div>
+    <button type="submit" class="btn btn-primary">Import</button>
+  </form>
 </div>
-
-{% if message %}
-    {% if "successfully" in message|lower %}
-        <div class="alert alert-success mt-3">{{ message }}</div>
-    {% else %}
-        <div class="alert alert-danger mt-3">{{ message }}</div>
-    {% endif %}
-{% endif %}
 {% endblock %}
