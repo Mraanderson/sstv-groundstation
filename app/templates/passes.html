@@ -3,6 +3,8 @@
 
 {% block content %}
 <div class="card p-3 bg-secondary text-light">
+
+  <!-- Header with toggle -->
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h2 class="mb-0">Upcoming ISS Passes (Next 24 Hours)</h2>
     <div class="form-check form-switch">
@@ -26,6 +28,7 @@
       <tbody>
         {% for p in passes %}
         <tr>
+          <!-- Store UTC datetime in data-utc attribute -->
           <td data-utc="{{ p.aos.isoformat() }}Z">{{ p.aos.strftime('%Y-%m-%d %H:%M:%S') }}</td>
           <td data-utc="{{ p.los.isoformat() }}Z">{{ p.los.strftime('%Y-%m-%d %H:%M:%S') }}</td>
           <td>{{ '%.1f'|format(p.max_elev) }}</td>
@@ -39,6 +42,7 @@
   {% endif %}
 </div>
 
+<!-- Timezone toggle script -->
 <script>
 document.getElementById('timeToggle').addEventListener('change', function() {
   const rows = document.querySelectorAll('#passesTable tbody tr');
