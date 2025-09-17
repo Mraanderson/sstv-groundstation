@@ -3,5 +3,5 @@ __pycach__/
 *.log
 vnuv/
 .env
-images
+images/
 app/config.json
