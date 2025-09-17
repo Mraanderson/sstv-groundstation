@@ -26,11 +26,12 @@
 
   <!-- Diagnostics -->
   {% if info %}
-  <div class="small text-muted mb-2">
+  <div class="small text-muted mb-2" id="diagnosticsLine">
     <span><strong>TLE epoch (UTC):</strong> {{ info.tle_epoch_utc }}</span> ·
     <span><strong>TLE age:</strong> {{ info.tle_age_days }} days</span> ·
     <span><strong>Observer:</strong> lat {{ info.observer.lat }}, lon {{ info.observer.lon }}, alt {{ info.observer.alt_m }} m</span> ·
-    <span><strong>Min elev:</strong> {{ info.min_elev_deg }}°</span>
+    <span><strong>Min elev:</strong> {{ info.min_elev_deg }}°</span> ·
+    <span id="timeModeLabel"><strong>Time mode:</strong> {{ 'Local' if show_local_time else 'UTC' }}</span>
   </div>
   {% endif %}
 
@@ -74,6 +75,7 @@ function setDisplayMode(showUTC) {
   });
   document.getElementById('aosHeader').textContent = `AOS (${showUTC ? 'UTC' : 'Local'})`;
   document.getElementById('losHeader').textContent = `LOS (${showUTC ? 'UTC' : 'Local'})`;
+  document.getElementById('timeModeLabel').innerHTML = `<strong>Time mode:</strong> ${showUTC ? 'UTC' : 'Local'}`;
 }
 
 document.addEventListener('DOMContentLoaded', function() {
