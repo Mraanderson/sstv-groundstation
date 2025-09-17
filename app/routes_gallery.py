@@ -11,4 +11,4 @@ def gallery():
 @bp.route("/images/<path:filename>")
 def serve_image(filename):
     return send_from_directory(IMAGES_DIR, filename)
-  
+    
