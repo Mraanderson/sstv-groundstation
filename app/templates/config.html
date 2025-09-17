@@ -3,16 +3,16 @@
 {% block content %}
 <div class="card p-3 position-relative">
 
-  <!-- Save button in top-right -->
-  <form method="post" class="position-absolute top-0 end-0 m-3">
-    <button type="submit" class="btn btn-primary btn-sm">Save</button>
-  </form>
-
-  <h2>Configuration</h2>
+  <h2 class="mb-3">Configuration</h2>
   {% if message %}<div class="alert alert-info">{{ message }}</div>{% endif %}
 
-  <!-- Main form -->
+  <!-- Single form containing everything -->
   <form method="post" id="configForm">
+
+    <!-- Save button top-right -->
+    <div class="position-absolute top-0 end-0 m-3">
+      <button type="submit" class="btn btn-primary btn-sm">Save</button>
+    </div>
 
     <!-- Lat/Lon side-by-side -->
     <div class="row mb-3">
@@ -87,7 +87,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       });
 
-    // Fetch timezone from backend
+    // Fetch timezone from backend (timezonefinder)
     fetch(`/get-timezone?lat=${lat}&lon=${lng}`)
       .then(res => res.json())
       .then(data => {
