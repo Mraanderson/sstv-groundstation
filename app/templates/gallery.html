@@ -1,26 +1,18 @@
 {% extends "base.html" %}
-
-{% block title %}Image Gallery{% endblock %}
-
+{% block title %}Gallery{% endblock %}
 {% block content %}
-<h1 class="mb-4 text-success">Image Gallery</h1>
-
-{% if image_names %}
-<div class="row g-3">
-    {% for image in image_names %}
-    <div class="col-6 col-md-4 col-lg-3">
-        <div class="card h-100 border-success">
-            <a href="{{ url_for('serve_image', filename=image) }}" target="_blank">
-                <img src="{{ url_for('serve_image', filename=image) }}" class="card-img-top img-fluid" alt="SSTV Image">
-            </a>
-            <div class="card-body p-2">
-                <p class="card-text small text-truncate" title="{{ image }}">{{ image }}</p>
-            </div>
+<div class="card p-3">
+  <h2>Gallery</h2>
+  {% if image_names %}
+    <div class="row">
+      {% for image in image_names %}
+        <div class="col-md-3 mb-3">
+          <img src="{{ url_for('serve_image', filename=image) }}" class="img-fluid rounded" alt="Image">
         </div>
+      {% endfor %}
     </div>
-    {% endfor %}
+  {% else %}
+    <p class="text-muted">No images found.</p>
+  {% endif %}
 </div>
-{% else %}
-<div class="alert alert-warning">No images found.</div>
-{% endif %}
 {% endblock %}
