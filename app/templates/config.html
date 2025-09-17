@@ -7,11 +7,11 @@
   <form method="post">
     <div class="mb-3">
       <label class="form-label">Latitude</label>
-      <input type="text" class="form-control" name="location_lat" value="{{ config_data.location_lat }}">
+      <input type="text" class="form-control" id="lat" name="location_lat" value="{{ config_data.location_lat }}">
     </div>
     <div class="mb-3">
       <label class="form-label">Longitude</label>
-      <input type="text" class="form-control" name="location_lon" value="{{ config_data.location_lon }}">
+      <input type="text" class="form-control" id="lon" name="location_lon" value="{{ config_data.location_lon }}">
     </div>
     <div class="mb-3">
       <label class="form-label">Altitude (m)</label>
@@ -25,7 +25,38 @@
       <input class="form-check-input" type="checkbox" name="show_local_time" {% if config_data.show_local_time %}checked{% endif %}>
       <label class="form-check-label">Show Local Time by Default</label>
     </div>
+
+    <!-- Map container -->
+    <div id="map" style="height: 300px;" class="mb-3"></div>
+
     <button type="submit" class="btn btn-primary">Save</button>
   </form>
 </div>
+
+<!-- Leaflet CSS & JS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const latInput = document.getElementById('lat');
+  const lonInput = document.getElementById('lon');
+  const startLat = parseFloat(latInput.value) || 0;
+  const startLon = parseFloat(lonInput.value) || 0;
+
+  const map = L.map('map').setView([startLat, startLon], 4);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  let marker = L.marker([startLat, startLon]).addTo(map);
+
+  map.on('click', function(e) {
+    const { lat, lng } = e.latlng;
+    latInput.value = lat.toFixed(6);
+    lonInput.value = lng.toFixed(6);
+    marker.setLatLng([lat, lng]);
+  });
+});
+</script>
 {% endblock %}
