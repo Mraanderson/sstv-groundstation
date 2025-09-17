@@ -1,16 +1,9 @@
 {% extends "base.html" %}
-
 {% block title %}Export Settings{% endblock %}
-
 {% block content %}
-<h1 class="mb-4 text-success">Export Settings</h1>
-
-<div class="card p-3 border-success">
-    <p class="mb-3">
-        Click the button below to download your current configuration and satellite list
-        as a <code>.json</code> file. You can later import this file to restore your settings.
-    </p>
-    <a href="{{ url_for('export_settings') }}" class="btn btn-primary w-100">Download Settings</a>
+<div class="card p-3">
+  <h2>Export Settings</h2>
+  <p>You can export your current configuration as a JSON file for backup or transfer.</p>
+  <a href="{{ url_for('export_settings') }}" class="btn btn-success">Download Settings</a>
 </div>
 {% endblock %}
-  
