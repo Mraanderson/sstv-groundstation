@@ -48,7 +48,7 @@ def passes_page():
     }
     warn = "TLE is older than 7 days — refresh from CelesTrak." if tle_age_days > 7 else None
 
-    # ✅ Make now_utc timezone-aware
+    # Timezone-aware current time
     now_utc = datetime.now(timezone.utc)
     start, end = now_utc, now_utc + timedelta(hours=24)
 
