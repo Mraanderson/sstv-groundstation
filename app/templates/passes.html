@@ -4,13 +4,21 @@
 {% block content %}
 <div class="card p-3 bg-secondary text-light">
 
-  <!-- Header with toggle -->
+  <!-- Header -->
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h2 class="mb-0">Upcoming ISS Passes (Next 24 Hours)</h2>
     <div class="form-check form-switch">
       <input class="form-check-input" type="checkbox" id="timeToggle">
       <label class="form-check-label" for="timeToggle">Show in local time</label>
     </div>
+  </div>
+
+  <!-- Update TLE button + last updated -->
+  <div class="d-flex align-items-center mb-3">
+    <form method="post" action="{{ url_for('update_tle') }}" class="me-3">
+      <button type="submit" class="btn btn-sm btn-primary">Update TLE</button>
+    </form>
+    <small class="text-muted">Last updated: {{ tle_last_updated }}</small>
   </div>
 
   <!-- Diagnostics -->
