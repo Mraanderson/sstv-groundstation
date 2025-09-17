@@ -4,7 +4,7 @@ from .utils import CONFIG_FILE, get_timezone_for_coords
 
 bp = Blueprint('config', __name__)
 
-@bp.route("/config", methods=["GET","POST"])
+@bp.route("/config", methods=["GET","POST"], endpoint='config_page')
 def config_page():
     keys = ["location_lat","location_lon","location_alt","timezone","show_local_time"]
     msg = None
@@ -17,7 +17,7 @@ def config_page():
         with open(CONFIG_FILE) as f: cfg_data = json.load(f)
     return render_template("config.html", config_data=cfg_data, message=msg)
 
-@bp.route("/get-timezone")
+@bp.route("/get-timezone", endpoint='get_timezone')
 def get_timezone():
     try:
         lat = float(request.args.get("lat")); lon = float(request.args.get("lon"))
