@@ -4,7 +4,7 @@ from .utils import CONFIG_FILE
 
 bp = Blueprint('settings', __name__)
 
-@bp.route("/import-settings", methods=["GET", "POST"])
+@bp.route("/import-settings", methods=["GET", "POST"], endpoint='import_settings')
 def import_settings():
     msg = None
     if request.method == "POST":
@@ -21,7 +21,7 @@ def import_settings():
             msg = "Please upload a valid .json file."
     return render_template("import_settings.html", message=msg)
 
-@bp.route("/export-settings")
+@bp.route("/export-settings", endpoint='export_settings')
 def export_settings():
     data = {"config": {}}
     if os.path.exists(CONFIG_FILE):
@@ -33,7 +33,7 @@ def export_settings():
         headers={"Content-Disposition": "attachment; filename=settings.json"}
     )
 
-@bp.route("/export-settings-page")
+@bp.route("/export-settings-page", endpoint='export_settings_page')
 def export_settings_page():
     return render_template("export_settings.html")
     
