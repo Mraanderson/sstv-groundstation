@@ -67,7 +67,7 @@ def config_page():
             cfg[k] = request.form.get(k)=="on" if k=="show_local_time" else request.form.get(k,"")
         with open(CONFIG_FILE,"w") as f: json.dump(cfg,f,indent=4)
         msg = "Configuration updated successfully."
-    cfg_data = {k:"" for k in keys}
+    cfg_data = {k:(True if k=="show_local_time" else "") for k in keys}
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE) as f: cfg_data = json.load(f)
     return render_template("config.html", config_data=cfg_data, message=msg)
@@ -84,7 +84,7 @@ def set_time_display():
     cfg = {}
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE) as f: cfg = json.load(f)
-    cfg["show_local_time"] = bool(data.get("show_local_time", False))
+    cfg["show_local_time"] = bool(data.get("show_local_time", True))
     with open(CONFIG_FILE,"w") as f: json.dump(cfg,f,indent=4)
     return ("",204)
 
@@ -96,7 +96,7 @@ def passes_page():
         except Exception as e: return render_template("passes.html", passes=[], message=f"TLE refresh failed: {e}", tle_last_updated=get_tle_last_updated())
     with open(CONFIG_FILE) as f: cfg = json.load(f)
     lat, lon, alt = float(cfg.get("location_lat",0)), float(cfg.get("location_lon",0)), float(cfg.get("location_alt",0))
-    show_local_time = bool(cfg.get("show_local_time", False))
+    show_local_time = bool(cfg.get("show_local_time", True))
     with open(TLE_FILE) as f: name,l1,l2 = f.read().strip().splitlines()[:3]
     ts = Loader('./skyfield_data').timescale()
     observer = wgs84.latlon(latitude_degrees=lat, longitude_degrees=lon, elevation_m=alt)
@@ -149,3 +149,4 @@ def export_settings():
 def export_settings_page(): return render_template("export_settings.html")
 
 if __name__=="__main__": app.run(debug=True, host="0.0.0.0")
+    
