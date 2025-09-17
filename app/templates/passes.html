@@ -18,11 +18,12 @@
 
   <!-- Update TLE button + last updated -->
   <div class="d-flex align-items-center mb-3">
-    <form method="post" action="{{ url_for('update_tle') }}" class="me-3">
-      <button type="submit" class="btn btn-sm btn-primary">Update TLE</button>
-    </form>
-    <small class="text-muted">Last updated: {{ tle_last_updated }}</small>
+    <button id="updateTleBtn" class="btn btn-sm btn-primary me-3">Update TLE</button>
+    <small class="text-muted">Last updated: <span id="tleLastUpdated">{{ tle_last_updated }}</span></small>
   </div>
+
+  <!-- Flash message -->
+  <div id="tleMessage" class="mb-3" style="display:none;"></div>
 
   <!-- Diagnostics -->
   {% if info %}
@@ -91,6 +92,28 @@ document.getElementById('timeToggle').addEventListener('change', function() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ show_local_time: !showUTC })
   });
+});
+
+document.getElementById('updateTleBtn').addEventListener('click', function() {
+  fetch("{{ url_for('update_tle') }}", { method: "POST" })
+    .then(res => {
+      if (res.ok) {
+        document.getElementById('tleMessage').className = 'alert alert-success';
+        document.getElementById('tleMessage').textContent = 'TLE updated successfully.';
+        document.getElementById('tleLastUpdated').textContent = new Date().toUTCString();
+      } else {
+        document.getElementById('tleMessage').className = 'alert alert-danger';
+        document.getElementById('tleMessage').textContent = 'Error updating TLE.';
+      }
+      document.getElementById('tleMessage').style.display = 'block';
+      setTimeout(() => { document.getElementById('tleMessage').style.display = 'none'; }, 3000);
+    })
+    .catch(() => {
+      document.getElementById('tleMessage').className = 'alert alert-danger';
+      document.getElementById('tleMessage').textContent = 'Error updating TLE.';
+      document.getElementById('tleMessage').style.display = 'block';
+      setTimeout(() => { document.getElementById('tleMessage').style.display = 'none'; }, 3000);
+    });
 });
 </script>
 {% endblock %}
