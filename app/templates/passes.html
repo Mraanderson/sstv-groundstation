@@ -43,13 +43,21 @@
           </tr>
         </thead>
         <tbody>
+          {% set now_utc = namespace(value=datetime.utcnow()) %}
           {% for p in passes %}
-          <tr>
-            <td data-utc="{{ p.aos.strftime('%Y-%m-%dT%H:%M:%SZ') }}">{{ p.aos.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-            <td data-utc="{{ p.los.strftime('%Y-%m-%dT%H:%M:%SZ') }}">{{ p.los.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-            <td class="text-center">{{ '%.1f'|format(p.max_elev) }}</td>
-            <td class="text-center">{{ p.duration }}</td>
-          </tr>
+            {% if p.aos <= now_utc.value <= p.los %}
+              {% set row_class = 'table-warning' %}
+            {% elif p.aos <= now_utc.value + timedelta(hours=1) and p.aos > now_utc.value %}
+              {% set row_class = 'table-info' %}
+            {% else %}
+              {% set row_class = '' %}
+            {% endif %}
+            <tr class="{{ row_class }}">
+              <td data-utc="{{ p.aos.strftime('%Y-%m-%dT%H:%M:%SZ') }}">{{ p.aos.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+              <td data-utc="{{ p.los.strftime('%Y-%m-%dT%H:%M:%SZ') }}">{{ p.los.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+              <td class="text-center">{{ '%.1f'|format(p.max_elev) }}</td>
+              <td class="text-center">{{ p.duration }}</td>
+            </tr>
           {% endfor %}
         </tbody>
       </table>
@@ -90,3 +98,4 @@ document.getElementById('timeToggle').addEventListener('change', function() {
 });
 </script>
 {% endblock %}
+              
