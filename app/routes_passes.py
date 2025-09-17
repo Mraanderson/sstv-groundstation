@@ -48,8 +48,10 @@ def passes_page():
     }
     warn = "TLE is older than 7 days — refresh from CelesTrak." if tle_age_days > 7 else None
 
+    # ✅ Make now_utc timezone-aware
     now_utc = datetime.now(timezone.utc)
-    start, end = datetime.now(timezone.utc), datetime.now(timezone.utc) + timedelta(hours=24)
+    start, end = now_utc, now_utc + timedelta(hours=24)
+
     passes = []
     try:
         t, events = sat.find_events(
@@ -99,3 +101,4 @@ def passes_page():
         tle_last_updated=get_tle_last_updated(),
         show_local_time=show_local_time
     )
+    
