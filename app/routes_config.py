@@ -24,4 +24,4 @@ def get_timezone():
     except (TypeError, ValueError):
         return {"timezone": ""}
     return {"timezone": get_timezone_for_coords(lat, lon)}
-  
+    
