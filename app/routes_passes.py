@@ -10,10 +10,10 @@ from .utils import (
 
 bp = Blueprint('passes', __name__)
 
-@bp.route("/passes")
+@bp.route("/passes", endpoint='passes_page')
 def passes_page():
     if not config_exists_and_valid():
-        return redirect(url_for('config.config_page'))
+        return redirect(url_for('config_page'))
 
     if tle_needs_refresh():
         try:
@@ -48,10 +48,8 @@ def passes_page():
     }
     warn = "TLE is older than 7 days — refresh from CelesTrak." if tle_age_days > 7 else None
 
-    # Timezone-aware current time
     now_utc = datetime.now(timezone.utc)
     start, end = now_utc, now_utc + timedelta(hours=24)
-
     passes = []
     try:
         t, events = sat.find_events(
