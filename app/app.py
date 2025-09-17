@@ -1,15 +1,18 @@
-from flask import Flask, render_template, send_from_directory, request, redirect, url_for
+from flask import Flask, render_template, send_from_directory, request, redirect, url_for, Response
 import os, json, requests
 from datetime import datetime, timedelta, timezone
 from skyfield.api import Loader, wgs84, EarthSatellite
 from timezonefinder import TimezoneFinder
 
 app = Flask(__name__)
+
+# Paths
 IMAGES_DIR = os.path.abspath(os.path.join(app.root_path, '..', 'images'))
 TLE_DIR = os.path.abspath(os.path.join(app.root_path, '..', 'tle'))
 CONFIG_FILE = os.path.join(app.root_path, 'config.json')
 TLE_FILE = os.path.join(TLE_DIR, "iss__zarya_.txt")
 
+# Utilities
 def get_all_images():
     imgs = []
     for root, _, files in os.walk(IMAGES_DIR):
@@ -31,8 +34,8 @@ def config_exists_and_valid():
 
 def get_tle_last_updated():
     if os.path.exists(TLE_FILE):
-        mtime = datetime.fromtimestamp(os.path.getmtime(TLE_FILE), tz=timezone.utc)
-        return mtime.strftime("%Y-%m-%d %H:%M:%S UTC")
+        m = datetime.fromtimestamp(os.path.getmtime(TLE_FILE), tz=timezone.utc)
+        return m.strftime("%Y-%m-%d %H:%M:%S UTC")
     return "Never"
 
 def fetch_latest_tle():
@@ -42,20 +45,21 @@ def fetch_latest_tle():
     lines = r.text.strip().splitlines()
     for i in range(len(lines)):
         if lines[i].upper().startswith("ISS"):
-            with open(TLE_FILE,"w") as f: f.write("\n".join(lines[i:i+3])+"\n")
+            with open(TLE_FILE, "w") as f: f.write("\n".join(lines[i:i+3]) + "\n")
             return True
     return False
 
 def tle_needs_refresh(max_age_days=3):
     if not os.path.exists(TLE_FILE): return True
-    mtime = datetime.fromtimestamp(os.path.getmtime(TLE_FILE), tz=timezone.utc)
-    return (datetime.now(timezone.utc)-mtime).total_seconds()/86400.0 > max_age_days
+    m = datetime.fromtimestamp(os.path.getmtime(TLE_FILE), tz=timezone.utc)
+    return (datetime.now(timezone.utc) - m).total_seconds()/86400.0 > max_age_days
 
+# Routes
 @app.route("/images/<path:filename>")
 def serve_image(filename): 
     return send_from_directory(IMAGES_DIR, filename)
 
-@app.route("/") 
+@app.route("/")
 @app.route("/gallery")
 def gallery(): 
     return render_template("gallery.html", image_names=get_all_images())
@@ -64,109 +68,132 @@ def gallery():
 def config_page():
     keys = ["location_lat","location_lon","location_alt","timezone","show_local_time"]
     msg = None
-    if request.method=="POST":
+    if request.method == "POST":
         cfg = {}
         for k in keys:
-            cfg[k] = request.form.get(k)=="on" if k=="show_local_time" else request.form.get(k,"")
-        with open(CONFIG_FILE,"w") as f: json.dump(cfg,f,indent=4)
+            cfg[k] = (request.form.get(k) == "on") if k == "show_local_time" else request.form.get(k, "")
+        with open(CONFIG_FILE, "w") as f: json.dump(cfg, f, indent=4)
         msg = "Configuration updated successfully."
-    cfg_data = {k:(True if k=="show_local_time" else "") for k in keys}
+    cfg_data = {k: (True if k=="show_local_time" else "") for k in keys}
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE) as f: cfg_data = json.load(f)
     return render_template("config.html", config_data=cfg_data, message=msg)
 
 @app.route("/get-timezone")
 def get_timezone():
-    lat = float(request.args.get("lat"))
-    lon = float(request.args.get("lon"))
+    try:
+        lat = float(request.args.get("lat")); lon = float(request.args.get("lon"))
+    except (TypeError, ValueError):
+        return {"timezone": ""}
     tf = TimezoneFinder()
-    tz = tf.timezone_at(lat=lat, lng=lon)
+    tz = tf.timezone_at(lat=lat, lng=lon) or tf.closest_timezone_at(lat=lat, lng=lon) or ""
     return {"timezone": tz}
 
 @app.route("/update-tle", methods=["POST"])
 def update_tle():
-    try: 
-        msg = "TLE updated successfully." if fetch_latest_tle() else "ISS TLE not found in source."
-    except Exception as e: 
-        msg = f"Error updating TLE: {e}"
+    try:
+        fetch_latest_tle()
+    except Exception:
+        pass
     return redirect(url_for('passes_page'))
 
 @app.route("/set-time-display", methods=["POST"])
 def set_time_display():
-    data = request.get_json()
+    data = request.get_json() or {}
     cfg = {}
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE) as f: cfg = json.load(f)
     cfg["show_local_time"] = bool(data.get("show_local_time", True))
-    with open(CONFIG_FILE,"w") as f: json.dump(cfg,f,indent=4)
-    return ("",204)
+    with open(CONFIG_FILE, "w") as f: json.dump(cfg, f, indent=4)
+    return ("", 204)
 
 @app.route("/passes")
 def passes_page():
     if not config_exists_and_valid(): 
         return redirect(url_for('config_page'))
+
     if tle_needs_refresh():
         try: fetch_latest_tle()
-        except Exception as e: 
+        except Exception as e:
             return render_template("passes.html", passes=[], message=f"TLE refresh failed: {e}", tle_last_updated=get_tle_last_updated())
+
     with open(CONFIG_FILE) as f: cfg = json.load(f)
-    lat, lon, alt = float(cfg.get("location_lat",0)), float(cfg.get("location_lon",0)), float(cfg.get("location_alt",0))
+    lat = float(cfg.get("location_lat", 0)); lon = float(cfg.get("location_lon", 0)); alt = float(cfg.get("location_alt", 0))
     show_local_time = bool(cfg.get("show_local_time", True))
-    with open(TLE_FILE) as f: name,l1,l2 = f.read().strip().splitlines()[:3]
+
+    with open(TLE_FILE) as f: name, l1, l2 = f.read().strip().splitlines()[:3]
+
     ts = Loader('./skyfield_data').timescale()
     observer = wgs84.latlon(latitude_degrees=lat, longitude_degrees=lon, elevation_m=alt)
-    sat = EarthSatellite(l1,l2,name,ts)
+    sat = EarthSatellite(l1, l2, name, ts)
+
     tle_epoch_dt = sat.epoch.utc_datetime().replace(tzinfo=timezone.utc)
-    tle_age_days = (datetime.now(timezone.utc)-tle_epoch_dt).total_seconds()/86400.0
-    info = {"tle_epoch_utc": tle_epoch_dt.strftime("%Y-%m-%d %H:%M:%S"),
-            "tle_age_days": round(tle_age_days,2),
-            "observer":{"lat":lat,"lon":lon,"alt_m":alt},
-            "min_elev_deg":0.0}
-    warn = "TLE is older than 7 days — refresh from CelesTrak." if tle_age_days>7 else None
-    now, end_time = datetime.now(timezone.utc), datetime.now(timezone.utc)+timedelta(hours=24)
+    tle_age_days = (datetime.now(timezone.utc) - tle_epoch_dt).total_seconds()/86400.0
+    info = {
+        "tle_epoch_utc": tle_epoch_dt.strftime("%Y-%m-%d %H:%M:%S"),
+        "tle_age_days": round(tle_age_days, 2),
+        "observer": {"lat": lat, "lon": lon, "alt_m": alt},
+        "min_elev_deg": 0.0
+    }
+    warn = "TLE is older than 7 days — refresh from CelesTrak." if tle_age_days > 7 else None
+
+    now_utc = datetime.utcnow()
+    start = datetime.now(timezone.utc); end = start + timedelta(hours=24)
     passes = []
     try:
-        t, events = sat.find_events(observer, ts.from_datetime(now), ts.from_datetime(end_time), altitude_degrees=info["min_elev_deg"])
+        t, events = sat.find_events(observer, ts.from_datetime(start), ts.from_datetime(end), altitude_degrees=info["min_elev_deg"])
     except Exception as e:
         return render_template("passes.html", passes=[], message=f"Error finding passes: {e}", info=info, tle_last_updated=get_tle_last_updated(), show_local_time=show_local_time)
-    current_pass = {}
-    for ti, event in zip(t, events):
-        if event==0: current_pass={"satellite":"ISS (ZARYA)","aos":ti.utc_datetime()}
-        elif event==1: current_pass["max_elev"]=(sat-observer).at(ti).altaz()[0].degrees
-        elif event==2:
-            current_pass["los"]=ti.utc_datetime()
-            if "aos" in current_pass and "los" in current_pass:
-                current_pass["duration"]=(current_pass["los"]-current_pass["aos"]).seconds
-                passes.append(current_pass)
-            current_pass={}
-    passes.sort(key=lambda p:p["aos"])
+
+    current = {}
+    for ti, ev in zip(t, events):
+        if ev == 0:
+            current = {"satellite": "ISS (ZARYA)", "aos": ti.utc_datetime()}
+        elif ev == 1:
+            current["max_elev"] = (sat - observer).at(ti).altaz()[0].degrees
+        elif ev == 2:
+            current["los"] = ti.utc_datetime()
+            if "aos" in current and "los" in current:
+                current["duration"] = (current["los"] - current["aos"]).seconds
+                if current["aos"] <= now_utc <= current["los"]:
+                    current["row_class"] = "table-warning"
+                elif current["aos"] <= now_utc + timedelta(hours=1) and current["aos"] > now_utc:
+                    current["row_class"] = "table-info"
+                else:
+                    current["row_class"] = ""
+                passes.append(current)
+            current = {}
+
+    passes.sort(key=lambda p: p["aos"])
     return render_template("passes.html", passes=passes, message=warn, info=info, tle_last_updated=get_tle_last_updated(), show_local_time=show_local_time)
 
 @app.route("/import-settings", methods=["GET","POST"])
 def import_settings():
-    msg=None
-    if request.method=="POST":
-        file=request.files.get("settings_file")
+    msg = None
+    if request.method == "POST":
+        file = request.files.get("settings_file")
         if file and file.filename.endswith(".json"):
             try:
-                data=json.load(file)
-                with open(CONFIG_FILE,"w") as f: json.dump(data.get("config",{}),f,indent=4)
-                msg="Settings imported successfully."
-            except Exception as e: msg=f"Error importing settings: {e}"
-        else: msg="Please upload a valid .json file."
+                data = json.load(file)
+                with open(CONFIG_FILE, "w") as f: json.dump(data.get("config", {}), f, indent=4)
+                msg = "Settings imported successfully."
+            except Exception as e:
+                msg = f"Error importing settings: {e}"
+        else:
+            msg = "Please upload a valid .json file."
     return render_template("import_settings.html", message=msg)
 
 @app.route("/export-settings")
 def export_settings():
-    data={"config":{}}
+    data = {"config": {}}
     if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE) as f: data["config"]=json.load(f)
-    return app.response_class(json.dumps(data,indent=4), mimetype="application/json", headers={"Content-Disposition":"attachment;filename=settings.json"})
+        with open(CONFIG_FILE) as f: data["config"] = json.load(f)
+    return Response(json.dumps(data, indent=4), mimetype="application/json", headers={"Content-Disposition": "attachment; filename=settings.json"})
 
 @app.route("/export-settings-page")
 def export_settings_page(): 
     return render_template("export_settings.html")
 
-if __name__=="__main__": 
+if __name__ == "__main__": 
     app.run(debug=True, host="0.0.0.0")
     
