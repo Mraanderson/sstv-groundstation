@@ -1,31 +1,25 @@
 {% extends "base.html" %}
 {% block title %}Upcoming ISS Passes{% endblock %}
-
 {% block content %}
-<div class="card p-3 bg-secondary text-light">
+<div class="card p-3">
 
-  <!-- Heading -->
   <div class="mb-2">
     <h2 class="mb-0">Upcoming ISS Passes</h2>
     <small class="text-muted">(Next 24 Hours)</small>
   </div>
 
-  <!-- Show UTC slider -->
   <div class="form-check form-switch mb-3">
     <input class="form-check-input" type="checkbox" id="timeToggle" {% if not show_local_time %}checked{% endif %}>
     <label class="form-check-label" for="timeToggle">Show UTC</label>
   </div>
 
-  <!-- Update TLE button + last updated -->
   <div class="d-flex align-items-center mb-3">
     <button id="updateTleBtn" class="btn btn-sm btn-primary me-3">Update TLE</button>
     <small class="text-muted">Last updated: <span id="tleLastUpdated">{{ tle_last_updated }}</span></small>
   </div>
 
-  <!-- Flash message -->
   <div id="tleMessage" class="mb-3" style="display:none;"></div>
 
-  <!-- Diagnostics -->
   {% if info %}
   <div class="small text-muted mb-2" id="diagnosticsLine">
     <span><strong>TLE epoch (UTC):</strong> {{ info.tle_epoch_utc }}</span> ·
