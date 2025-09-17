@@ -1,3 +1,5 @@
+Current state broken
+
 # SSTV Ground Station
 
 A Python/Flask-based ground station for receiving, decoding, and managing Slow Scan Television (SSTV) images from satellites such as the ISS.  
