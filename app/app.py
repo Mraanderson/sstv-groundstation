@@ -83,17 +83,33 @@ def passes_page():
 
     load = Loader('./skyfield_data')
     ts = load.timescale()
-    observer = wgs84.latlon(lat, lon, alt)
+    observer = wgs84.latlon(latitude_degrees=lat, longitude_degrees=lon, elevation_m=alt)
     sat = EarthSatellite(l1, l2, name, ts)
+
+    # Diagnostics: TLE epoch and age
+    tle_epoch_dt = sat.epoch.utc_datetime().replace(tzinfo=timezone.utc)
+    tle_age_days = (datetime.now(timezone.utc) - tle_epoch_dt).total_seconds() / 86400.0
+    info = {
+        "tle_epoch_utc": tle_epoch_dt.strftime("%Y-%m-%d %H:%M:%S"),
+        "tle_age_days": round(tle_age_days, 2),
+        "observer": {"lat": lat, "lon": lon, "alt_m": alt},
+        "min_elev_deg": 0.0
+    }
+    warning = "TLE is older than 7 days — refresh from CelesTrak." if tle_age_days > 7 else None
 
     now = datetime.now(timezone.utc)
     end_time = now + timedelta(hours=24)
 
     passes = []
     try:
-        t, events = sat.find_events(observer, ts.from_datetime(now), ts.from_datetime(end_time), altitude_degrees=0.0)
+        t, events = sat.find_events(
+            observer,
+            ts.from_datetime(now),
+            ts.from_datetime(end_time),
+            altitude_degrees=info["min_elev_deg"]
+        )
     except Exception as e:
-        return render_template("passes.html", passes=[], message=f"Error finding passes: {e}")
+        return render_template("passes.html", passes=[], message=f"Error finding passes: {e}", info=info)
 
     current_pass = {}
     for ti, event in zip(t, events):
@@ -101,8 +117,8 @@ def passes_page():
             current_pass = {"satellite": sat_name, "aos": ti.utc_datetime()}
         elif event == 1:
             topocentric = (sat - observer).at(ti)
-            alt, az, distance = topocentric.altaz()
-            current_pass["max_elev"] = alt.degrees
+            alt_deg, az, distance = topocentric.altaz()
+            current_pass["max_elev"] = alt_deg.degrees
         elif event == 2:
             current_pass["los"] = ti.utc_datetime()
             if "aos" in current_pass and "los" in current_pass:
@@ -111,7 +127,7 @@ def passes_page():
             current_pass = {}
 
     passes.sort(key=lambda p: p["aos"])
-    return render_template("passes.html", passes=passes, message=None)
+    return render_template("passes.html", passes=passes, message=warning, info=info)
 
 # --- Import settings ---
 @app.route("/import-settings", methods=["GET", "POST"])
