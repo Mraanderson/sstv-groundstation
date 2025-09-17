@@ -1,7 +1,6 @@
 from flask import Flask, render_template, send_from_directory, request, redirect, url_for
 import os
 import json
-import re
 from datetime import datetime, timedelta, timezone
 import requests
 from skyfield.api import Loader, wgs84, EarthSatellite
@@ -25,6 +24,20 @@ def get_all_images():
                 image_files.append(rel_path.replace("\\", "/"))
     return sorted(image_files)
 
+# --- Config helpers ---
+def config_exists_and_valid():
+    if not os.path.exists(CONFIG_FILE):
+        return False
+    try:
+        with open(CONFIG_FILE) as f:
+            cfg = json.load(f)
+        for key in ["location_lat", "location_lon", "location_alt", "timezone"]:
+            if not cfg.get(key):
+                return False
+        return True
+    except Exception:
+        return False
+
 # --- TLE helpers ---
 def get_tle_last_updated():
     if os.path.exists(TLE_FILE):
@@ -33,6 +46,7 @@ def get_tle_last_updated():
     return "Never"
 
 def fetch_latest_tle():
+    os.makedirs(TLE_DIR, exist_ok=True)
     tle_url = "https://celestrak.org/NORAD/elements/stations.txt"
     r = requests.get(tle_url, timeout=10)
     r.raise_for_status()
@@ -43,6 +57,13 @@ def fetch_latest_tle():
                 f.write("\n".join(lines[i:i+3]) + "\n")
             return True
     return False
+
+def tle_needs_refresh(max_age_days=3):
+    if not os.path.exists(TLE_FILE):
+        return True
+    mtime = datetime.fromtimestamp(os.path.getmtime(TLE_FILE), tz=timezone.utc)
+    age_days = (datetime.now(timezone.utc) - mtime).total_seconds() / 86400.0
+    return age_days > max_age_days
 
 # --- Routes: Gallery ---
 @app.route("/images/<path:filename>")
@@ -86,31 +107,26 @@ def update_tle():
         message = f"Error updating TLE: {e}"
     return redirect(url_for('passes_page'))
 
-# --- Routes: Pass prediction for ISS ---
+# --- Pass prediction for ISS ---
 @app.route("/passes")
 def passes_page():
-    sat_name = "ISS (ZARYA)"
-    safe_name = re.sub(r"[^A-Za-z0-9_\-]", "_", sat_name.lower())
+    if not config_exists_and_valid():
+        return redirect(url_for('config_page'))
 
-    if not os.path.exists(TLE_FILE):
-        return render_template("passes.html", passes=[], message="ISS TLE file not found.", tle_last_updated=get_tle_last_updated())
-
-    if not os.path.exists(CONFIG_FILE):
-        return render_template("passes.html", passes=[], message="Station location not configured.", tle_last_updated=get_tle_last_updated())
+    if tle_needs_refresh():
+        try:
+            fetch_latest_tle()
+        except Exception as e:
+            return render_template("passes.html", passes=[], message=f"TLE refresh failed: {e}", tle_last_updated=get_tle_last_updated())
 
     with open(CONFIG_FILE) as f:
         cfg = json.load(f)
-    try:
-        lat = float(cfg.get("location_lat", 0))
-        lon = float(cfg.get("location_lon", 0))
-        alt = float(cfg.get("location_alt", 0))
-    except ValueError:
-        return render_template("passes.html", passes=[], message="Invalid station coordinates.", tle_last_updated=get_tle_last_updated())
+    lat = float(cfg.get("location_lat", 0))
+    lon = float(cfg.get("location_lon", 0))
+    alt = float(cfg.get("location_alt", 0))
 
     with open(TLE_FILE) as f:
         lines = f.read().strip().splitlines()
-        if len(lines) < 3:
-            return render_template("passes.html", passes=[], message="ISS TLE file incomplete.", tle_last_updated=get_tle_last_updated())
         name, l1, l2 = lines[0], lines[1], lines[2]
 
     load = Loader('./skyfield_data')
@@ -118,7 +134,6 @@ def passes_page():
     observer = wgs84.latlon(latitude_degrees=lat, longitude_degrees=lon, elevation_m=alt)
     sat = EarthSatellite(l1, l2, name, ts)
 
-    # Diagnostics: TLE epoch and age
     tle_epoch_dt = sat.epoch.utc_datetime().replace(tzinfo=timezone.utc)
     tle_age_days = (datetime.now(timezone.utc) - tle_epoch_dt).total_seconds() / 86400.0
     info = {
@@ -146,7 +161,7 @@ def passes_page():
     current_pass = {}
     for ti, event in zip(t, events):
         if event == 0:
-            current_pass = {"satellite": sat_name, "aos": ti.utc_datetime()}
+            current_pass = {"satellite": "ISS (ZARYA)", "aos": ti.utc_datetime()}
         elif event == 1:
             topocentric = (sat - observer).at(ti)
             alt_deg, az, distance = topocentric.altaz()
@@ -198,3 +213,4 @@ def export_settings_page():
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0")
+    
