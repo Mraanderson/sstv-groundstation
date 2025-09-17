@@ -3,25 +3,31 @@
 
 {% block content %}
 <div class="card p-3 bg-secondary text-light">
-  <h2 class="mb-3">Upcoming ISS Passes (Next 24 Hours)</h2>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Upcoming ISS Passes (Next 24 Hours)</h2>
+    <div class="form-check form-switch">
+      <input class="form-check-input" type="checkbox" id="timeToggle">
+      <label class="form-check-label" for="timeToggle">Show in local time</label>
+    </div>
+  </div>
 
   {% if message %}
     <div class="alert alert-warning">{{ message }}</div>
   {% elif passes %}
-    <table class="table table-dark table-striped table-hover align-middle">
+    <table class="table table-dark table-striped table-hover align-middle" id="passesTable">
       <thead>
         <tr>
-          <th scope="col">AOS (UTC)</th>
-          <th scope="col">LOS (UTC)</th>
-          <th scope="col">Max Elev (°)</th>
-          <th scope="col">Duration (s)</th>
+          <th>AOS</th>
+          <th>LOS</th>
+          <th>Max Elev (°)</th>
+          <th>Duration (s)</th>
         </tr>
       </thead>
       <tbody>
         {% for p in passes %}
         <tr>
-          <td>{{ p.aos.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-          <td>{{ p.los.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+          <td data-utc="{{ p.aos.isoformat() }}Z">{{ p.aos.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+          <td data-utc="{{ p.los.isoformat() }}Z">{{ p.los.strftime('%Y-%m-%d %H:%M:%S') }}</td>
           <td>{{ '%.1f'|format(p.max_elev) }}</td>
           <td>{{ p.duration }}</td>
         </tr>
@@ -32,4 +38,23 @@
     <p class="text-muted">No ISS passes found in the next 24 hours.</p>
   {% endif %}
 </div>
+
+<script>
+document.getElementById('timeToggle').addEventListener('change', function() {
+  const rows = document.querySelectorAll('#passesTable tbody tr');
+  rows.forEach(row => {
+    row.querySelectorAll('td[data-utc]').forEach(cell => {
+      const utcString = cell.getAttribute('data-utc');
+      const date = new Date(utcString);
+      if (this.checked) {
+        // Local time
+        cell.textContent = date.toLocaleString();
+      } else {
+        // Back to UTC
+        cell.textContent = date.toISOString().replace('T', ' ').substring(0, 19);
+      }
+    });
+  });
+});
+</script>
 {% endblock %}
