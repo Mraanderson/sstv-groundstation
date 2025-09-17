@@ -13,6 +13,16 @@
     </div>
   </div>
 
+  <!-- Diagnostics -->
+  {% if info %}
+  <div class="small text-muted mb-2">
+    <span><strong>TLE epoch (UTC):</strong> {{ info.tle_epoch_utc }}</span> ·
+    <span><strong>TLE age:</strong> {{ info.tle_age_days }} days</span> ·
+    <span><strong>Observer:</strong> lat {{ info.observer.lat }}, lon {{ info.observer.lon }}, alt {{ info.observer.alt_m }} m</span> ·
+    <span><strong>Min elev:</strong> {{ info.min_elev_deg }}°</span>
+  </div>
+  {% endif %}
+
   {% if message %}
     <div class="alert alert-warning">{{ message }}</div>
   {% elif passes %}
@@ -28,7 +38,7 @@
       <tbody>
         {% for p in passes %}
         <tr>
-          <!-- Force safe UTC format for JS parsing -->
+          <!-- Safe UTC format for JS parsing -->
           <td data-utc="{{ p.aos.strftime('%Y-%m-%dT%H:%M:%SZ') }}">{{ p.aos.strftime('%Y-%m-%d %H:%M:%S') }}</td>
           <td data-utc="{{ p.los.strftime('%Y-%m-%dT%H:%M:%SZ') }}">{{ p.los.strftime('%Y-%m-%d %H:%M:%S') }}</td>
           <td>{{ '%.1f'|format(p.max_elev) }}</td>
