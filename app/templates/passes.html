@@ -43,11 +43,10 @@
           </tr>
         </thead>
         <tbody>
-          {% set now_utc = namespace(value=datetime.utcnow()) %}
           {% for p in passes %}
-            {% if p.aos <= now_utc.value <= p.los %}
+            {% if p.aos <= now_utc <= p.los %}
               {% set row_class = 'table-warning' %}
-            {% elif p.aos <= now_utc.value + timedelta(hours=1) and p.aos > now_utc.value %}
+            {% elif p.aos <= now_utc + timedelta(hours=1) and p.aos > now_utc %}
               {% set row_class = 'table-info' %}
             {% else %}
               {% set row_class = '' %}
