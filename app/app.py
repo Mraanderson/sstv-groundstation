@@ -1,8 +1,9 @@
-from flask import Flask, render_template, send_from_directory, request
+from flask import Flask, render_template, send_from_directory, request, redirect, url_for
 import os
 import json
 import re
 from datetime import datetime, timedelta, timezone
+import requests
 from skyfield.api import Loader, wgs84, EarthSatellite
 
 app = Flask(__name__)
@@ -11,6 +12,7 @@ app = Flask(__name__)
 IMAGES_DIR = os.path.abspath(os.path.join(app.root_path, '..', 'images'))
 TLE_DIR = os.path.abspath(os.path.join(app.root_path, '..', 'tle'))
 CONFIG_FILE = os.path.join(app.root_path, 'config.json')
+TLE_FILE = os.path.join(TLE_DIR, "iss__zarya_.txt")
 
 # --- Gallery helpers ---
 def get_all_images():
@@ -22,6 +24,25 @@ def get_all_images():
                 rel_path = os.path.join(rel_dir, file) if rel_dir != '.' else file
                 image_files.append(rel_path.replace("\\", "/"))
     return sorted(image_files)
+
+# --- TLE helpers ---
+def get_tle_last_updated():
+    if os.path.exists(TLE_FILE):
+        mtime = datetime.fromtimestamp(os.path.getmtime(TLE_FILE), tz=timezone.utc)
+        return mtime.strftime("%Y-%m-%d %H:%M:%S UTC")
+    return "Never"
+
+def fetch_latest_tle():
+    tle_url = "https://celestrak.org/NORAD/elements/stations.txt"
+    r = requests.get(tle_url, timeout=10)
+    r.raise_for_status()
+    lines = r.text.strip().splitlines()
+    for i in range(len(lines)):
+        if lines[i].upper().startswith("ISS"):
+            with open(TLE_FILE, "w") as f:
+                f.write("\n".join(lines[i:i+3]) + "\n")
+            return True
+    return False
 
 # --- Routes: Gallery ---
 @app.route("/images/<path:filename>")
@@ -53,18 +74,29 @@ def config_page():
 
     return render_template("config.html", config_data=config_data, message=message)
 
+# --- Update TLE route ---
+@app.route("/update-tle", methods=["POST"])
+def update_tle():
+    try:
+        if fetch_latest_tle():
+            message = "TLE updated successfully."
+        else:
+            message = "ISS TLE not found in source."
+    except Exception as e:
+        message = f"Error updating TLE: {e}"
+    return redirect(url_for('passes_page'))
+
 # --- Routes: Pass prediction for ISS ---
 @app.route("/passes")
 def passes_page():
     sat_name = "ISS (ZARYA)"
     safe_name = re.sub(r"[^A-Za-z0-9_\-]", "_", sat_name.lower())
-    tle_path = os.path.join(TLE_DIR, f"{safe_name}.txt")
 
-    if not os.path.exists(tle_path):
-        return render_template("passes.html", passes=[], message="ISS TLE file not found.")
+    if not os.path.exists(TLE_FILE):
+        return render_template("passes.html", passes=[], message="ISS TLE file not found.", tle_last_updated=get_tle_last_updated())
 
     if not os.path.exists(CONFIG_FILE):
-        return render_template("passes.html", passes=[], message="Station location not configured.")
+        return render_template("passes.html", passes=[], message="Station location not configured.", tle_last_updated=get_tle_last_updated())
 
     with open(CONFIG_FILE) as f:
         cfg = json.load(f)
@@ -73,12 +105,12 @@ def passes_page():
         lon = float(cfg.get("location_lon", 0))
         alt = float(cfg.get("location_alt", 0))
     except ValueError:
-        return render_template("passes.html", passes=[], message="Invalid station coordinates.")
+        return render_template("passes.html", passes=[], message="Invalid station coordinates.", tle_last_updated=get_tle_last_updated())
 
-    with open(tle_path) as f:
+    with open(TLE_FILE) as f:
         lines = f.read().strip().splitlines()
         if len(lines) < 3:
-            return render_template("passes.html", passes=[], message="ISS TLE file incomplete.")
+            return render_template("passes.html", passes=[], message="ISS TLE file incomplete.", tle_last_updated=get_tle_last_updated())
         name, l1, l2 = lines[0], lines[1], lines[2]
 
     load = Loader('./skyfield_data')
@@ -109,7 +141,7 @@ def passes_page():
             altitude_degrees=info["min_elev_deg"]
         )
     except Exception as e:
-        return render_template("passes.html", passes=[], message=f"Error finding passes: {e}", info=info)
+        return render_template("passes.html", passes=[], message=f"Error finding passes: {e}", info=info, tle_last_updated=get_tle_last_updated())
 
     current_pass = {}
     for ti, event in zip(t, events):
@@ -127,7 +159,7 @@ def passes_page():
             current_pass = {}
 
     passes.sort(key=lambda p: p["aos"])
-    return render_template("passes.html", passes=passes, message=warning, info=info)
+    return render_template("passes.html", passes=passes, message=warning, info=info, tle_last_updated=get_tle_last_updated())
 
 # --- Import settings ---
 @app.route("/import-settings", methods=["GET", "POST"])
@@ -166,4 +198,3 @@ def export_settings_page():
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0")
-    
