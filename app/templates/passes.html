@@ -28,9 +28,9 @@
       <tbody>
         {% for p in passes %}
         <tr>
-          <!-- Store UTC datetime in data-utc attribute -->
-          <td data-utc="{{ p.aos.isoformat() }}Z">{{ p.aos.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-          <td data-utc="{{ p.los.isoformat() }}Z">{{ p.los.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+          <!-- Force safe UTC format for JS parsing -->
+          <td data-utc="{{ p.aos.strftime('%Y-%m-%dT%H:%M:%SZ') }}">{{ p.aos.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+          <td data-utc="{{ p.los.strftime('%Y-%m-%dT%H:%M:%SZ') }}">{{ p.los.strftime('%Y-%m-%d %H:%M:%S') }}</td>
           <td>{{ '%.1f'|format(p.max_elev) }}</td>
           <td>{{ p.duration }}</td>
         </tr>
@@ -55,7 +55,7 @@ document.getElementById('timeToggle').addEventListener('change', function() {
         cell.textContent = date.toLocaleString();
       } else {
         // Back to UTC
-        cell.textContent = date.toISOString().replace('T', ' ').substring(0, 19);
+        cell.textContent = utcString.replace('T', ' ').replace('Z', '');
       }
     });
   });
