@@ -6,23 +6,6 @@ import os
 from datetime import datetime
 from . import bp
 
-def load_config_file():
-    """Load config from JSON file, return dict with defaults if missing."""
-    if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE) as f:
-            try:
-                return json.load(f)
-            except json.JSONDecodeError:
-                pass
-    # Defaults if file missing or invalid
-    return {
-        "latitude": "",
-        "longitude": "",
-        "altitude_m": "",
-        "timezone": "",
-        "theme": "auto"
-    }
-
 @bp.route("/", methods=["GET", "POST"], endpoint="config_page")
 def config_page():
     if request.method == "POST":
@@ -40,7 +23,7 @@ def config_page():
         tf = TimezoneFinder()
         tz = tf.timezone_at(lat=lat, lng=lon) or "UTC"
 
-        # Update app config
+        # Update app config in memory
         current_app.config["LATITUDE"] = lat
         current_app.config["LONGITUDE"] = lon
         current_app.config["ALTITUDE_M"] = alt
@@ -71,13 +54,11 @@ def config_page():
         flash("Configuration saved successfully.", "success")
         return redirect(url_for("config.config_page"))
 
-    # GET request → load from file so debug panel is always correct
-    cfg = load_config_file()
+    # GET request → pass current_app.config values so map works
     return render_template(
         "config/config.html",
-        latitude=cfg.get("latitude"),
-        longitude=cfg.get("longitude"),
-        altitude=cfg.get("altitude_m"),
-        timezone=cfg.get("timezone")
+        latitude=current_app.config.get("LATITUDE"),
+        longitude=current_app.config.get("LONGITUDE"),
+        altitude=current_app.config.get("ALTITUDE_M"),
+        timezone=current_app.config.get("TIMEZONE")
     )
-    
