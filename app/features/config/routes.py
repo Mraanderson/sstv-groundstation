@@ -1,27 +1,43 @@
-from flask import render_template, request, redirect, url_for, current_app
+from flask import render_template, request, redirect, url_for, current_app, flash
 from timezonefinder import TimezoneFinder
+from app.config_paths import CONFIG_FILE  # <-- shared path
+import json
+import os
 from . import bp
 
 @bp.route("/", methods=["GET", "POST"], endpoint="config_page")
 def config_page():
     if request.method == "POST":
-        lat = float(request.form["latitude"])
-        lon = float(request.form["longitude"])
-        alt = float(request.form["altitude"])
+        try:
+            lat = float(request.form["latitude"])
+            lon = float(request.form["longitude"])
+            alt = float(request.form["altitude"])
+        except (ValueError, KeyError):
+            flash("Invalid location data. Please click on the map to set your location.", "danger")
+            return redirect(url_for("config.config_page"))
 
         # Guess timezone from lat/lon
         tf = TimezoneFinder()
-        tz = tf.timezone_at(lat=lat, lng=lon)
+        tz = tf.timezone_at(lat=lat, lng=lon) or "UTC"
 
+        # Update app config
         current_app.config["LATITUDE"] = lat
         current_app.config["LONGITUDE"] = lon
         current_app.config["ALTITUDE_M"] = alt
-        current_app.config["TIMEZONE"] = tz or "UTC"
+        current_app.config["TIMEZONE"] = tz
 
-        # Persist to user_config.json if save_user_config is available
-        if hasattr(current_app, "save_user_config"):
-            current_app.save_user_config()
+        # Persist to shared CONFIG_FILE
+        os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
+        with open(CONFIG_FILE, "w") as f:
+            json.dump({
+                "latitude": lat,
+                "longitude": lon,
+                "altitude_m": alt,
+                "timezone": tz,
+                "theme": current_app.config.get("THEME", "auto")
+            }, f, indent=2)
 
+        flash("Configuration saved successfully.", "success")
         return redirect(url_for("config.config_page"))
 
     return render_template(
