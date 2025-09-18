@@ -3,6 +3,12 @@ from datetime import datetime
 from flask import render_template, current_app, request, redirect, url_for, send_from_directory
 from . import bp
 
+# Allowed image extensions
+ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"}
+
+def is_image_file(filename):
+    return os.path.splitext(filename.lower())[1] in ALLOWED_EXTENSIONS
+
 @bp.route("/", endpoint="gallery")
 @bp.route("/gallery", endpoint="gallery")
 def gallery():
@@ -20,7 +26,7 @@ def gallery():
 
     for img in sorted(os.listdir(image_dir)):
         path = os.path.join(image_dir, img)
-        if os.path.isfile(path):
+        if os.path.isfile(path) and is_image_file(img):
             images.append({
                 "name": img,
                 "size_kb": round(os.path.getsize(path) / 1024, 1),
@@ -35,7 +41,7 @@ def gallery_partial():
     images = []
     for img in sorted(os.listdir(image_dir)):
         path = os.path.join(image_dir, img)
-        if os.path.isfile(path):
+        if os.path.isfile(path) and is_image_file(img):
             images.append({
                 "name": img,
                 "size_kb": round(os.path.getsize(path) / 1024, 1),
