@@ -1,88 +1,91 @@
 import os
 import requests
-from flask import Blueprint, render_template, current_app, flash, redirect, url_for
 from datetime import datetime, timedelta
-from skyfield.api import Loader, EarthSatellite, Topos
+from flask import render_template, current_app, redirect, url_for, flash
+from skyfield.api import Loader, Topos
 
-bp = Blueprint("passes", __name__, template_folder="templates")
+from . import bp
 
-# Paths
-TLE_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "tle")
-TLE_FILE = os.path.join(TLE_DIR, "stations.txt")
-TLE_URL = "https://celestrak.org/NORAD/elements/stations.txt"
+TLE_SOURCE_URL = "https://celestrak.org/NORAD/elements/active.txt"
 
-# Skyfield loader
-sf_loader = Loader(os.path.join(os.path.dirname(__file__), "..", "..", "data", "skyfield"))
-ts = sf_loader.timescale()
+def tle_file_path():
+    return os.path.join(current_app.config["TLE_DIR"], "active.txt")
 
-@bp.route("/update-tle", methods=["GET"], endpoint="update_tle")
-def update_tle():
-    """Fetch latest ISS TLE from Celestrak and save locally."""
-    try:
-        os.makedirs(TLE_DIR, exist_ok=True)
-        resp = requests.get(TLE_URL, timeout=10)
-        resp.raise_for_status()
-        with open(TLE_FILE, "w", encoding="utf-8") as f:
-            f.write(resp.text)
-        flash("TLE updated successfully.", "success")
-    except Exception as e:
-        flash(f"Failed to update TLE: {e}", "danger")
-    return redirect(url_for("passes.passes_page"))
+def load_tle_satellites():
+    """Load satellites from the TLE file."""
+    tle_path = tle_file_path()
+    if not os.path.exists(tle_path):
+        return None, []
+    with open(tle_path) as f:
+        lines = [line.strip() for line in f if line.strip()]
+    satellites = [lines[i] for i in range(0, len(lines), 3)]
+    return tle_path, satellites
 
-@bp.route("/", methods=["GET"], endpoint="passes_page")
+@bp.route("/", endpoint="passes_page")
 def passes_page():
-    """Display upcoming ISS passes based on observer location."""
-    # Load observer location from config
     lat = current_app.config.get("LATITUDE")
     lon = current_app.config.get("LONGITUDE")
     alt = current_app.config.get("ALTITUDE_M")
     tz = current_app.config.get("TIMEZONE")
 
-    if not all([lat, lon, alt, tz]):
-        flash("Observer location not set. Please configure your location first.", "warning")
-        return render_template("passes/passes.html", passes=None, tle_info=None, error="Missing location data.")
+    tle_path, satellites = load_tle_satellites()
+    tle_info = None
+    passes = []
 
-    # Load TLE file
-    if not os.path.exists(TLE_FILE):
-        flash("TLE file not found. Please update TLE first.", "warning")
-        return render_template("passes/passes.html", passes=None, tle_info=None, error="Missing TLE data.")
-
-    try:
-        with open(TLE_FILE, "r") as f:
-            lines = f.readlines()
-
-        satellites = []
-        for i in range(0, len(lines), 3):
-            name = lines[i].strip()
-            line1 = lines[i + 1].strip()
-            line2 = lines[i + 2].strip()
-            satellites.append(EarthSatellite(line1, line2, name, ts))
-
-        observer = Topos(latitude_degrees=lat, longitude_degrees=lon, elevation_m=alt)
-        now = ts.now()
-        end = ts.utc(datetime.utcnow() + timedelta(hours=24))
-
-        passes = []
-        for sat in satellites:
-            t0, events = sat.find_events(observer, now, end, altitude_degrees=10.0)
-            for ti, event in zip(t0, events):
-                label = {0: "AOS", 1: "MAX", 2: "LOS"}[event]
-                passes.append({
-                    "satellite": sat.name,
-                    "event": label,
-                    "time": ti.utc_datetime().astimezone()
-                })
-
-        passes.sort(key=lambda p: p["time"])
-
+    if tle_path:
+        mtime = datetime.fromtimestamp(os.path.getmtime(tle_path))
         tle_info = {
-            "filename": os.path.basename(TLE_FILE),
-            "last_updated": datetime.fromtimestamp(os.path.getmtime(TLE_FILE)).strftime("%Y-%m-%d %H:%M:%S")
+            "filename": os.path.basename(tle_path),
+            "last_updated": mtime.strftime("%Y-%m-%d %H:%M:%S"),
         }
 
-        return render_template("passes/passes.html", passes=passes, tle_info=tle_info, error=None)
+        if None not in (lat, lon, alt, tz):
+            # Predict passes for next 24 hours
+            load = Loader("./skyfield_data")
+            ts = load.timescale()
+            observer = Topos(latitude_degrees=lat, longitude_degrees=lon, elevation_m=alt)
 
+            with open(tle_path) as f:
+                lines = [line.strip() for line in f if line.strip()]
+            for i in range(0, len(lines), 3):
+                try:
+                    name, l1, l2 = lines[i], lines[i+1], lines[i+2]
+                except IndexError:
+                    continue
+                sat = load.tle(name, l1, l2)
+                now = datetime.utcnow()
+                end_time = now + timedelta(hours=24)
+                t0 = ts.utc(now.year, now.month, now.day, now.hour, now.minute)
+                t1 = ts.utc(end_time.year, end_time.month, end_time.day, end_time.hour, end_time.minute)
+                try:
+                    times, events = sat.find_events(observer, t0, t1, altitude_degrees=10.0)
+                except Exception:
+                    continue
+                for ti, event in zip(times, events):
+                    passes.append({
+                        "satellite": name,
+                        "time": ti.utc_datetime().astimezone(),
+                        "event": ["rise", "culminate", "set"][event]
+                    })
+
+            passes.sort(key=lambda p: p["time"])
+
+    return render_template("passes/passes.html",
+                           tle_info=tle_info,
+                           satellites=satellites,
+                           passes=passes,
+                           location_set=None not in (lat, lon, alt, tz))
+
+@bp.route("/update-tle", endpoint="update_tle")
+def update_tle():
+    try:
+        resp = requests.get(TLE_SOURCE_URL, timeout=10)
+        resp.raise_for_status()
+        os.makedirs(current_app.config["TLE_DIR"], exist_ok=True)
+        with open(tle_file_path(), "w") as f:
+            f.write(resp.text)
+        flash("TLE data updated successfully.", "success")
     except Exception as e:
-        flash(f"Error processing TLE data: {e}", "danger")
-        return render_template("passes/passes.html", passes=None, tle_info=None, error="Failed to compute passes.")
-        
+        flash(f"Failed to update TLE data: {e}", "danger")
+    return redirect(url_for("passes.passes_page"))
+    
