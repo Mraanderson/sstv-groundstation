@@ -3,20 +3,6 @@
 {% block content %}
 <h1 class="mb-4">Configuration</h1>
 
-<!-- Debug Panel -->
-<div id="config-debug" class="mb-3 p-2 border bg-light">
-  <strong>Current Config:</strong><br>
-  Latitude: {{ latitude or '' }}<br>
-  Longitude: {{ longitude or '' }}<br>
-  Elevation: {{ altitude or '' }}<br>
-  Timezone: {{ timezone or '' }}
-</div>
-
-<!-- Saved Confirmation -->
-<div id="save-confirm" style="display:none;" class="mb-3 p-2 border bg-success text-white">
-  ✅ Config saved successfully
-</div>
-
 <div class="card shadow-sm">
   <div class="card-body">
     <p class="text-muted">Click on the map to set your location. Latitude, longitude, and altitude will be filled automatically. Timezone is guessed from your location.</p>
@@ -24,7 +10,6 @@
     <div id="map" style="height: 400px;"></div>
 
     <form id="location-form" action="{{ url_for('config.config_page') }}" method="post" class="mt-3">
-      <!-- Save button moved to top -->
       <button type="submit" class="btn btn-primary mb-3">Save Location</button>
 
       <div class="row g-3">
@@ -98,23 +83,14 @@
         return;
       }
 
-      // Update debug panel
-      document.getElementById('config-debug').innerHTML =
-        `<strong>Debug — Current Config:</strong><br>
-         Latitude: ${data.latitude}<br>
-         Longitude: ${data.longitude}<br>
-         Elevation: ${data.elevation}<br>
-         Timezone: ${data.timezone}`;
-
       // Show confirmation
-      const confirmBox = document.getElementById('save-confirm');
-      confirmBox.style.display = 'block';
+      const confirmBox = document.createElement('div');
+      confirmBox.className = 'alert alert-success mt-3';
       confirmBox.textContent = `✅ Config saved successfully at ${data.saved_time}`;
+      this.parentNode.insertBefore(confirmBox, this);
 
-      // Hide after 3 seconds
-      setTimeout(() => {
-        confirmBox.style.display = 'none';
-      }, 3000);
+      // Remove after 3 seconds
+      setTimeout(() => confirmBox.remove(), 3000);
     })
     .catch(err => {
       alert('❌ Error saving config: ' + err);
