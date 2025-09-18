@@ -19,6 +19,9 @@
         Save Location
     </button>
 
+    <!-- Map container -->
+    <div id="map" style="height: 400px; margin-bottom: 1em;"></div>
+
     <div class="form-group">
         <label for="latitude">Latitude</label>
         <input type="text" id="latitude" name="latitude" class="form-control" value="{{ latitude }}">
@@ -39,6 +42,25 @@
         <input type="text" id="timezone" name="timezone" class="form-control" value="{{ timezone }}">
     </div>
 </form>
+
+<!-- Your existing map JS init code -->
+<script>
+    // Example Leaflet map init — replace with your actual map code
+    var map = L.map('map').setView([{{ latitude or 0 }}, {{ longitude or 0 }}], 5);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    var marker = L.marker([{{ latitude or 0 }}, {{ longitude or 0 }}]).addTo(map);
+
+    map.on('click', function(e) {
+        var lat = e.latlng.lat.toFixed(6);
+        var lon = e.latlng.lng.toFixed(6);
+        document.getElementById('latitude').value = lat;
+        document.getElementById('longitude').value = lon;
+        marker.setLatLng(e.latlng);
+    });
+</script>
 
 <!-- JavaScript for AJAX save + live debug update -->
 <script>
