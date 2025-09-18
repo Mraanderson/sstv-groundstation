@@ -3,11 +3,11 @@
     <strong>Debug — Current Config:</strong><br>
     Latitude: {{ latitude }}<br>
     Longitude: {{ longitude }}<br>
-    Elevation: {{ elevation }}<br>
+    Elevation: {{ altitude }}<br>
     Timezone: {{ timezone }}
 </div>
 
-<!-- Saved Confirmation (hidden by default) -->
+<!-- Saved Confirmation -->
 <div id="save-confirm" style="display:none; background:#d4edda; padding:10px; border:1px solid #c3e6cb; margin-bottom:1em;">
     ✅ Config saved successfully
 </div>
@@ -30,8 +30,8 @@
     </div>
 
     <div class="form-group">
-        <label for="elevation">Elevation (m)</label>
-        <input type="text" id="elevation" name="elevation" class="form-control" value="{{ elevation }}">
+        <label for="altitude">Elevation (m)</label>
+        <input type="text" id="altitude" name="altitude" class="form-control" value="{{ altitude }}">
     </div>
 
     <div class="form-group">
@@ -45,12 +45,18 @@
 document.getElementById('location-form').addEventListener('submit', function(e) {
     e.preventDefault();
 
-    fetch('/config', {
+    fetch(window.location.pathname, {
         method: 'POST',
+        headers: { 'Accept': 'application/json' },
         body: new FormData(this)
     })
     .then(res => res.json())
     .then(data => {
+        if (data.error) {
+            alert('❌ ' + data.error);
+            return;
+        }
+
         // Update debug panel
         document.getElementById('config-debug').innerHTML =
             `<strong>Debug — Current Config:</strong><br>
