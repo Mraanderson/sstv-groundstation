@@ -1,12 +1,44 @@
-from flask import render_template
+import os
+import requests
+from datetime import datetime
+from flask import render_template, current_app, redirect, url_for, flash
 from . import bp
 
-@bp.route("/passes", endpoint='passes_page')
+TLE_SOURCE_URL = "https://celestrak.org/NORAD/elements/active.txt"
+
+def tle_file_path():
+    return os.path.join(current_app.config["TLE_DIR"], "active.txt")
+
+@bp.route("/", endpoint="passes_page")
 def passes_page():
-    # Placeholder data for now — will be replaced with real pass predictions
-    passes = [
-        {"satellite": "ISS (ZARYA)", "start": "2025-09-18 10:00", "end": "2025-09-18 10:12", "max_elevation": "45°"},
-        {"satellite": "NOAA 19", "start": "2025-09-18 11:30", "end": "2025-09-18 11:42", "max_elevation": "30°"}
-    ]
-    return render_template("passes/passes.html", passes=passes)
-  
+    tle_path = tle_file_path()
+    tle_info = None
+    satellites = []
+
+    if os.path.exists(tle_path):
+        mtime = datetime.fromtimestamp(os.path.getmtime(tle_path))
+        tle_info = {
+            "filename": os.path.basename(tle_path),
+            "last_updated": mtime.strftime("%Y-%m-%d %H:%M:%S")
+        }
+        with open(tle_path) as f:
+            lines = [line.strip() for line in f if line.strip()]
+            satellites = [lines[i] for i in range(0, len(lines), 3)]
+
+    return render_template("passes/passes.html",
+                           tle_info=tle_info,
+                           satellites=satellites)
+
+@bp.route("/update-tle", endpoint="update_tle")
+def update_tle():
+    try:
+        resp = requests.get(TLE_SOURCE_URL, timeout=10)
+        resp.raise_for_status()
+        os.makedirs(current_app.config["TLE_DIR"], exist_ok=True)
+        with open(tle_file_path(), "w") as f:
+            f.write(resp.text)
+        flash("TLE data updated successfully.", "success")
+    except Exception as e:
+        flash(f"Failed to update TLE data: {e}", "danger")
+    return redirect(url_for("passes.passes_page"))
+    
