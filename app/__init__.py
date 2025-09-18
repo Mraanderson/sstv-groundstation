@@ -1,7 +1,7 @@
 import os
 import json
 from datetime import datetime
-from flask import Flask
+from flask import Flask, redirect, url_for
 
 # Path to personal config file
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), "..", "user_config.json")
@@ -58,13 +58,26 @@ def create_app():
         "theme": app.config["THEME"]
     })
 
-    # Register blueprints
-    for feature_name in os.listdir(os.path.join(app.root_path, "features")):
-        feature_path = os.path.join(app.root_path, "features", feature_name)
-        if os.path.isdir(feature_path) and os.path.exists(os.path.join(feature_path, "__init__.py")):
-            module = __import__(f"app.features.{feature_name}", fromlist=["bp"])
-            if hasattr(module, "bp"):
-                app.register_blueprint(module.bp)
+    # Register blueprints with prefixes
+    from app.features.gallery import bp as gallery_bp
+    from app.features.config import bp as config_bp
+    from app.features.passes import bp as passes_bp
+    from app.features.settings import bp as settings_bp
+
+    app.register_blueprint(gallery_bp, url_prefix="/gallery")
+    app.register_blueprint(config_bp, url_prefix="/config")
+    app.register_blueprint(passes_bp, url_prefix="/passes")
+    app.register_blueprint(settings_bp, url_prefix="/settings")
+
+    # Conditional home route
+    @app.route("/")
+    def home():
+        if not app.config.get("LATITUDE") \
+           or not app.config.get("LONGITUDE") \
+           or not app.config.get("ALTITUDE_M") \
+           or not app.config.get("TIMEZONE"):
+            return redirect(url_for("config.config_page"))
+        return redirect(url_for("gallery.gallery"))
 
     return app
     
