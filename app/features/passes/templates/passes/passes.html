@@ -3,13 +3,29 @@
 {% block content %}
 <h1 class="mb-4">Satellite Pass Predictions</h1>
 
-<div class="card shadow-sm">
+<div class="card shadow-sm mb-4">
   <div class="card-body">
-    <p class="text-muted">This page will display upcoming satellite passes.</p>
-    <!-- Example placeholder -->
-    <ul class="list-group">
-      <li class="list-group-item">No pass data available yet.</li>
-    </ul>
+    {% if tle_info %}
+      <p><strong>TLE File:</strong> {{ tle_info.filename }}</p>
+      <p><strong>Last Updated:</strong> {{ tle_info.last_updated }}</p>
+      <p><strong>Satellites in TLE:</strong> {{ satellites|length }}</p>
+    {% else %}
+      <p class="text-warning">No TLE data found.</p>
+    {% endif %}
+    <a href="{{ url_for('update_tle') }}" class="btn btn-primary">Update TLE</a>
   </div>
 </div>
+
+{% if satellites %}
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h5>Satellites in Current TLE</h5>
+      <ul class="list-group">
+        {% for sat in satellites %}
+          <li class="list-group-item">{{ sat }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+{% endif %}
 {% endblock %}
