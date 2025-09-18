@@ -3,16 +3,30 @@
 {% block content %}
 <h1 class="mb-4">Configuration</h1>
 
+<!-- Debug Panel -->
+<div id="config-debug" class="mb-3 p-2 border bg-light">
+  <strong>Current Config:</strong><br>
+  Latitude: {{ latitude or '' }}<br>
+  Longitude: {{ longitude or '' }}<br>
+  Elevation: {{ altitude or '' }}<br>
+  Timezone: {{ timezone or '' }}
+</div>
+
+<!-- Saved Confirmation -->
+<div id="save-confirm" style="display:none;" class="mb-3 p-2 border bg-success text-white">
+  ✅ Config saved successfully
+</div>
+
 <div class="card shadow-sm">
   <div class="card-body">
-    <p class="text-muted">
-      Click on the map to set your location. Latitude, longitude, and altitude will be filled automatically.
-      Timezone is guessed from your location.
-    </p>
+    <p class="text-muted">Click on the map to set your location. Latitude, longitude, and altitude will be filled automatically. Timezone is guessed from your location.</p>
 
     <div id="map" style="height: 400px;"></div>
 
-    <form action="{{ url_for('config.config_page') }}" method="post" class="mt-3">
+    <form id="location-form" action="{{ url_for('config.config_page') }}" method="post" class="mt-3">
+      <!-- Save button moved to top -->
+      <button type="submit" class="btn btn-primary mb-3">Save Location</button>
+
       <div class="row g-3">
         <div class="col-md-3">
           <label class="form-label">Latitude</label>
@@ -31,20 +45,15 @@
           <input type="text" id="tz" name="timezone" class="form-control" value="{{ timezone or '' }}" readonly>
         </div>
       </div>
-      <button type="submit" class="btn btn-primary mt-3">Save</button>
     </form>
   </div>
 </div>
 
-<!-- Leaflet CSS/JS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script>
-  const map = L.map('map').setView(
-    [{{ latitude or 0 }}, {{ longitude or 0 }}],
-    {{ latitude and longitude and 8 or 2 }}
-  );
+  const map = L.map('map').setView([{{ latitude or 0 }}, {{ longitude or 0 }}], {{ latitude and longitude and 8 or 2 }});
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
@@ -70,8 +79,46 @@
       document.getElementById('alt').value = '';
     }
 
-    // Timezone will be calculated in backend, so clear it here
     document.getElementById('tz').value = '';
+  });
+
+  // AJAX save handler
+  document.getElementById('location-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    fetch(this.action, {
+      method: 'POST',
+      headers: { 'Accept': 'application/json' },
+      body: new FormData(this)
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.error) {
+        alert('❌ ' + data.error);
+        return;
+      }
+
+      // Update debug panel
+      document.getElementById('config-debug').innerHTML =
+        `<strong>Debug — Current Config:</strong><br>
+         Latitude: ${data.latitude}<br>
+         Longitude: ${data.longitude}<br>
+         Elevation: ${data.elevation}<br>
+         Timezone: ${data.timezone}`;
+
+      // Show confirmation
+      const confirmBox = document.getElementById('save-confirm');
+      confirmBox.style.display = 'block';
+      confirmBox.textContent = `✅ Config saved successfully at ${data.saved_time}`;
+
+      // Hide after 3 seconds
+      setTimeout(() => {
+        confirmBox.style.display = 'none';
+      }, 3000);
+    })
+    .catch(err => {
+      alert('❌ Error saving config: ' + err);
+    });
   });
 </script>
 {% endblock %}
