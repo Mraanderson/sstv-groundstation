@@ -1,18 +1,22 @@
+<div class="row g-3">
 {% for img in images %}
-  <div class="thumb" style="display:inline-block; margin:10px; text-align:center;">
-    <a href="{{ url_for('gallery.serve_image', filename=img.name) }}" target="_blank">
-      <img src="{{ url_for('gallery.serve_image', filename=img.name) }}" alt="{{ img.name }}" style="max-width:200px; display:block; margin-bottom:5px;">
-    </a>
-    <div class="meta" style="font-size:0.9em; color:#555;">
-      <div><strong>{{ img.name }}</strong></div>
-      <div>{{ img.size_kb }} KB</div>
-      <div>{{ img.modified | datetimeformat }}</div>
-    </div>
-    <div class="actions" style="margin-top:5px;">
-      <a href="{{ url_for('gallery.serve_image', filename=img.name) }}" download>Download</a> |
-      <a href="{{ url_for('gallery.gallery', delete=img.name) }}" onclick="return confirm('Delete this image?');">Delete</a>
+  <div class="col-6 col-sm-4 col-md-3 col-lg-2 text-center">
+    <div class="thumb">
+      <a href="{{ url_for('gallery.serve_image', filename=img.name) }}" target="_blank">
+        <img src="{{ url_for('gallery.serve_image', filename=img.name) }}" alt="{{ img.name }}" class="img-fluid shadow-sm">
+      </a>
+      <div class="meta mt-1">
+        <div><strong>{{ img.name }}</strong></div>
+        <div>{{ img.size_kb }} KB</div>
+        <div>{{ img.modified | datetimeformat }}</div>
+      </div>
+      <div class="actions mt-1">
+        <a href="{{ url_for('gallery.serve_image', filename=img.name) }}" download class="btn btn-sm btn-outline-primary">Download</a>
+        <a href="{{ url_for('gallery.gallery', delete=img.name) }}" onclick="return confirm('Delete this image?');" class="btn btn-sm btn-outline-danger">Delete</a>
+      </div>
     </div>
   </div>
 {% else %}
   <p>No images found.</p>
 {% endfor %}
+</div>
