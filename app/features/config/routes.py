@@ -6,6 +6,23 @@ import os
 from datetime import datetime
 from . import bp
 
+def load_config_file():
+    """Load config from JSON file, return dict with defaults if missing."""
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE) as f:
+            try:
+                return json.load(f)
+            except json.JSONDecodeError:
+                pass
+    # Defaults if file missing or invalid
+    return {
+        "latitude": "",
+        "longitude": "",
+        "altitude_m": "",
+        "timezone": "",
+        "theme": "auto"
+    }
+
 @bp.route("/", methods=["GET", "POST"], endpoint="config_page")
 def config_page():
     if request.method == "POST":
@@ -54,12 +71,13 @@ def config_page():
         flash("Configuration saved successfully.", "success")
         return redirect(url_for("config.config_page"))
 
-    # GET request → render page
+    # GET request → load from file so debug panel is always correct
+    cfg = load_config_file()
     return render_template(
         "config/config.html",
-        latitude=current_app.config.get("LATITUDE"),
-        longitude=current_app.config.get("LONGITUDE"),
-        altitude=current_app.config.get("ALTITUDE_M"),
-        timezone=current_app.config.get("TIMEZONE")
+        latitude=cfg.get("latitude"),
+        longitude=cfg.get("longitude"),
+        altitude=cfg.get("altitude_m"),
+        timezone=cfg.get("timezone")
     )
     
