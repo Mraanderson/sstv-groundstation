@@ -1,3 +1,24 @@
-Flask
-requests
-timezonefinder
+# Core web framework
+Flask>=2.3.2
+
+# Template engine (Flask already includes Jinja2, but pinning for stability)
+Jinja2>=3.1.2
+
+# HTTP requests for fetching TLEs
+requests>=2.31.0
+
+# Astronomy & orbital mechanics
+skyfield>=1.46
+sgp4>=2.22
+
+# Location & timezone detection
+timezonefinder>=6.2.0
+
+# Optional: elevation API calls are done via requests, no extra lib needed
+
+# For serving static files and uploads
+Werkzeug>=2.3.6
+
+# If you use Flask's flash messaging with categories
+itsdangerous>=2.1.2
+click>=8.1.3
