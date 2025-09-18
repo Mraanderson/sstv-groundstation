@@ -1,12 +1,31 @@
-/* Default light mode styles remain unchanged */
+/* ===== Light Mode (default) ===== */
 
-/* ===== Dark mode via system preference ===== */
+body {
+  padding-top: 56px; /* space for fixed navbar */
+  background-color: #ffffff;
+  color: #212529;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.thumb img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
+.meta {
+  font-size: 0.85em;
+  color: #555;
+}
+
+/* ===== Dark Mode via System Preference ===== */
 @media (prefers-color-scheme: dark) {
   body {
     background-color: #121212;
     color: #e0e0e0;
   }
 
+  /* Navbar */
   .navbar {
     background-color: #1e1e1e !important;
   }
@@ -16,6 +35,11 @@
     color: #e0e0e0 !important;
   }
 
+  .navbar .nav-link:hover {
+    color: #ffffff !important;
+  }
+
+  /* Cards */
   .card {
     background-color: #1e1e1e;
     border-color: #333;
@@ -25,6 +49,7 @@
     color: #e0e0e0;
   }
 
+  /* Forms */
   .form-control {
     background-color: #2a2a2a;
     color: #e0e0e0;
@@ -38,11 +63,54 @@
     box-shadow: none;
   }
 
+  .form-label,
+  label,
+  .form-text,
+  small {
+    color: #b0b0b0 !important;
+  }
+
+  /* Buttons */
   .btn-primary {
     background-color: #3a6ea5;
     border-color: #3a6ea5;
   }
 
+  .btn-outline-light {
+    color: #e0e0e0;
+    border-color: #e0e0e0;
+  }
+
+  .btn-outline-light:hover {
+    background-color: #e0e0e0;
+    color: #121212;
+  }
+
+  /* Tables */
+  table {
+    color: #e0e0e0;
+  }
+
+  thead {
+    background-color: #1e1e1e;
+  }
+
+  tbody tr {
+    border-color: #333;
+  }
+
+  th, td {
+    color: #e0e0e0;
+  }
+
+  /* Alerts */
+  .alert {
+    background-color: #2a2a2a;
+    color: #e0e0e0;
+    border-color: #444;
+  }
+
+  /* Links */
   a {
     color: #90caf9;
   }
@@ -51,11 +119,18 @@
     color: #bbdefb;
   }
 
+  /* Thumbnails */
   .thumb img {
     border: 1px solid #444;
   }
 
+  /* Meta text */
   .meta {
     color: #aaa;
+  }
+
+  /* Headings */
+  h1, h2, h3, h4, h5, h6 {
+    color: #e0e0e0;
   }
 }
