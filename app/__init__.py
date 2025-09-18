@@ -1,7 +1,7 @@
 import os
 import json
 from datetime import datetime
-from flask import Flask, redirect, url_for
+from flask import Flask, redirect, url_for, current_app
 from app.config_paths import CONFIG_FILE  # shared config file path
 
 def load_user_config():
@@ -56,6 +56,11 @@ def create_app():
         "theme": app.config["THEME"]
     })
 
+    # 🔹 Inject theme into all templates so base.html can use {{ theme }}
+    @app.context_processor
+    def inject_theme():
+        return dict(theme=current_app.config.get("THEME", "auto"))
+
     # Register blueprints
     from app.features.gallery import bp as gallery_bp
     from app.features.config import bp as config_bp
@@ -78,3 +83,4 @@ def create_app():
         return redirect(url_for("gallery.gallery"))
 
     return app
+    
