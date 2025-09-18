@@ -5,23 +5,67 @@
 
 <div class="card shadow-sm">
   <div class="card-body">
-    <p class="text-muted">This page will display and allow editing of the application configuration.</p>
-    <!-- Example table layout -->
-    <table class="table table-striped">
-      <thead>
-        <tr>
-          <th>Setting</th>
-          <th>Value</th>
-        </tr>
-      </thead>
-      <tbody>
-        <!-- Replace with dynamic config data -->
-        <tr>
-          <td>Example Setting</td>
-          <td>Example Value</td>
-        </tr>
-      </tbody>
-    </table>
+    <p class="text-muted">Click on the map to set your location. Latitude, longitude, and altitude will be filled automatically. Timezone is guessed from your location.</p>
+
+    <div id="map" style="height: 400px;"></div>
+
+    <form action="{{ url_for('config.config_page') }}" method="post" class="mt-3">
+      <div class="row g-3">
+        <div class="col-md-3">
+          <label class="form-label">Latitude</label>
+          <input type="text" id="lat" name="latitude" class="form-control" value="{{ latitude or '' }}" readonly>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Longitude</label>
+          <input type="text" id="lon" name="longitude" class="form-control" value="{{ longitude or '' }}" readonly>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Altitude (m)</label>
+          <input type="text" id="alt" name="altitude" class="form-control" value="{{ altitude or '' }}" readonly>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Timezone</label>
+          <input type="text" id="tz" name="timezone" class="form-control" value="{{ timezone or '' }}" readonly>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary mt-3">Save</button>
+    </form>
   </div>
 </div>
+
+<!-- Leaflet CSS/JS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+  const map = L.map('map').setView([{{ latitude or 0 }}, {{ longitude or 0 }}], {{ latitude and longitude and 8 or 2 }});
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  let marker;
+
+  map.on('click', async function(e) {
+    const lat = e.latlng.lat.toFixed(6);
+    const lon = e.latlng.lng.toFixed(6);
+
+    if (marker) { map.removeLayer(marker); }
+    marker = L.marker([lat, lon]).addTo(map);
+
+    document.getElementById('lat').value = lat;
+    document.getElementById('lon').value = lon;
+
+    // Fetch altitude from Open-Elevation
+    try {
+      const altRes = await fetch(`https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lon}`);
+      const altData = await altRes.json();
+      document.getElementById('alt').value = altData.results[0].elevation;
+    } catch {
+      document.getElementById('alt').value = '';
+    }
+
+    // Timezone will be calculated in backend, so we just clear it here
+    document.getElementById('tz').value = '';
+  });
+</script>
 {% endblock %}
