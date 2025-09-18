@@ -13,4 +13,4 @@ pip install --upgrade pip
 pip install -r requirements.txt
 
 # Run the app
-python app/app.py
+python run.py
