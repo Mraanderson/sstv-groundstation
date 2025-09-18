@@ -12,14 +12,28 @@ clone_branch() {
     git clone -b "$branch" "$REPO_URL" "$APP_DIR"
 }
 
+# Function to list remote branches and select one
+list_and_clone_branch() {
+    echo "Fetching remote branches..."
+    branches=$(git ls-remote --heads "$REPO_URL" | awk '{print $2}' | sed 's|refs/heads/||')
+    echo "Available branches:"
+    select branch in $branches; do
+        if [ -n "$branch" ]; then
+            clone_branch "$branch"
+            break
+        else
+            echo "Invalid selection."
+        fi
+    done
+}
+
 # Menu
 echo "=============================="
 echo "   SSTV Groundstation Setup   "
 echo "=============================="
 echo "1) Clear & clone MAIN branch"
-echo "2) Clear & clone TLE branch (tle-expansion)"
-echo "3) Clear & clone another branch"
-echo "4) Run without git pull"
+echo "2) Clear & clone from branch list"
+echo "3) Run from current folder"
 echo "=============================="
 read -p "Select an option: " choice
 
@@ -28,14 +42,15 @@ case $choice in
         clone_branch "main"
         ;;
     2)
-        clone_branch "feature/tle-expansion"
+        list_and_clone_branch
         ;;
     3)
-        read -p "Enter branch name: " branch
-        clone_branch "$branch"
-        ;;
-    4)
-        echo "Skipping git pull..."
+        if [ -d "$APP_DIR" ]; then
+            echo "Using existing folder: $APP_DIR"
+        else
+            echo "Error: $APP_DIR does not exist. Please clone first."
+            exit 1
+        fi
         ;;
     *)
         echo "Invalid choice."
