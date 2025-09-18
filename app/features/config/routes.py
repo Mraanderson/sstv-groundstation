@@ -1,8 +1,9 @@
-from flask import render_template, request, redirect, url_for, current_app, flash
+from flask import render_template, request, redirect, url_for, current_app, flash, jsonify
 from timezonefinder import TimezoneFinder
-from app.config_paths import CONFIG_FILE  # <-- shared path
+from app.config_paths import CONFIG_FILE
 import json
 import os
+from datetime import datetime
 from . import bp
 
 @bp.route("/", methods=["GET", "POST"], endpoint="config_page")
@@ -13,6 +14,8 @@ def config_page():
             lon = float(request.form["longitude"])
             alt = float(request.form["altitude"])
         except (ValueError, KeyError):
+            if request.accept_mimetypes['application/json']:
+                return jsonify({"error": "Invalid location data"}), 400
             flash("Invalid location data. Please click on the map to set your location.", "danger")
             return redirect(url_for("config.config_page"))
 
@@ -37,9 +40,21 @@ def config_page():
                 "theme": current_app.config.get("THEME", "auto")
             }, f, indent=2)
 
+        # AJAX request → return JSON for live update
+        if request.accept_mimetypes['application/json']:
+            return jsonify({
+                "latitude": lat,
+                "longitude": lon,
+                "elevation": alt,
+                "timezone": tz,
+                "saved_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            })
+
+        # Normal form POST → redirect
         flash("Configuration saved successfully.", "success")
         return redirect(url_for("config.config_page"))
 
+    # GET request → render page
     return render_template(
         "config/config.html",
         latitude=current_app.config.get("LATITUDE"),
