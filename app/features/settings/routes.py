@@ -5,16 +5,11 @@ from flask import (
     redirect, url_for, flash, render_template
 )
 from werkzeug.utils import secure_filename
+from app.config_paths import CONFIG_FILE  # <-- shared path
 from . import bp
-
-# Path to the user config file (project root)
-CONFIG_FILE = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "user_config.json")
-)
 
 @bp.route("/set-theme", methods=["POST"], endpoint="set_theme")
 def set_theme():
-    """Update theme in config and save."""
     data = request.get_json()
     theme = data.get("theme", "auto")
     current_app.config["THEME"] = theme
@@ -24,13 +19,11 @@ def set_theme():
 
 @bp.route("/import", methods=["GET", "POST"], endpoint="import_settings")
 def import_settings():
-    """Import settings from uploaded JSON file."""
     if request.method == "POST":
         file = request.files.get("settings_file")
         if file:
             filename = secure_filename(file.filename)
             if filename.lower().endswith(".json"):
-                os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
                 file.save(CONFIG_FILE)
                 try:
                     with open(CONFIG_FILE, "r") as f:
@@ -52,7 +45,6 @@ def import_settings():
 
 @bp.route("/export", methods=["GET"], endpoint="export_settings")
 def export_settings():
-    """Export current settings as JSON file."""
     if os.path.exists(CONFIG_FILE):
         return send_file(CONFIG_FILE, as_attachment=True, download_name="user_config.json")
     flash("No settings file found to export. Please save your configuration first.", "warning")
