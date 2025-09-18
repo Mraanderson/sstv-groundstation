@@ -3,9 +3,11 @@ import json
 from datetime import datetime
 from flask import Flask
 
+# Path to personal config file
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), "..", "user_config.json")
 
 def load_user_config():
+    """Load user config from JSON file or return defaults."""
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, "r") as f:
             return json.load(f)
@@ -18,10 +20,12 @@ def load_user_config():
     }
 
 def save_user_config(data):
+    """Save user config to JSON file."""
     with open(CONFIG_FILE, "w") as f:
         json.dump(data, f, indent=2)
 
 def datetimeformat(value, format="%Y-%m-%d %H:%M:%S"):
+    """Format timestamps for templates."""
     if isinstance(value, (int, float)):
         return datetime.fromtimestamp(value).strftime(format)
     if isinstance(value, datetime):
@@ -42,9 +46,10 @@ def create_app():
         THEME=user_cfg.get("theme", "auto")
     )
 
+    # Register Jinja filter
     app.jinja_env.filters["datetimeformat"] = datetimeformat
 
-    # Make save function available
+    # Attach save function
     app.save_user_config = lambda: save_user_config({
         "latitude": app.config["LATITUDE"],
         "longitude": app.config["LONGITUDE"],
