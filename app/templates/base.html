@@ -11,7 +11,8 @@
 
 <nav class="navbar navbar-expand-lg navbar-light bg-light">
   <div class="container-fluid">
-    <a class="navbar-brand" href="{{ url_for('main.index') }}">SSTV Groundstation</a>
+    <!-- Fixed: link now points to 'home' route -->
+    <a class="navbar-brand" href="{{ url_for('home') }}">SSTV Groundstation</a>
     <div class="d-flex">
       <button id="dark-mode-toggle" class="btn btn-outline-secondary btn-sm">
         🌙 Dark Mode
