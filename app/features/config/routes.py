@@ -9,6 +9,7 @@ def config_page():
         lon = float(request.form["longitude"])
         alt = float(request.form["altitude"])
 
+        # Guess timezone from lat/lon
         tf = TimezoneFinder()
         tz = tf.timezone_at(lat=lat, lng=lon)
 
