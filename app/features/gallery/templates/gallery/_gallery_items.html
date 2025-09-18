@@ -1,1 +1,22 @@
+{% for img in image_names %}
+  {% set file_path = (current_app.config['IMAGE_DIR'] ~ '/' ~ img) %}
+  {% set file_size = (os.path.getsize(file_path) / 1024) | round(1) %}
+  {% set modified_time = os.path.getmtime(file_path) | datetimeformat %}
+  <div class="thumb" style="display:inline-block; margin:10px; text-align:center;">
+    <a href="{{ url_for('serve_image', filename=img) }}" target="_blank">
+      <img src="{{ url_for('serve_image', filename=img) }}" alt="{{ img }}" style="max-width:200px; display:block; margin-bottom:5px;">
+    </a>
+    <div class="meta" style="font-size:0.9em; color:#555;">
+      <div><strong>{{ img }}</strong></div>
+      <div>{{ file_size }} KB</div>
+      <div>{{ modified_time }}</div>
+    </div>
+    <div class="actions" style="margin-top:5px;">
+      <a href="{{ url_for('serve_image', filename=img) }}" download>Download</a> |
+      <a href="{{ url_for('gallery') }}?delete={{ img }}" onclick="return confirm('Delete this image?');">Delete</a>
+    </div>
+  </div>
+{% else %}
+  <p>No images found.</p>
+{% endfor %}
 
