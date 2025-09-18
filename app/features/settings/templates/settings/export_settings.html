@@ -4,8 +4,7 @@
 
 <p>This page will allow you to download the current configuration settings as a file.</p>
 
-<form action="#" method="get">
+<form action="{{ url_for('settings.export_settings') }}" method="get">
   <button type="submit">Download Settings</button>
 </form>
 {% endblock %}
-
