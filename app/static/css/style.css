@@ -1,87 +1,61 @@
-/* ===== Light mode (default) ===== */
-/* Your existing Bootstrap theme handles most of this */
+/* Default light mode styles remain unchanged */
 
-/* ===== Dark mode overrides ===== */
-body.dark-mode {
-  background-color: #121212;
-  color: #e0e0e0;
-}
+/* ===== Dark mode via system preference ===== */
+@media (prefers-color-scheme: dark) {
+  body {
+    background-color: #121212;
+    color: #e0e0e0;
+  }
 
-/* Navbar */
-body.dark-mode .navbar {
-  background-color: #1e1e1e !important;
-}
-body.dark-mode .navbar .nav-link {
-  color: #e0e0e0 !important;
-}
-body.dark-mode .navbar .nav-link:hover {
-  color: #ffffff !important;
-}
-body.dark-mode .navbar-brand {
-  color: #ffffff !important;
-}
+  .navbar {
+    background-color: #1e1e1e !important;
+  }
 
-/* Cards */
-body.dark-mode .card {
-  background-color: #1e1e1e;
-  border-color: #333;
-}
-body.dark-mode .card .card-body {
-  color: #e0e0e0;
-}
+  .navbar .nav-link,
+  .navbar-brand {
+    color: #e0e0e0 !important;
+  }
 
-/* Forms */
-body.dark-mode .form-control {
-  background-color: #2a2a2a;
-  color: #e0e0e0;
-  border-color: #444;
-}
-body.dark-mode .form-control:focus {
-  background-color: #2a2a2a;
-  color: #ffffff;
-  border-color: #666;
-  box-shadow: none;
-}
+  .card {
+    background-color: #1e1e1e;
+    border-color: #333;
+  }
 
-/* Buttons */
-body.dark-mode .btn-primary {
-  background-color: #3a6ea5;
-  border-color: #3a6ea5;
-}
-body.dark-mode .btn-outline-light {
-  color: #e0e0e0;
-  border-color: #e0e0e0;
-}
-body.dark-mode .btn-outline-light:hover {
-  background-color: #e0e0e0;
-  color: #121212;
-}
+  .card .card-body {
+    color: #e0e0e0;
+  }
 
-/* Tables */
-body.dark-mode table {
-  color: #e0e0e0;
-}
-body.dark-mode thead {
-  background-color: #1e1e1e;
-}
-body.dark-mode tbody tr {
-  border-color: #333;
-}
+  .form-control {
+    background-color: #2a2a2a;
+    color: #e0e0e0;
+    border-color: #444;
+  }
 
-/* Links */
-body.dark-mode a {
-  color: #90caf9;
-}
-body.dark-mode a:hover {
-  color: #bbdefb;
-}
+  .form-control:focus {
+    background-color: #2a2a2a;
+    color: #ffffff;
+    border-color: #666;
+    box-shadow: none;
+  }
 
-/* Thumbnails & images */
-body.dark-mode .thumb img {
-  border: 1px solid #444;
-}
+  .btn-primary {
+    background-color: #3a6ea5;
+    border-color: #3a6ea5;
+  }
 
-/* Meta text */
-body.dark-mode .meta {
-  color: #aaa;
+  a {
+    color: #90caf9;
+  }
+
+  a:hover {
+    color: #bbdefb;
+  }
+
+  .thumb img {
+    border: 1px solid #444;
+  }
+
+  .meta {
+    color: #aaa;
+  }
 }
