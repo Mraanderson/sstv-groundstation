@@ -1,24 +1,24 @@
 # Core web framework
-Flask>=2.3.2
+Flask
 
 # Template engine (Flask already includes Jinja2, but pinning for stability)
-Jinja2>=3.1.2
+Jinja2
 
 # HTTP requests for fetching TLEs
-requests>=2.31.0
+requests
 
 # Astronomy & orbital mechanics
-skyfield>=1.46
-sgp4>=2.22
+skyfield
+sgp4
 
 # Location & timezone detection
-timezonefinder>=6.2.0
+timezonefinder
 
 # Optional: elevation API calls are done via requests, no extra lib needed
 
 # For serving static files and uploads
-Werkzeug>=2.3.6
+Werkzeug
 
 # If you use Flask's flash messaging with categories
-itsdangerous>=2.1.2
-click>=8.1.3
+itsdangerous
+click
