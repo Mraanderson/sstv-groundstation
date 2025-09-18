@@ -26,7 +26,6 @@ def create_app():
     app.jinja_env.filters["datetimeformat"] = datetimeformat
 
     # Auto-discover and register blueprints from features/
-    from app import features
     for feature_name in os.listdir(os.path.join(app.root_path, "features")):
         feature_path = os.path.join(app.root_path, "features", feature_name)
         if os.path.isdir(feature_path) and os.path.exists(os.path.join(feature_path, "__init__.py")):
