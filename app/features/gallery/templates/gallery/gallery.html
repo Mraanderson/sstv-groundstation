@@ -1,33 +1,27 @@
 {% extends "base.html" %}
+{% block title %}Gallery{% endblock %}
 {% block content %}
-<h1>Decoded Images</h1>
+<h1 class="mb-4">Image Gallery</h1>
 
 <div id="gallery-container">
   {% include "gallery/_gallery_items.html" %}
 </div>
 
 <script>
-  let refreshInterval = 10000; // 10 seconds
-
-  function refreshGallery() {
-    if (document.visibilityState === "visible") {
-      fetch("{{ url_for('gallery.gallery_partial') }}")
-        .then(response => response.text())
-        .then(html => {
-          const container = document.querySelector("#gallery-container");
-          container.innerHTML = html;
-          container.querySelectorAll("img").forEach(img => {
-            img.style.opacity = 0;
-            img.onload = () => {
-              img.style.transition = "opacity 0.5s";
-              img.style.opacity = 1;
-            };
-          });
-        })
-        .catch(err => console.error("Gallery refresh failed:", err));
+  // Example: refresh gallery every 60 seconds
+  async function refreshGallery() {
+    try {
+      const response = await fetch("{{ url_for('gallery.gallery_partial') }}");
+      if (response.ok) {
+        const html = await response.text();
+        document.getElementById("gallery-container").innerHTML = html;
+      }
+    } catch (err) {
+      console.error("Error refreshing gallery:", err);
     }
   }
 
-  setInterval(refreshGallery, refreshInterval);
+  // Refresh every 60 seconds
+  setInterval(refreshGallery, 60000);
 </script>
 {% endblock %}
