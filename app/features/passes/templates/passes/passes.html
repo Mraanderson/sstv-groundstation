@@ -12,14 +12,12 @@
     {% else %}
       <p class="text-warning">No TLE data found.</p>
     {% endif %}
-    <a href="{{ url_for('update_tle') }}" class="btn btn-primary">Update TLE</a>
+    <a href="{{ url_for('passes.update_tle') }}" class="btn btn-primary">Update TLE</a>
   </div>
 </div>
 
-{% if not location_set %}
-  <div class="alert alert-warning">
-    Location not set. Please configure your latitude, longitude, and altitude in the Config page.
-  </div>
+{% if error %}
+  <div class="alert alert-warning">{{ error }}</div>
 {% endif %}
 
 {% if passes %}
@@ -46,7 +44,7 @@
       </table>
     </div>
   </div>
-{% elif tle_info and location_set %}
+{% elif tle_info and not error %}
   <p>No passes found in the next 24 hours.</p>
 {% endif %}
 {% endblock %}
