@@ -1,28 +1,27 @@
 {% extends "base.html" %}
+{% block title %}Configuration{% endblock %}
 {% block content %}
-<h1>Configuration</h1>
+<h1 class="mb-4">Configuration</h1>
 
-{% if config.error %}
-  <p style="color:red;">{{ config.error }}</p>
-{% elif config.message %}
-  <p>{{ config.message }}</p>
-{% else %}
-  <table border="1" cellpadding="5" cellspacing="0">
-    <thead>
-      <tr>
-        <th>Key</th>
-        <th>Value</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for key, value in config.items() %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <p class="text-muted">This page will display and allow editing of the application configuration.</p>
+    <!-- Example table layout -->
+    <table class="table table-striped">
+      <thead>
         <tr>
-          <td>{{ key }}</td>
-          <td>{{ value }}</td>
+          <th>Setting</th>
+          <th>Value</th>
         </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-{% endif %}
+      </thead>
+      <tbody>
+        <!-- Replace with dynamic config data -->
+        <tr>
+          <td>Example Setting</td>
+          <td>Example Value</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 {% endblock %}
-
