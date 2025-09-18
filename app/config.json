@@ -1,9 +1,0 @@
-{
-  "latitude": 50.0,
-  "longitude": -2.0,
-  "elevation": 50,
-  "satellite": "ISS (ZARYA)",
-  "tle_group": "stations",
-  "frequency": 145800000,
-  "sstv_mode": "PD120"
-}

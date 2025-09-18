@@ -1,9 +1,0 @@
-{% extends "base.html" %}
-{% block title %}Export Settings{% endblock %}
-{% block content %}
-<div class="card p-3">
-  <h2>Export Settings</h2>
-  <p>You can export your current configuration as a JSON file for backup or transfer.</p>
-  <a href="{{ url_for('export_settings') }}" class="btn btn-success">Download Settings</a>
-</div>
-{% endblock %}
