@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="auto">
+<html lang="en" data-theme="{{ current_app.config.get('THEME', 'auto') }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9,7 +9,6 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
     <style>
-        /* Base spacing for fixed navbar */
         body { padding-top: 56px; }
 
         /* Theme variables */
@@ -55,54 +54,33 @@
             --sg-muted: #6c757d;
         }
 
-        /* Apply theme variables */
         body {
             background-color: var(--sg-body-bg);
             color: var(--sg-body-color);
         }
         a { color: var(--sg-link-color); }
         a:hover { color: var(--sg-link-hover); }
-
-        .card {
-            background-color: var(--sg-card-bg);
-            border-color: var(--sg-card-border);
-        }
-
+        .card { background-color: var(--sg-card-bg); border-color: var(--sg-card-border); }
         .text-muted { color: var(--sg-muted) !important; }
-
-        /* Gallery helpers */
-        .thumb img {
-            max-width: 100%;
-            height: auto;
-            border-radius: 6px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        html[data-theme="dark"] .thumb img,
-        html[data-theme="auto"] @media (prefers-color-scheme: dark) {
-            .thumb img { box-shadow: 0 2px 10px rgba(0,0,0,0.35); }
-        }
+        .thumb img { max-width: 100%; height: auto; border-radius: 6px; }
     </style>
 </head>
 <body>
     <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg fixed-top" style="background-color:#1f2937;">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
         <div class="container-fluid">
-            <a class="navbar-brand text-light" href="{{ url_for('gallery.gallery') }}">SSTV Groundstation</a>
-            <button class="navbar-toggler text-light border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+            <a class="navbar-brand" href="{{ url_for('gallery.gallery') }}">SSTV Groundstation</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
                 aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="#e5e7eb" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M3 6h18v2H3zM3 11h18v2H3zM3 16h18v2H3z"/>
-                    </svg>
-                </span>
+                <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto align-items-lg-center">
-                    <li class="nav-item"><a class="nav-link text-light" href="{{ url_for('gallery.gallery') }}">Gallery</a></li>
-                    <li class="nav-item"><a class="nav-link text-light" href="{{ url_for('config.config_page') }}">Config</a></li>
-                    <li class="nav-item"><a class="nav-link text-light" href="{{ url_for('passes.passes_page') }}">Passes</a></li>
-                    <li class="nav-item"><a class="nav-link text-light" href="{{ url_for('settings.import_settings') }}">Import</a></li>
-                    <li class="nav-item"><a class="nav-link text-light" href="{{ url_for('settings.export_settings') }}">Export</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('gallery.gallery') }}">Gallery</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('config.config_page') }}">Config</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('passes.passes_page') }}">Passes</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('settings.import_settings') }}">Import</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('settings.export_settings') }}">Export</a></li>
                     <li class="nav-item ms-lg-3">
                         <div class="dropdown">
                             <button class="btn btn-sm btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -131,7 +109,6 @@
     <!-- Theme toggle logic -->
     <script>
         (function() {
-            const KEY = 'sg-theme';
             const html = document.documentElement;
 
             function applyTheme(mode) {
@@ -140,25 +117,21 @@
                 }
             }
 
-            // Load saved theme or default to auto
-            const saved = localStorage.getItem(KEY) || 'auto';
-            applyTheme(saved);
+            // Apply theme from server-rendered attribute
+            applyTheme(html.getAttribute('data-theme') || 'auto');
 
             // Hook up dropdown
             document.querySelectorAll('[data-theme-choice]').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const choice = btn.getAttribute('data-theme-choice');
-                    localStorage.setItem(KEY, choice);
                     applyTheme(choice);
+                    // Save to backend
+                    fetch("{{ url_for('settings.set_theme') }}", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ theme: choice })
+                    });
                 });
-            });
-
-            // Optional: react to system changes if in auto
-            const mql = window.matchMedia('(prefers-color-scheme: dark)');
-            mql.addEventListener('change', () => {
-                if ((localStorage.getItem(KEY) || 'auto') === 'auto') {
-                    applyTheme('auto');
-                }
             });
         })();
     </script>
