@@ -1,1 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Configuration</h1>
+
+{% if config.error %}
+  <p style="color:red;">{{ config.error }}</p>
+{% elif config.message %}
+  <p>{{ config.message }}</p>
+{% else %}
+  <table border="1" cellpadding="5" cellspacing="0">
+    <thead>
+      <tr>
+        <th>Key</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for key, value in config.items() %}
+        <tr>
+          <td>{{ key }}</td>
+          <td>{{ value }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endif %}
+{% endblock %}
 
