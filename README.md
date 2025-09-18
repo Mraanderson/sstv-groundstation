@@ -1,6 +1,6 @@
 # SSTV Groundstation 2.0
 
-A Flask‑based web application for managing and displaying decoded SSTV (Slow Scan Television) images, satellite pass predictions, and configuration settings.
+A Flask‑based web application for managing and displaying decoded SSTV (Slow Scan Television) images, satellite pass predictions, and configuration settings. CLI for headless Debian devices. 
 
 ---
 
