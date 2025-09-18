@@ -5,7 +5,10 @@
 
 <div class="card shadow-sm">
   <div class="card-body">
-    <p class="text-muted">Click on the map to set your location. Latitude, longitude, and altitude will be filled automatically. Timezone is guessed from your location.</p>
+    <p class="text-muted">
+      Click on the map to set your location. Latitude, longitude, and altitude will be filled automatically.
+      Timezone is guessed from your location.
+    </p>
 
     <div id="map" style="height: 400px;"></div>
 
@@ -33,11 +36,15 @@
   </div>
 </div>
 
+<!-- Leaflet CSS/JS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script>
-  const map = L.map('map').setView([{{ latitude or 0 }}, {{ longitude or 0 }}], {{ latitude and longitude and 8 or 2 }});
+  const map = L.map('map').setView(
+    [{{ latitude or 0 }}, {{ longitude or 0 }}],
+    {{ latitude and longitude and 8 or 2 }}
+  );
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
@@ -63,6 +70,7 @@
       document.getElementById('alt').value = '';
     }
 
+    // Timezone will be calculated in backend, so clear it here
     document.getElementById('tz').value = '';
   });
 </script>
