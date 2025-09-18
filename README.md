@@ -11,37 +11,14 @@ A Flask-based web application for managing and displaying decoded SSTV (Slow Sca
 
 ---
 
-## 🗂 Folder Layout
-
-app/
-  __init__.py          # App factory and blueprint auto-registration
-  config.py            # Central configuration class
-  utils/               # Shared utility modules
-  features/            # Modular feature blueprints
-    gallery/           # Live-updating image gallery
-    config/            # Configuration viewer/editor
-    passes/            # Satellite pass predictions
-    settings/          # Import/export settings
-  templates/           # Shared base template
-  static/              # Shared static assets
-images/                # Decoded SSTV images
-tle/                   # Two-Line Element orbital data
-run.py                 # App entry point
-requirements.txt       # Python dependencies
-README.md              # Project documentation
-
----
-
 ## 🚀 Getting Started
 
 ### 1. Clone the repository
-git clone https://github.com/yourusername/yourrepo.git
-cd yourrepo
+git clone https://github.com/Mraanderson/sstv-groundstation.git
+cd sstv-groundstation 
 
 ### 2. Create a virtual environment
 python -m venv venv
-source venv/bin/activate   # On macOS/Linux
-venv\Scripts\activate      # On Windows
 
 ### 3. Install dependencies
 pip install -r requirements.txt
@@ -56,7 +33,7 @@ The app will start on http://localhost:5000
 ## 🛠 Features
 
 - **Gallery** — Displays decoded SSTV images with live refresh.
-- **Config** — View (and later edit) application configuration.
+- **Config** — View (and lateration configuration.
 - **Passes** — Placeholder for satellite pass prediction data.
 - **Settings** — Import/export configuration files.
 
