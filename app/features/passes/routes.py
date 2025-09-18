@@ -1,8 +1,9 @@
 import os
 import requests
 from datetime import datetime, timedelta
-from flask import render_template, current_app, redirect, url_for, flash
+from flask import render_template, current_app, redirect, url_for, flash, jsonify
 from skyfield.api import Loader, Topos
+from zoneinfo import ZoneInfo
 
 from . import bp
 
@@ -21,6 +22,22 @@ def load_tle_satellites():
     satellites = [lines[i] for i in range(0, len(lines), 3)]
     return tle_path, satellites
 
+def get_tle_age_days(tle_path):
+    try:
+        with open(tle_path) as f:
+            lines = [line.strip() for line in f if line.strip()]
+        if len(lines) < 2:
+            return None
+        line1 = lines[1]
+        epoch_str = line1[18:32]  # YYDDD.DDDDDDDD
+        year = int(epoch_str[:2])
+        year += 2000 if year < 57 else 1900
+        day_of_year = float(epoch_str[2:])
+        epoch = datetime(year, 1, 1) + timedelta(days=day_of_year - 1)
+        return round((datetime.utcnow() - epoch).total_seconds() / 86400, 1)
+    except Exception:
+        return None
+
 @bp.route("/", endpoint="passes_page")
 def passes_page():
     lat = current_app.config.get("LATITUDE")
@@ -37,6 +54,7 @@ def passes_page():
         tle_info = {
             "filename": os.path.basename(tle_path),
             "last_updated": mtime.strftime("%Y-%m-%d %H:%M:%S"),
+            "age_days": get_tle_age_days(tle_path)
         }
 
         if None not in (lat, lon, alt, tz):
@@ -50,21 +68,25 @@ def passes_page():
             for i in range(0, len(lines), 3):
                 try:
                     name, l1, l2 = lines[i], lines[i+1], lines[i+2]
-                except IndexError:
+                    sat = load.tle(name, l1, l2)
+                except Exception:
                     continue
-                sat = load.tle(name, l1, l2)
+
                 now = datetime.utcnow()
                 end_time = now + timedelta(hours=24)
                 t0 = ts.utc(now.year, now.month, now.day, now.hour, now.minute)
                 t1 = ts.utc(end_time.year, end_time.month, end_time.day, end_time.hour, end_time.minute)
+
                 try:
                     times, events = sat.find_events(observer, t0, t1, altitude_degrees=10.0)
                 except Exception:
                     continue
+
                 for ti, event in zip(times, events):
+                    local_time = ti.utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
                     passes.append({
                         "satellite": name,
-                        "time": ti.utc_datetime().astimezone(),
+                        "time": local_time,
                         "event": ["rise", "culminate", "set"][event]
                     })
 
@@ -74,6 +96,8 @@ def passes_page():
                            tle_info=tle_info,
                            satellites=satellites,
                            passes=passes,
+                           timezone=tz,
+                           now=datetime.now(ZoneInfo(tz)),
                            location_set=None not in (lat, lon, alt, tz))
 
 @bp.route("/update-tle", endpoint="update_tle")
@@ -84,8 +108,7 @@ def update_tle():
         os.makedirs(current_app.config["TLE_DIR"], exist_ok=True)
         with open(tle_file_path(), "w") as f:
             f.write(resp.text)
-        flash("TLE data updated successfully.", "success")
+        return jsonify({"status": "success", "updated": True})
     except Exception as e:
-        flash(f"Failed to update TLE data: {e}", "danger")
-    return redirect(url_for("passes.passes_page"))
-    
+        return jsonify({"status": "error", "message": str(e)})
+        
