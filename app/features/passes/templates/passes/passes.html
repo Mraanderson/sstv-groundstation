@@ -1,1 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Upcoming Passes</h1>
+
+{% if passes %}
+  <table border="1" cellpadding="5" cellspacing="0">
+    <thead>
+      <tr>
+        <th>Satellite</th>
+        <th>Start Time</th>
+        <th>End Time</th>
+        <th>Max Elevation</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in passes %}
+        <tr>
+          <td>{{ p.satellite }}</td>
+          <td>{{ p.start }}</td>
+          <td>{{ p.end }}</td>
+          <td>{{ p.max_elevation }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p>No passes scheduled.</p>
+{% endif %}
+{% endblock %}
 
