@@ -1,50 +1,42 @@
 {% extends "base.html" %}
 {% block title %}Satellite Passes{% endblock %}
-{% block content %}
-<h1 class="mb-4">Satellite Pass Predictions</h1>
 
-<div class="card shadow-sm mb-4">
-  <div class="card-body">
-    {% if tle_info %}
-      <p><strong>TLE File:</strong> {{ tle_info.filename }}</p>
-      <p><strong>Last Updated:</strong> {{ tle_info.last_updated }}</p>
-      <p><strong>Satellites in TLE:</strong> {{ satellites|length }}</p>
-    {% else %}
-      <p class="text-warning">No TLE data found.</p>
-    {% endif %}
-    <a href="{{ url_for('passes.update_tle') }}" class="btn btn-primary">Update TLE</a>
-  </div>
-</div>
+{% block content %}
+<h1 class="mb-4">Upcoming Satellite Passes</h1>
 
 {% if error %}
   <div class="alert alert-warning">{{ error }}</div>
 {% endif %}
 
-{% if passes %}
-  <div class="card shadow-sm">
-    <div class="card-body">
-      <h5>Next 24 Hours of Passes</h5>
-      <table class="table table-striped">
-        <thead>
-          <tr>
-            <th>Satellite</th>
-            <th>Event</th>
-            <th>Time</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for p in passes %}
-            <tr>
-              <td>{{ p.satellite }}</td>
-              <td>{{ p.event }}</td>
-              <td>{{ p.time.strftime("%Y-%m-%d %H:%M:%S") }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+{% if tle_info %}
+  <div class="mb-3">
+    <strong>TLE File:</strong> {{ tle_info.filename }}<br>
+    <strong>Last Updated:</strong> {{ tle_info.last_updated }}
   </div>
-{% elif tle_info and not error %}
-  <p>No passes found in the next 24 hours.</p>
+{% endif %}
+
+<a href="{{ url_for('passes.update_tle') }}" class="btn btn-primary mb-4">Update TLE</a>
+
+{% if passes %}
+  <table class="table table-bordered table-striped">
+    <thead>
+      <tr>
+        <th>Satellite</th>
+        <th>Event</th>
+        <th>Time</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in passes %}
+        <tr>
+          <td>{{ p.satellite }}</td>
+          <td>{{ p.event }}</td>
+          <td>{{ p.time.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p>No passes found for the next 24 hours.</p>
 {% endif %}
 {% endblock %}
