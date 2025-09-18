@@ -9,7 +9,6 @@ def config_page():
         lon = float(request.form["longitude"])
         alt = float(request.form["altitude"])
 
-        # Guess timezone from lat/lon
         tf = TimezoneFinder()
         tz = tf.timezone_at(lat=lat, lng=lon)
 
@@ -18,7 +17,10 @@ def config_page():
         current_app.config["ALTITUDE_M"] = alt
         current_app.config["TIMEZONE"] = tz or "UTC"
 
-        current_app.save_user_config()
+        # Persist if you have save_user_config
+        if hasattr(current_app, "save_user_config"):
+            current_app.save_user_config()
+
         return redirect(url_for("config.config_page"))
 
     return render_template(
