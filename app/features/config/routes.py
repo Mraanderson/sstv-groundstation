@@ -1,20 +1,31 @@
-from flask import render_template, current_app
+from flask import render_template, request, redirect, url_for, current_app
+from timezonefinder import TimezoneFinder
 from . import bp
-import os
-import json
 
-@bp.route("/config", endpoint='config_page')
+@bp.route("/", methods=["GET", "POST"], endpoint="config_page")
 def config_page():
-    config_file = current_app.config['CONFIG_FILE']
-    config_data = {}
-    if os.path.exists(config_file):
-        try:
-            with open(config_file, "r", encoding="utf-8") as f:
-                config_data = json.load(f)
-        except Exception:
-            config_data = {"error": "Could not read config file."}
-    else:
-        config_data = {"message": "No config file found."}
+    if request.method == "POST":
+        lat = float(request.form["latitude"])
+        lon = float(request.form["longitude"])
+        alt = float(request.form["altitude"])
 
-    return render_template("config/config.html", config=config_data)
-  
+        # Guess timezone from lat/lon
+        tf = TimezoneFinder()
+        tz = tf.timezone_at(lat=lat, lng=lon)
+
+        current_app.config["LATITUDE"] = lat
+        current_app.config["LONGITUDE"] = lon
+        current_app.config["ALTITUDE_M"] = alt
+        current_app.config["TIMEZONE"] = tz or "UTC"
+
+        # TODO: persist to file/db if you want it saved across restarts
+        return redirect(url_for("config.config_page"))
+
+    return render_template(
+        "config/config.html",
+        latitude=current_app.config.get("LATITUDE"),
+        longitude=current_app.config.get("LONGITUDE"),
+        altitude=current_app.config.get("ALTITUDE_M"),
+        timezone=current_app.config.get("TIMEZONE")
+    )
+    
