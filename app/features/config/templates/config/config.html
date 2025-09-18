@@ -7,16 +7,14 @@
     Timezone: {{ timezone }}
 </div>
 
-<!-- Optional Saved Confirmation -->
-{% if saved %}
-<div style="background:#d4edda; padding:10px; border:1px solid #c3e6cb; margin-bottom:1em;">
-    ✅ Config saved successfully at {{ saved_time }}
+<!-- Saved Confirmation (hidden by default) -->
+<div id="save-confirm" style="display:none; background:#d4edda; padding:10px; border:1px solid #c3e6cb; margin-bottom:1em;">
+    ✅ Config saved successfully
 </div>
-{% endif %}
 
 <!-- Location Form -->
 <form id="location-form" method="POST">
-    <!-- Save button moved to top -->
+    <!-- Save button at top -->
     <button type="submit" id="save-location" class="btn btn-primary" style="margin-bottom:1em;">
         Save Location
     </button>
@@ -41,3 +39,38 @@
         <input type="text" id="timezone" name="timezone" class="form-control" value="{{ timezone }}">
     </div>
 </form>
+
+<!-- JavaScript for AJAX save + live debug update -->
+<script>
+document.getElementById('location-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    fetch('/config', {
+        method: 'POST',
+        body: new FormData(this)
+    })
+    .then(res => res.json())
+    .then(data => {
+        // Update debug panel
+        document.getElementById('config-debug').innerHTML =
+            `<strong>Debug — Current Config:</strong><br>
+             Latitude: ${data.latitude}<br>
+             Longitude: ${data.longitude}<br>
+             Elevation: ${data.elevation}<br>
+             Timezone: ${data.timezone}`;
+
+        // Show confirmation
+        const confirmBox = document.getElementById('save-confirm');
+        confirmBox.style.display = 'block';
+        confirmBox.textContent = `✅ Config saved successfully at ${data.saved_time}`;
+
+        // Hide after 3 seconds
+        setTimeout(() => {
+            confirmBox.style.display = 'none';
+        }, 3000);
+    })
+    .catch(err => {
+        alert('❌ Error saving config: ' + err);
+    });
+});
+</script>
