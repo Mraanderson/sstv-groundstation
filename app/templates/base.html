@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   {% block head %}{% endblock %}
 </head>
-<body class="{% if current_app.config.get('THEME') == 'dark' %}dark-mode{% endif %}">
+<body class="{% if theme == 'dark' %}dark-mode{% endif %}">
 
 <nav class="navbar navbar-expand-lg navbar-light bg-light">
   <div class="container-fluid">
@@ -43,10 +43,10 @@
       headers: { 'Accept': 'application/json' },
       body: new FormData(Object.assign(document.createElement('form'), {
         theme: isDark ? 'dark' : 'light',
-        latitude: '{{ current_app.config.get("LATITUDE", "") }}',
-        longitude: '{{ current_app.config.get("LONGITUDE", "") }}',
-        altitude: '{{ current_app.config.get("ALTITUDE_M", "") }}',
-        timezone: '{{ current_app.config.get("TIMEZONE", "") }}'
+        latitude: '{{ latitude|default("") }}',
+        longitude: '{{ longitude|default("") }}',
+        altitude: '{{ altitude|default("") }}',
+        timezone: '{{ timezone|default("") }}'
       }))
     });
   });
