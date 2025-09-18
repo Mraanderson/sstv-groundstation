@@ -1,24 +1,13 @@
-{% extends "base.html" %}
-{% block content %}
-<h1>Decoded Images</h1>
-
-<div id="gallery-container">
-  {% include "gallery/_gallery_items.html" %}
-</div>
-
 <script>
   let refreshInterval = 10000; // 10 seconds
 
   function refreshGallery() {
-    // Only refresh if the page is visible
     if (document.visibilityState === "visible") {
-      fetch("{{ url_for('gallery_partial') }}")
+      fetch("{{ url_for('gallery.gallery_partial') }}")   <!-- FIXED -->
         .then(response => response.text())
         .then(html => {
           const container = document.querySelector("#gallery-container");
           container.innerHTML = html;
-
-          // Fade in new images
           container.querySelectorAll("img").forEach(img => {
             img.style.opacity = 0;
             img.onload = () => {
@@ -33,5 +22,3 @@
 
   setInterval(refreshGallery, refreshInterval);
 </script>
-{% endblock %}
-
