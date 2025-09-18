@@ -1,10 +1,14 @@
 {% extends "base.html" %}
+{% block title %}Export Settings{% endblock %}
 {% block content %}
-<h1>Export Settings</h1>
+<h1 class="mb-4">Export Settings</h1>
 
-<p>This page will allow you to download the current configuration settings as a file.</p>
-
-<form action="{{ url_for('settings.export_settings') }}" method="get">
-  <button type="submit">Download Settings</button>
-</form>
+<div class="card shadow-sm">
+  <div class="card-body">
+    <p class="text-muted">Download the current configuration settings as a file.</p>
+    <form action="{{ url_for('settings.export_settings') }}" method="get" class="mt-3">
+      <button type="submit" class="btn btn-success">Download Settings</button>
+    </form>
+  </div>
+</div>
 {% endblock %}
