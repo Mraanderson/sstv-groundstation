@@ -23,7 +23,7 @@ def config_page():
         tf = TimezoneFinder()
         tz = tf.timezone_at(lat=lat, lng=lon) or "UTC"
 
-        # Update app config in memory
+        # Update app config
         current_app.config["LATITUDE"] = lat
         current_app.config["LONGITUDE"] = lon
         current_app.config["ALTITUDE_M"] = alt
@@ -54,7 +54,7 @@ def config_page():
         flash("Configuration saved successfully.", "success")
         return redirect(url_for("config.config_page"))
 
-    # GET request → pass current_app.config values so map works
+    # GET request → unchanged so map/menu work
     return render_template(
         "config/config.html",
         latitude=current_app.config.get("LATITUDE"),
@@ -62,3 +62,4 @@ def config_page():
         altitude=current_app.config.get("ALTITUDE_M"),
         timezone=current_app.config.get("TIMEZONE")
     )
+    
