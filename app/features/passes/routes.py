@@ -7,7 +7,7 @@ from skyfield.api import Loader, EarthSatellite, wgs84
 from zoneinfo import ZoneInfo
 
 from . import bp
-from app.utils.sdr import rtl_sdr_present  # new import
+from app.utils.sdr import rtl_sdr_present  # RTL-SDR detection helper
 
 # Single reliable satellite for testing
 SSTV_SATELLITES = [
@@ -106,8 +106,9 @@ def passes_page():
                         start = times[j].utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
                         peak = times[j+1].utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
                         end = times[j+2].utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
-                        # Calculate max elevation at peak
-                        alt_deg = sat.at(ts.from_datetime(times[j+1].utc_datetime())).observe(observer).apparent().altaz()[0].degrees
+                        # Correct max elevation calculation
+                        peak_time = ts.from_datetime(times[j+1].utc_datetime())
+                        alt_deg = observer.at(peak_time).observe(sat).apparent().altaz()[0].degrees
                         passes.append({
                             "satellite": name,
                             "start": start,
@@ -183,4 +184,4 @@ def update_tle():
     except Exception as e:
         print("TLE update failed:", e)
         return jsonify({"status": "error", "message": str(e)})
-        
+                    
