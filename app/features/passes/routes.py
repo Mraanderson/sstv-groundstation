@@ -108,7 +108,7 @@ def passes_page():
                         end = times[j+2].utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
                         # Correct max elevation calculation
                         peak_time = ts.from_datetime(times[j+1].utc_datetime())
-                        alt_deg = observer.at(peak_time).observe(sat).apparent().altaz()[0].degrees
+                        alt_deg = observer.observe(sat).at(peak_time).apparent().altaz()[0].degrees
                         passes.append({
                             "satellite": name,
                             "start": start,
@@ -184,4 +184,4 @@ def update_tle():
     except Exception as e:
         print("TLE update failed:", e)
         return jsonify({"status": "error", "message": str(e)})
-                    
+        
