@@ -1,24 +1,16 @@
 # Core web framework
-Flask
-
-# Template engine (Flask already includes Jinja2, but pinning for stability)
-Jinja2
+Flask==3.0.3
 
 # HTTP requests for fetching TLEs
-requests
+requests==2.32.3
 
 # Astronomy & orbital mechanics
-skyfield
-sgp4
+skyfield==1.49
+sgp4==2.23
 
-# Location & timezone detection
-timezonefinder
+# Timezone support (zoneinfo is built-in for Python >=3.9)
+# Only include this if running on Python < 3.9
+# zoneinfo; python_version < "3.9"
 
-# Optional: elevation API calls are done via requests, no extra lib needed
-
-# For serving static files and uploads
-Werkzeug
-
-# If you use Flask's flash messaging with categories
-itsdangerous
-click
+# Optional: if you later add automatic timezone detection
+# timezonefinder==6.2.0
