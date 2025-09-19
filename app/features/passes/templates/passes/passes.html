@@ -20,6 +20,12 @@
   </div>
 </div>
 
+{% if not sdr_present %}
+  <div class="alert alert-warning">
+    ⚠ No RTL‑SDR detected — pass quality will not be recorded.
+  </div>
+{% endif %}
+
 {% if not location_set %}
   <div class="alert alert-info">
     Please set your location in the Config page to enable pass predictions.
@@ -42,6 +48,7 @@
             <th>Start</th>
             <th>Peak</th>
             <th>End</th>
+            <th>Max Elev (°)</th>
           </tr>
         </thead>
         <tbody>
@@ -56,6 +63,7 @@
               <td>{{ p.start.strftime("%Y-%m-%d %H:%M:%S") }}</td>
               <td>{{ p.peak.strftime("%Y-%m-%d %H:%M:%S") }}</td>
               <td>{{ p.end.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+              <td>{{ p.max_elevation }}</td>
             </tr>
           {% endfor %}
         </tbody>
