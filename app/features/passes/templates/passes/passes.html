@@ -38,6 +38,8 @@
         <thead>
           <tr>
             <th>Satellite</th>
+            <th>Frequency (MHz)</th>
+            <th>Mode</th>
             <th>Event</th>
             <th>Time ({{ timezone }})</th>
           </tr>
@@ -47,6 +49,16 @@
             {% set age_hours = (now - p.time).total_seconds() / 3600 %}
             <tr class="{% if age_hours > 0 and age_hours < 12 %}text-muted{% endif %}">
               <td>{{ p.satellite }}</td>
+              <td>
+                {% for sat in config['SSTV_SATELLITES'] if sat.name == p.satellite %}
+                  {{ sat.frequency }}
+                {% endfor %}
+              </td>
+              <td>
+                {% for sat in config['SSTV_SATELLITES'] if sat.name == p.satellite %}
+                  {{ sat.mode }}
+                {% endfor %}
+              </td>
               <td>{{ p.event }}</td>
               <td>{{ p.time.strftime("%Y-%m-%d %H:%M:%S") }}</td>
             </tr>
