@@ -1,13 +1,17 @@
 import os
 import requests
 from datetime import datetime, timedelta
-from flask import render_template, current_app, redirect, url_for, flash, jsonify
+from flask import render_template, current_app, jsonify
 from skyfield.api import Loader, Topos
 from zoneinfo import ZoneInfo
 
 from . import bp
 
-TLE_SOURCE_URL = "https://celestrak.org/NORAD/elements/active.txt"
+# Direct TLE URLs for ISS and UMKA‑1 from Celestrak GP API
+TLE_SOURCES = {
+    "ISS": "https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=TLE",
+    "UMKA-1": "https://celestrak.org/NORAD/elements/gp.php?CATNR=47951&FORMAT=TLE"
+}
 
 def tle_file_path():
     return os.path.join(current_app.config["TLE_DIR"], "active.txt")
@@ -65,13 +69,9 @@ def passes_page():
 
             with open(tle_path) as f:
                 lines = [line.strip() for line in f if line.strip()]
-            target_sats = ["ISS", "UMKA-1"]
             for i in range(0, len(lines), 3):
                 try:
-                    name = lines[i].strip()
-                    if name.upper() not in [s.upper() for s in target_sats]:
-                        continue
-                    l1, l2 = lines[i+1], lines[i+2]
+                    name, l1, l2 = lines[i], lines[i+1], lines[i+2]
                     sat = load.tle(name, l1, l2)
                 except Exception:
                     continue
@@ -107,20 +107,25 @@ def passes_page():
 @bp.route("/update-tle", endpoint="update_tle")
 def update_tle():
     try:
-        resp = requests.get(TLE_SOURCE_URL, timeout=10)
-        resp.raise_for_status()
-
         tle_dir = current_app.config["TLE_DIR"]
         os.makedirs(tle_dir, exist_ok=True)
+        path = tle_file_path()
 
-        path = os.path.join(tle_dir, "active.txt")
-        print("Saving TLE to:", path)
-        print("TLE_DIR exists:", os.path.exists(tle_dir))
+        all_tle_lines = []
+        for name, url in TLE_SOURCES.items():
+            print(f"Fetching TLE for {name} from {url}")
+            resp = requests.get(url, timeout=10)
+            resp.raise_for_status()
+            tle_lines = resp.text.strip().splitlines()
+            if len(tle_lines) >= 3:
+                all_tle_lines.extend(tle_lines[:3])
+            else:
+                print(f"Warning: TLE for {name} is incomplete")
 
         with open(path, "w") as f:
-            f.write(resp.text)
+            f.write("\n".join(all_tle_lines) + "\n")
 
-        print("TLE saved successfully.")
+        print(f"TLE saved successfully to {path}")
         return jsonify({"status": "success", "updated": True})
     except Exception as e:
         print("TLE update failed:", e)
