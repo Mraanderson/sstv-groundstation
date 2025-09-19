@@ -20,6 +20,12 @@
   </div>
 </div>
 
+{% if not location_set %}
+  <div class="alert alert-info">
+    Please set your location in the Config page to enable pass predictions.
+  </div>
+{% endif %}
+
 {% if error %}
   <div class="alert alert-warning">{{ error }}</div>
 {% endif %}
