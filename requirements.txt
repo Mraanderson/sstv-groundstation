@@ -13,4 +13,4 @@ sgp4==2.23
 # zoneinfo; python_version < "3.9"
 
 # Optional: if you later add automatic timezone detection
-# timezonefinder==6.2.0
+timezonefinder==6.2.0
