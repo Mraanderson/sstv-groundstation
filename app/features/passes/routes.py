@@ -1,8 +1,8 @@
 import os
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from flask import render_template, current_app, jsonify
-from skyfield.api import Loader, Topos
+from skyfield.api import Loader, EarthSatellite, wgs84
 from zoneinfo import ZoneInfo
 
 from . import bp
@@ -43,8 +43,8 @@ def get_tle_age_days(tle_path):
         year = int(epoch_str[:2])
         year += 2000 if year < 57 else 1900
         day_of_year = float(epoch_str[2:])
-        epoch = datetime(year, 1, 1) + timedelta(days=day_of_year - 1)
-        return round((datetime.utcnow() - epoch).total_seconds() / 86400, 1)
+        epoch = datetime(year, 1, 1, tzinfo=timezone.utc) + timedelta(days=day_of_year - 1)
+        return round((datetime.now(timezone.utc) - epoch).total_seconds() / 86400, 1)
     except Exception:
         return None
 
@@ -70,44 +70,69 @@ def passes_page():
         if None not in (lat, lon, alt, tz):
             load = Loader("./skyfield_data")
             ts = load.timescale()
-            observer = Topos(latitude_degrees=lat, longitude_degrees=lon, elevation_m=alt)
+            # Observer location using wgs84
+            observer = wgs84.latlon(latitude_degrees=lat, longitude_degrees=lon, elevation_m=alt)
 
+            # Read TLE triples
             with open(tle_path) as f:
                 lines = [line.strip() for line in f if line.strip()]
+
+            # Time window: next 24 hours
+            now_utc = datetime.now(timezone.utc)
+            end_utc = now_utc + timedelta(hours=24)
+            t0 = ts.from_datetime(now_utc)
+            t1 = ts.from_datetime(end_utc)
+
             for i in range(0, len(lines), 3):
                 try:
                     name, l1, l2 = lines[i], lines[i+1], lines[i+2]
-                    sat = load.tle(name, l1, l2)
-                except Exception:
+                except IndexError:
+                    print("Skipping incomplete TLE triple at index", i)
                     continue
 
-                now = datetime.utcnow()
-                end_time = now + timedelta(hours=24)
-                t0 = ts.utc(now.year, now.month, now.day, now.hour, now.minute)
-                t1 = ts.utc(end_time.year, end_time.month, end_time.day, end_time.hour, end_time.minute)
+                try:
+                    # Build satellite reliably
+                    sat = EarthSatellite(l1, l2, name, ts)
+                except Exception as e:
+                    print(f"Failed to build satellite for {name}: {e}")
+                    continue
 
                 try:
                     times, events = sat.find_events(observer, t0, t1, altitude_degrees=10.0)
-                except Exception:
+                except Exception as e:
+                    print(f"find_events failed for {name}: {e}")
                     continue
 
                 for ti, event in zip(times, events):
-                    local_time = ti.utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
+                    # ti is a Time object; convert to tz-aware datetime
+                    dt_local = ti.utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
+                    if dt_local < datetime.now(ZoneInfo(tz)):
+                        continue  # keep only future events
                     passes.append({
                         "satellite": name,
-                        "time": local_time,
+                        "time": dt_local,
                         "event": ["rise", "culminate", "set"][event]
                     })
 
             passes.sort(key=lambda p: p["time"])
 
-    return render_template("passes/passes.html",
-                           tle_info=tle_info,
-                           satellites=satellites,
-                           passes=passes,
-                           timezone=tz,
-                           now=datetime.now(ZoneInfo(tz)),
-                           location_set=None not in (lat, lon, alt, tz))
+    # Safe 'now' for template even if tz is unset
+    now_for_template = None
+    if tz:
+        try:
+            now_for_template = datetime.now(ZoneInfo(tz))
+        except Exception:
+            now_for_template = datetime.now()
+
+    return render_template(
+        "passes/passes.html",
+        tle_info=tle_info,
+        satellites=satellites,
+        passes=passes,
+        timezone=tz,
+        now=now_for_template,
+        location_set=None not in (lat, lon, alt, tz)
+    )
 
 @bp.route("/update-tle", endpoint="update_tle")
 def update_tle():
@@ -116,20 +141,21 @@ def update_tle():
         os.makedirs(tle_dir, exist_ok=True)
         path = tle_file_path()
 
-        all_tle_lines = []
-        for sat in SSTV_SATELLITES:
-            url = f"https://celestrak.org/NORAD/elements/gp.php?CATNR={sat['norad_id']}&FORMAT=TLE"
-            print(f"Fetching TLE for {sat['name']} from {url}")
-            resp = requests.get(url, timeout=10)
-            resp.raise_for_status()
-            tle_lines = resp.text.strip().splitlines()
-            if len(tle_lines) >= 3:
-                all_tle_lines.extend(tle_lines[:3])
-            else:
-                print(f"Warning: TLE for {sat['name']} is incomplete")
+        # Fetch ISS only for reliability
+        iss = SSTV_SATELLITES[0]
+        url = f"https://celestrak.org/NORAD/elements/gp.php?CATNR={iss['norad_id']}&FORMAT=TLE"
+        print(f"Fetching TLE for {iss['name']} from {url}")
+        resp = requests.get(url, timeout=10)
+        resp.raise_for_status()
+        tle_lines = resp.text.strip().splitlines()
+
+        if len(tle_lines) < 3:
+            print(f"Warning: TLE for {iss['name']} is incomplete")
+            return jsonify({"status": "error", "message": "Incomplete TLE"})
 
         with open(path, "w") as f:
-            f.write("\n".join(all_tle_lines) + "\n")
+            # Ensure exactly 3 lines (name, line1, line2)
+            f.write("\n".join(tle_lines[:3]) + "\n")
 
         print(f"TLE saved successfully to {path}")
         return jsonify({"status": "success", "updated": True})
