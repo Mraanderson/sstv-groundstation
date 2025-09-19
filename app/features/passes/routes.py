@@ -92,7 +92,7 @@ def passes_page():
                     continue
 
                 try:
-                    times, events = sat.find_events(observer, t0, t1, altitude_degrees=10.0)
+                    times, events = sat.find_events(observer, t0, t1, altitude_degrees=0.0)
                 except Exception as e:
                     print(f"find_events failed for {name}: {e}")
                     continue
