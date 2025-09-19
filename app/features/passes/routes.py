@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 
 from . import bp
 
-# Master SSTV-capable satellite list (active, silent, deorbited)
+# Single reliable satellite for testing
 SSTV_SATELLITES = [
     {
         "name": "ISS (ZARYA)",
@@ -16,78 +16,6 @@ SSTV_SATELLITES = [
         "mode": "FM SSTV",
         "status": "Active",
         "notes": "ARISS SSTV events"
-    },
-    {
-        "name": "UMKA-1",
-        "norad_id": 57172,
-        "frequency": "437.625",
-        "mode": "FM SSTV",
-        "status": "Active",
-        "notes": "Also telemetry"
-    },
-    {
-        "name": "PO-101 (Diwata-2)",
-        "norad_id": 43678,
-        "frequency": "145.900",
-        "mode": "FM SSTV",
-        "status": "Active",
-        "notes": "Also APRS"
-    },
-    {
-        "name": "RS-44 (DOSAAF-85)",
-        "norad_id": 44909,
-        "frequency": "145.960",
-        "mode": "FM/SSB",
-        "status": "Active",
-        "notes": "Primarily transponder, SSTV during events"
-    },
-    {
-        "name": "FO-29 (JAS-2)",
-        "norad_id": 24278,
-        "frequency": "145.900",
-        "mode": "FM/SSB",
-        "status": "Active",
-        "notes": "SSTV possible during special ops"
-    },
-    {
-        "name": "AO-7",
-        "norad_id": 7530,
-        "frequency": "145.950",
-        "mode": "FM/SSB",
-        "status": "Active (intermittent)",
-        "notes": "Launched 1974, SSTV possible, Mode B"
-    },
-    {
-        "name": "ARISSat-1 / RadioSkaf-V",
-        "norad_id": 37772,
-        "frequency": "145.950",
-        "mode": "FM SSTV",
-        "status": "Deorbited",
-        "notes": "Deorbited 2012-01-04"
-    },
-    {
-        "name": "SuitSat-1",
-        "norad_id": 28933,
-        "frequency": "145.990",
-        "mode": "FM SSTV",
-        "status": "Deorbited",
-        "notes": "Deorbited 2006-09-07"
-    },
-    {
-        "name": "RS-15",
-        "norad_id": 23439,
-        "frequency": "145.858",
-        "mode": "FM SSTV",
-        "status": "Silent",
-        "notes": "Last heard ~2008"
-    },
-    {
-        "name": "AO-27",
-        "norad_id": 22825,
-        "frequency": "145.850",
-        "mode": "FM SSTV",
-        "status": "Silent",
-        "notes": "Last active 2012"
     }
 ]
 
