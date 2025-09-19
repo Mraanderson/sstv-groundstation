@@ -1,4 +1,5 @@
 import os
+import csv
 import requests
 from datetime import datetime, timedelta, timezone
 from flask import render_template, current_app, jsonify
@@ -6,6 +7,7 @@ from skyfield.api import Loader, EarthSatellite, wgs84
 from zoneinfo import ZoneInfo
 
 from . import bp
+from app.utils.sdr import rtl_sdr_present  # new import
 
 # Single reliable satellite for testing
 SSTV_SATELLITES = [
@@ -57,6 +59,7 @@ def passes_page():
     tle_path, satellites = load_tle_satellites()
     tle_info = None
     passes = []
+    sdr_flag = rtl_sdr_present()  # detect SDR once per request
 
     if tle_path:
         mtime = datetime.fromtimestamp(os.path.getmtime(tle_path))
@@ -103,16 +106,37 @@ def passes_page():
                         start = times[j].utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
                         peak = times[j+1].utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
                         end = times[j+2].utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
-                        if end < datetime.now(ZoneInfo(tz)):
-                            continue
+                        # Calculate max elevation at peak
+                        alt_deg = sat.at(ts.from_datetime(times[j+1].utc_datetime())).observe(observer).apparent().altaz()[0].degrees
                         passes.append({
                             "satellite": name,
                             "start": start,
                             "peak": peak,
-                            "end": end
+                            "end": end,
+                            "max_elevation": round(alt_deg, 1)
                         })
 
             passes.sort(key=lambda p: p["start"])
+
+            # Log any passes that have already ended
+            log_path = os.path.join(current_app.config["TLE_DIR"], "pass_log.csv")
+            try:
+                with open(log_path, "a", newline="") as csvfile:
+                    writer = csv.writer(csvfile)
+                    for p in passes:
+                        if p["end"] < datetime.now(ZoneInfo(tz)):
+                            writer.writerow([
+                                datetime.now().isoformat(),  # log timestamp
+                                p["satellite"],
+                                p["start"].isoformat(),
+                                p["peak"].isoformat(),
+                                p["end"].isoformat(),
+                                p["max_elevation"],
+                                sdr_flag,
+                                ""  # placeholder for quality
+                            ])
+            except Exception as e:
+                print(f"Pass logging failed: {e}")
 
     now_for_template = None
     if tz:
@@ -129,7 +153,8 @@ def passes_page():
         timezone=tz,
         now=now_for_template,
         location_set=None not in (lat, lon, alt, tz),
-        sstv_sats=SSTV_SATELLITES
+        sstv_sats=SSTV_SATELLITES,
+        sdr_present=sdr_flag
     )
 
 @bp.route("/update-tle", endpoint="update_tle")
