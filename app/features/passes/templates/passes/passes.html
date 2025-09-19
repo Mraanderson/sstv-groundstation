@@ -44,26 +44,20 @@
         <thead>
           <tr>
             <th>Satellite</th>
-            <th>Frequency (MHz)</th>
+            <th>Max Elev (°)</th>
             <th>Start</th>
             <th>Peak</th>
             <th>End</th>
-            <th>Max Elev (°)</th>
           </tr>
         </thead>
         <tbody>
           {% for p in passes %}
             <tr>
               <td>{{ p.satellite }}</td>
-              <td>
-                {% for sat in sstv_sats if sat.name == p.satellite %}
-                  {{ sat.frequency }}
-                {% endfor %}
-              </td>
+              <td>{{ p.max_elevation }}</td>
               <td>{{ p.start.strftime("%Y-%m-%d %H:%M:%S") }}</td>
               <td>{{ p.peak.strftime("%Y-%m-%d %H:%M:%S") }}</td>
               <td>{{ p.end.strftime("%Y-%m-%d %H:%M:%S") }}</td>
-              <td>{{ p.max_elevation }}</td>
             </tr>
           {% endfor %}
         </tbody>
