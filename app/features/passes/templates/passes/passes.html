@@ -39,28 +39,23 @@
           <tr>
             <th>Satellite</th>
             <th>Frequency (MHz)</th>
-            <th>Mode</th>
-            <th>Event</th>
-            <th>Time ({{ timezone }})</th>
+            <th>Start</th>
+            <th>Peak</th>
+            <th>End</th>
           </tr>
         </thead>
         <tbody>
           {% for p in passes %}
-            {% set age_hours = (now - p.time).total_seconds() / 3600 %}
-            <tr class="{% if age_hours > 0 and age_hours < 12 %}text-muted{% endif %}">
+            <tr>
               <td>{{ p.satellite }}</td>
               <td>
                 {% for sat in sstv_sats if sat.name == p.satellite %}
                   {{ sat.frequency }}
                 {% endfor %}
               </td>
-              <td>
-                {% for sat in sstv_sats if sat.name == p.satellite %}
-                  {{ sat.mode }}
-                {% endfor %}
-              </td>
-              <td>{{ p.event }}</td>
-              <td>{{ p.time.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+              <td>{{ p.start.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+              <td>{{ p.peak.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+              <td>{{ p.end.strftime("%Y-%m-%d %H:%M:%S") }}</td>
             </tr>
           {% endfor %}
         </tbody>
