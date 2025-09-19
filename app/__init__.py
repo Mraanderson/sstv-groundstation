@@ -44,6 +44,11 @@ def create_app():
         THEME=user_cfg.get("theme", "auto")
     )
 
+    # 🔹 Ensure TLE directory exists and is configured
+    tle_dir = os.path.join(app.root_path, "static", "tle")
+    os.makedirs(tle_dir, exist_ok=True)
+    app.config["TLE_DIR"] = tle_dir
+
     # Register Jinja filter
     app.jinja_env.filters["datetimeformat"] = datetimeformat
 
