@@ -113,10 +113,16 @@ def update_tle():
         tle_dir = current_app.config["TLE_DIR"]
         os.makedirs(tle_dir, exist_ok=True)
 
-        with open(tle_file_path(), "w") as f:
+        path = os.path.join(tle_dir, "active.txt")
+        print("Saving TLE to:", path)
+        print("TLE_DIR exists:", os.path.exists(tle_dir))
+
+        with open(path, "w") as f:
             f.write(resp.text)
 
+        print("TLE saved successfully.")
         return jsonify({"status": "success", "updated": True})
     except Exception as e:
+        print("TLE update failed:", e)
         return jsonify({"status": "error", "message": str(e)})
-                         
+        
