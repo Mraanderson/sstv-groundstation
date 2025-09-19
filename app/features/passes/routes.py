@@ -65,9 +65,13 @@ def passes_page():
 
             with open(tle_path) as f:
                 lines = [line.strip() for line in f if line.strip()]
+            target_sats = ["ISS", "UMKA-1"]
             for i in range(0, len(lines), 3):
                 try:
-                    name, l1, l2 = lines[i], lines[i+1], lines[i+2]
+                    name = lines[i].strip()
+                    if name.upper() not in [s.upper() for s in target_sats]:
+                        continue
+                    l1, l2 = lines[i+1], lines[i+2]
                     sat = load.tle(name, l1, l2)
                 except Exception:
                     continue
@@ -105,10 +109,14 @@ def update_tle():
     try:
         resp = requests.get(TLE_SOURCE_URL, timeout=10)
         resp.raise_for_status()
-        os.makedirs(current_app.config["TLE_DIR"], exist_ok=True)
+
+        tle_dir = current_app.config["TLE_DIR"]
+        os.makedirs(tle_dir, exist_ok=True)
+
         with open(tle_file_path(), "w") as f:
             f.write(resp.text)
+
         return jsonify({"status": "success", "updated": True})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
-        
+                         
