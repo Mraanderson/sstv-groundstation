@@ -13,7 +13,6 @@ SSTV_SATELLITES = [
         "name": "ISS (ZARYA)",
         "norad_id": 25544,
         "frequency": "145.800",
-        "mode": "FM SSTV",
         "status": "Active",
         "notes": "ARISS SSTV events"
     }
@@ -70,14 +69,11 @@ def passes_page():
         if None not in (lat, lon, alt, tz):
             load = Loader("./skyfield_data")
             ts = load.timescale()
-            # Observer location using wgs84
             observer = wgs84.latlon(latitude_degrees=lat, longitude_degrees=lon, elevation_m=alt)
 
-            # Read TLE triples
             with open(tle_path) as f:
                 lines = [line.strip() for line in f if line.strip()]
 
-            # Time window: next 24 hours
             now_utc = datetime.now(timezone.utc)
             end_utc = now_utc + timedelta(hours=24)
             t0 = ts.from_datetime(now_utc)
@@ -87,11 +83,9 @@ def passes_page():
                 try:
                     name, l1, l2 = lines[i], lines[i+1], lines[i+2]
                 except IndexError:
-                    print("Skipping incomplete TLE triple at index", i)
                     continue
 
                 try:
-                    # Build satellite reliably
                     sat = EarthSatellite(l1, l2, name, ts)
                 except Exception as e:
                     print(f"Failed to build satellite for {name}: {e}")
@@ -103,20 +97,23 @@ def passes_page():
                     print(f"find_events failed for {name}: {e}")
                     continue
 
-                for ti, event in zip(times, events):
-                    # ti is a Time object; convert to tz-aware datetime
-                    dt_local = ti.utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
-                    if dt_local < datetime.now(ZoneInfo(tz)):
-                        continue  # keep only future events
-                    passes.append({
-                        "satellite": name,
-                        "time": dt_local,
-                        "event": ["rise", "culminate", "set"][event]
-                    })
+                # Group into passes: rise (0), culminate (1), set (2)
+                for j in range(0, len(events) - 2, 3):
+                    if events[j] == 0 and events[j+1] == 1 and events[j+2] == 2:
+                        start = times[j].utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
+                        peak = times[j+1].utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
+                        end = times[j+2].utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
+                        if end < datetime.now(ZoneInfo(tz)):
+                            continue
+                        passes.append({
+                            "satellite": name,
+                            "start": start,
+                            "peak": peak,
+                            "end": end
+                        })
 
-            passes.sort(key=lambda p: p["time"])
+            passes.sort(key=lambda p: p["start"])
 
-    # Safe 'now' for template even if tz is unset
     now_for_template = None
     if tz:
         try:
@@ -131,7 +128,8 @@ def passes_page():
         passes=passes,
         timezone=tz,
         now=now_for_template,
-        location_set=None not in (lat, lon, alt, tz)
+        location_set=None not in (lat, lon, alt, tz),
+        sstv_sats=SSTV_SATELLITES
     )
 
 @bp.route("/update-tle", endpoint="update_tle")
@@ -141,7 +139,6 @@ def update_tle():
         os.makedirs(tle_dir, exist_ok=True)
         path = tle_file_path()
 
-        # Fetch ISS only for reliability
         iss = SSTV_SATELLITES[0]
         url = f"https://celestrak.org/NORAD/elements/gp.php?CATNR={iss['norad_id']}&FORMAT=TLE"
         print(f"Fetching TLE for {iss['name']} from {url}")
@@ -154,7 +151,6 @@ def update_tle():
             return jsonify({"status": "error", "message": "Incomplete TLE"})
 
         with open(path, "w") as f:
-            # Ensure exactly 3 lines (name, line1, line2)
             f.write("\n".join(tle_lines[:3]) + "\n")
 
         print(f"TLE saved successfully to {path}")
