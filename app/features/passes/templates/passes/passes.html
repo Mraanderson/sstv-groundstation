@@ -7,14 +7,30 @@
   <div class="card-body">
     {% if tle_info %}
       <p><strong>TLE File:</strong> {{ tle_info.filename }}</p>
-      <p><strong>Last Updated:</strong> {{ tle_info.last_updated }}</p>
+      <p><strong>Last Updated:</strong> {{ tle_info.last_updated }}
+        <span class="text-muted">({{ tle_info.age_days|round(1) }} days old)</span>
+      </p>
       <p><strong>Satellites in TLE:</strong> {{ satellites|length }}</p>
     {% else %}
       <p class="text-warning">No TLE data found.</p>
     {% endif %}
-    <a href="{{ url_for('passes.update_tle') }}" class="btn btn-primary">Update TLE</a>
+    <button id="update-tle-btn" class="btn btn-primary">
+      <span id="update-icon" class="me-2">🔄</span> Update TLE
+    </button>
   </div>
 </div>
+
+{% if not sdr_present %}
+  <div class="alert alert-warning">
+    ⚠ No RTL‑SDR detected — pass quality will not be recorded.
+  </div>
+{% endif %}
+
+{% if not location_set %}
+  <div class="alert alert-info">
+    Please set your location in the Config page to enable pass predictions.
+  </div>
+{% endif %}
 
 {% if error %}
   <div class="alert alert-warning">{{ error }}</div>
@@ -28,16 +44,20 @@
         <thead>
           <tr>
             <th>Satellite</th>
-            <th>Event</th>
-            <th>Time</th>
+            <th>Max Elev (°)</th>
+            <th>Start</th>
+            <th>Peak</th>
+            <th>End</th>
           </tr>
         </thead>
         <tbody>
           {% for p in passes %}
             <tr>
               <td>{{ p.satellite }}</td>
-              <td>{{ p.event }}</td>
-              <td>{{ p.time.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+              <td>{{ p.max_elevation }}</td>
+              <td>{{ p.start.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+              <td>{{ p.peak.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+              <td>{{ p.end.strftime("%Y-%m-%d %H:%M:%S") }}</td>
             </tr>
           {% endfor %}
         </tbody>
@@ -47,4 +67,26 @@
 {% elif tle_info and not error %}
   <p>No passes found in the next 24 hours.</p>
 {% endif %}
+
+<script>
+  document.getElementById('update-tle-btn').addEventListener('click', function () {
+    const btn = this;
+    const icon = document.getElementById('update-icon');
+    btn.disabled = true;
+    icon.textContent = '⏳';
+
+    fetch('{{ url_for("passes.update_tle") }}')
+      .then(res => res.json())
+      .then(data => {
+        icon.textContent = '✅';
+        setTimeout(() => {
+          location.reload();
+        }, 1000);
+      })
+      .catch(err => {
+        icon.textContent = '⚠️';
+        btn.disabled = false;
+      });
+  });
+</script>
 {% endblock %}
