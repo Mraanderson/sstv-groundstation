@@ -7,7 +7,7 @@ from pathlib import Path
 app = Flask(__name__)
 
 SETTINGS_FILE = Path("settings.json")
-SCHEDULER_SCRIPT = Path("utils/sd_scheduler.py")
+SCHEDULER_SCRIPT = Path("app/utils/sd_scheduler.py")  # adjust if path differs
 
 def load_settings():
     if SETTINGS_FILE.exists():
@@ -66,4 +66,4 @@ def status():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
-  
+    
