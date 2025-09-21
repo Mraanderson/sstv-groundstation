@@ -66,18 +66,88 @@ def save_predicted_passes(passes):
     except Exception as e:
         print(f"❌ Failed to write predicted_passes.csv: {e}")
 
+def generate_passes(lat, lon, alt, tz, tle_path, sdr_flag):
+    """Generate pass predictions and save CSV for scheduler."""
+    passes = []
+    if None in (lat, lon, alt, tz) or not tle_path:
+        return passes
+
+    load = Loader("./skyfield_data")
+    ts = load.timescale()
+    observer = wgs84.latlon(latitude_degrees=lat, longitude_degrees=lon, elevation_m=alt)
+
+    with open(tle_path) as f:
+        lines = [line.strip() for line in f if line.strip()]
+
+    now_utc = datetime.now(timezone.utc)
+    end_utc = now_utc + timedelta(hours=24)
+    t0 = ts.from_datetime(now_utc)
+    t1 = ts.from_datetime(end_utc)
+
+    for i in range(0, len(lines), 3):
+        try:
+            name, l1, l2 = lines[i], lines[i+1], lines[i+2]
+        except IndexError:
+            continue
+
+        try:
+            sat = EarthSatellite(l1, l2, name, ts)
+            times, events = sat.find_events(observer, t0, t1, altitude_degrees=0.0)
+        except Exception as e:
+            print(f"Satellite calc failed for {name}: {e}")
+            continue
+
+        for j in range(0, len(events) - 2, 3):
+            if events[j] == 0 and events[j+1] == 1 and events[j+2] == 2:
+                start = times[j].utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
+                peak = times[j+1].utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
+                end = times[j+2].utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
+                peak_time = ts.from_datetime(times[j+1].utc_datetime())
+                alt_deg = (sat - observer).at(peak_time).altaz()[0].degrees
+                passes.append({
+                    "satellite": name,
+                    "start": start,
+                    "peak": peak,
+                    "end": end,
+                    "max_elevation": round(alt_deg, 1)
+                })
+
+    passes.sort(key=lambda p: p["start"])
+    save_predicted_passes(passes)
+
+    # Log any passes that have already ended
+    if tz:
+        log_path = os.path.join(current_app.config["TLE_DIR"], "pass_log.csv")
+        try:
+            with open(log_path, "a", newline="") as csvfile:
+                writer = csv.writer(csvfile)
+                for p in passes:
+                    if p["end"] < datetime.now(ZoneInfo(tz)):
+                        writer.writerow([
+                            datetime.now().isoformat(),
+                            p["satellite"],
+                            p["start"].isoformat(),
+                            p["peak"].isoformat(),
+                            p["end"].isoformat(),
+                            p["max_elevation"],
+                            sdr_flag,
+                            ""
+                        ])
+        except Exception as e:
+            print(f"Pass logging failed: {e}")
+
+    return passes
+
 @bp.route("/", endpoint="passes_page")
 def passes_page():
     lat = current_app.config.get("LATITUDE")
     lon = current_app.config.get("LONGITUDE")
     alt = current_app.config.get("ALTITUDE_M")
     tz = current_app.config.get("TIMEZONE")
-
     tle_path, satellites = load_tle_satellites()
-    tle_info = None
-    passes = []
-    sdr_flag = rtl_sdr_present()  # detect SDR once per request
+    sdr_flag = rtl_sdr_present()
 
+    tle_info = None
     if tle_path:
         mtime = datetime.fromtimestamp(os.path.getmtime(tle_path))
         tle_info = {
@@ -86,84 +156,9 @@ def passes_page():
             "age_days": get_tle_age_days(tle_path)
         }
 
-        if None not in (lat, lon, alt, tz):
-            load = Loader("./skyfield_data")
-            ts = load.timescale()
-            observer = wgs84.latlon(latitude_degrees=lat, longitude_degrees=lon, elevation_m=alt)
+    passes = generate_passes(lat, lon, alt, tz, tle_path, sdr_flag)
 
-            with open(tle_path) as f:
-                lines = [line.strip() for line in f if line.strip()]
-
-            now_utc = datetime.now(timezone.utc)
-            end_utc = now_utc + timedelta(hours=24)
-            t0 = ts.from_datetime(now_utc)
-            t1 = ts.from_datetime(end_utc)
-
-            for i in range(0, len(lines), 3):
-                try:
-                    name, l1, l2 = lines[i], lines[i+1], lines[i+2]
-                except IndexError:
-                    continue
-
-                try:
-                    sat = EarthSatellite(l1, l2, name, ts)
-                except Exception as e:
-                    print(f"Failed to build satellite for {name}: {e}")
-                    continue
-
-                try:
-                    times, events = sat.find_events(observer, t0, t1, altitude_degrees=0.0)
-                except Exception as e:
-                    print(f"find_events failed for {name}: {e}")
-                    continue
-
-                # Group into passes: rise (0), culminate (1), set (2)
-                for j in range(0, len(events) - 2, 3):
-                    if events[j] == 0 and events[j+1] == 1 and events[j+2] == 2:
-                        start = times[j].utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
-                        peak = times[j+1].utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
-                        end = times[j+2].utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
-                        peak_time = ts.from_datetime(times[j+1].utc_datetime())
-                        alt_deg = (sat - observer).at(peak_time).altaz()[0].degrees
-                        passes.append({
-                            "satellite": name,
-                            "start": start,
-                            "peak": peak,
-                            "end": end,
-                            "max_elevation": round(alt_deg, 1)
-                        })
-
-            passes.sort(key=lambda p: p["start"])
-
-            # Save predictions for scheduler
-            save_predicted_passes(passes)
-
-            # Log any passes that have already ended
-            log_path = os.path.join(current_app.config["TLE_DIR"], "pass_log.csv")
-            try:
-                with open(log_path, "a", newline="") as csvfile:
-                    writer = csv.writer(csvfile)
-                    for p in passes:
-                        if p["end"] < datetime.now(ZoneInfo(tz)):
-                            writer.writerow([
-                                datetime.now().isoformat(),
-                                p["satellite"],
-                                p["start"].isoformat(),
-                                p["peak"].isoformat(),
-                                p["end"].isoformat(),
-                                p["max_elevation"],
-                                sdr_flag,
-                                ""
-                            ])
-            except Exception as e:
-                print(f"Pass logging failed: {e}")
-
-    now_for_template = None
-    if tz:
-        try:
-            now_for_template = datetime.now(ZoneInfo(tz))
-        except Exception:
-            now_for_template = datetime.now()
+    now_for_template = datetime.now(ZoneInfo(tz)) if tz else datetime.now()
 
     return render_template(
         "passes/passes.html",
@@ -192,7 +187,6 @@ def update_tle():
         tle_lines = resp.text.strip().splitlines()
 
         if len(tle_lines) < 3:
-            print(f"Warning: TLE for {iss['name']} is incomplete")
             return jsonify({"status": "error", "message": "Incomplete TLE"})
 
         with open(path, "w") as f:
@@ -200,8 +194,13 @@ def update_tle():
 
         print(f"TLE saved successfully to {path}")
 
-        # After updating TLE, regenerate passes CSV
-        passes_page()  # This will recalc and save predicted_passes.csv
+        # Generate passes immediately after updating TLE
+        lat = current_app.config.get("LATITUDE")
+        lon = current_app.config.get("LONGITUDE")
+        alt = current_app.config.get("ALTITUDE_M")
+        tz = current_app.config.get("TIMEZONE")
+        sdr_flag = rtl_sdr_present()
+        generate_passes(lat, lon, alt, tz, path, sdr_flag)
 
         return jsonify({"status": "success", "updated": True})
     except Exception as e:
