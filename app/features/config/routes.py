@@ -4,7 +4,7 @@ from app.config_paths import CONFIG_FILE
 import json
 import os
 from datetime import datetime
-from . import bp   # ✅ Ensure blueprint is imported so @bp.route works
+from . import bp
 
 @bp.route("/", methods=["GET", "POST"], endpoint="config_page")
 def config_page():
@@ -77,4 +77,21 @@ def config_page():
         altitude=current_app.config.get("ALTITUDE_M"),
         timezone=current_app.config.get("TIMEZONE")
     )
-    
+
+@bp.route("/altitude", methods=["GET"])
+def get_altitude():
+    lat = request.args.get("lat")
+    lon = request.args.get("lon")
+
+    if not lat or not lon:
+        return jsonify({"error": "Missing coordinates"}), 400
+
+    try:
+        import requests
+        res = requests.get(f"https://api.opentopodata.org/v1/srtm90m?locations={lat},{lon}")
+        data = res.json()
+        elevation = data["results"][0]["elevation"]
+        return jsonify({"elevation": elevation})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+                
