@@ -14,4 +14,4 @@ sgp4==2.23
 
 # Optional: if you later add automatic timezone detection
 timezonefinder==6.2.0
-psutils
+psutil
