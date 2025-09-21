@@ -7,7 +7,7 @@ from pathlib import Path
 recordings_bp = Blueprint('recordings', __name__)
 
 SETTINGS_FILE = Path("settings.json")
-SCHEDULER_SCRIPT = Path("app/utils/sd_scheduler.py")
+SCHEDULER_SCRIPT = Path("app/utils/sdr_scheduler.py")
 
 def load_settings():
     if SETTINGS_FILE.exists():
@@ -21,7 +21,7 @@ def find_scheduler_pid():
     """Find running scheduler process PID if any."""
     for proc in psutil.process_iter(['pid', 'cmdline']):
         try:
-            if proc.info['cmdline'] and "sd_scheduler.py" in " ".join(proc.info['cmdline']):
+            if proc.info['cmdline'] and "sdr_scheduler.py" in " ".join(proc.info['cmdline']):
                 return proc.info['pid']
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
