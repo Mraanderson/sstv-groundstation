@@ -7,6 +7,8 @@ from pathlib import Path
 import shutil
 import psutil
 import logging
+import json
+import sys
 from logging.handlers import RotatingFileHandler
 import sdr  # your existing SDR detection module
 
@@ -17,6 +19,7 @@ SAT_FREQ = {
 }
 RECORDINGS_DIR = Path("recordings")
 LOG_DIR = Path("logs")
+SETTINGS_FILE = Path("settings.json")
 SAMPLE_RATE = 48000
 GAIN = 40
 ELEVATION_THRESHOLD = 20
@@ -58,6 +61,14 @@ def create_pass_logger(log_path):
         phandler.setFormatter(formatter)
         plogger.addHandler(phandler)
     return plogger
+
+def recordings_enabled():
+    """Check settings.json for recording_enabled flag."""
+    try:
+        with open(SETTINGS_FILE) as f:
+            return json.load(f).get("recording_enabled", False)
+    except FileNotFoundError:
+        return False
 
 # --- FUNCTIONS ---
 def record_pass(sat_name, aos, los):
@@ -124,7 +135,6 @@ def record_pass(sat_name, aos, los):
         for line in summary_lines:
             log_and_print("info", line, pass_logger)
 
-        # Colour-coded verdict
         verdict = "PASS" if not error_flag and file_size_mb > 0 else "FAIL"
         colour = GREEN if verdict == "PASS" else RED
         print(f"{colour}[{sat_name}] PASS COMPLETE — Verdict: {verdict} — File: {file_size_mb:.2f} MB{RESET}")
@@ -170,11 +180,32 @@ def debug_monitor():
 
 # --- MAIN ---
 if __name__ == "__main__":
-    logger.info("Scheduler starting up")
+    logger.info("Scheduler starting up — running prechecks...")
+
+    # Precheck: recordings enabled
+    if not recordings_enabled():
+        log_and_print("info", "Recording disabled in settings.json — exiting.")
+        sys.exit(0)
+
+    # Precheck: SDR present
+    if not sdr.sdr_exists():
+        log_and_print("error", "No SDR detected — exiting.")
+        sys.exit(1)
+
+    # Precheck: passes available
     passes = load_pass_predictions(PASS_FILE)
+    if not passes:
+        log_and_print("warning", "No qualifying passes predicted — exiting.")
+        sys.exit(0)
+
+    log_and_print("info", f"{len(passes)} passes found — scheduling...")
     schedule_passes(passes)
 
     while True:
+        if not recordings_enabled():
+            log_and_print("info", "Recording disabled via web — shutting down.")
+            break
         schedule.run_pending()
         debug_monitor()
         time.sleep(5)
+        
