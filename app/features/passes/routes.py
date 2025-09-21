@@ -49,6 +49,23 @@ def get_tle_age_days(tle_path):
     except Exception:
         return None
 
+def save_predicted_passes(passes):
+    """Write passes to predicted_passes.csv for the scheduler."""
+    try:
+        with open("predicted_passes.csv", "w", newline="") as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(["satellite", "aos", "los", "max_elev"])
+            for p in passes:
+                writer.writerow([
+                    p["satellite"],
+                    p["start"].astimezone(ZoneInfo("UTC")).isoformat(timespec="seconds"),
+                    p["end"].astimezone(ZoneInfo("UTC")).isoformat(timespec="seconds"),
+                    p["max_elevation"]
+                ])
+        print("✅ predicted_passes.csv updated")
+    except Exception as e:
+        print(f"❌ Failed to write predicted_passes.csv: {e}")
+
 @bp.route("/", endpoint="passes_page")
 def passes_page():
     lat = current_app.config.get("LATITUDE")
@@ -106,7 +123,6 @@ def passes_page():
                         start = times[j].utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
                         peak = times[j+1].utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
                         end = times[j+2].utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
-                        # Correct max elevation calculation using vector subtraction
                         peak_time = ts.from_datetime(times[j+1].utc_datetime())
                         alt_deg = (sat - observer).at(peak_time).altaz()[0].degrees
                         passes.append({
@@ -119,6 +135,9 @@ def passes_page():
 
             passes.sort(key=lambda p: p["start"])
 
+            # Save predictions for scheduler
+            save_predicted_passes(passes)
+
             # Log any passes that have already ended
             log_path = os.path.join(current_app.config["TLE_DIR"], "pass_log.csv")
             try:
@@ -127,14 +146,14 @@ def passes_page():
                     for p in passes:
                         if p["end"] < datetime.now(ZoneInfo(tz)):
                             writer.writerow([
-                                datetime.now().isoformat(),  # log timestamp
+                                datetime.now().isoformat(),
                                 p["satellite"],
                                 p["start"].isoformat(),
                                 p["peak"].isoformat(),
                                 p["end"].isoformat(),
                                 p["max_elevation"],
                                 sdr_flag,
-                                ""  # placeholder for quality
+                                ""
                             ])
             except Exception as e:
                 print(f"Pass logging failed: {e}")
@@ -180,7 +199,12 @@ def update_tle():
             f.write("\n".join(tle_lines[:3]) + "\n")
 
         print(f"TLE saved successfully to {path}")
+
+        # After updating TLE, regenerate passes CSV
+        passes_page()  # This will recalc and save predicted_passes.csv
+
         return jsonify({"status": "success", "updated": True})
     except Exception as e:
         print("TLE update failed:", e)
         return jsonify({"status": "error", "message": str(e)})
+        
