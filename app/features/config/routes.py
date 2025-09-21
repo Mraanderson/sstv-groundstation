@@ -17,39 +17,30 @@ def config_page():
         tz = request.form.get("timezone")
 
         # Latitude
-        if lat:
+        if lat not in [None, ""]:
             try:
                 current_app.config["LATITUDE"] = float(lat)
             except ValueError:
-                if request.accept_mimetypes['application/json']:
-                    return jsonify({"error": "Invalid latitude"}), 400
-                flash("Invalid latitude.", "danger")
-                return redirect(url_for("config.config_page"))
+                return jsonify({"error": "Invalid latitude"}), 400
 
         # Longitude
-        if lon:
+        if lon not in [None, ""]:
             try:
                 current_app.config["LONGITUDE"] = float(lon)
             except ValueError:
-                if request.accept_mimetypes['application/json']:
-                    return jsonify({"error": "Invalid longitude"}), 400
-                flash("Invalid longitude.", "danger")
-                return redirect(url_for("config.config_page"))
+                return jsonify({"error": "Invalid longitude"}), 400
 
         # Altitude
-        if alt:
+        if alt not in [None, ""]:
             try:
                 current_app.config["ALTITUDE_M"] = float(alt)
             except ValueError:
-                if request.accept_mimetypes['application/json']:
-                    return jsonify({"error": "Invalid altitude"}), 400
-                flash("Invalid altitude.", "danger")
-                return redirect(url_for("config.config_page"))
+                return jsonify({"error": "Invalid altitude"}), 400
 
         # Timezone
-        if tz:
+        if tz not in [None, ""]:
             current_app.config["TIMEZONE"] = tz
-        elif lat and lon:
+        elif current_app.config.get("LATITUDE") is not None and current_app.config.get("LONGITUDE") is not None:
             tf = TimezoneFinder()
             current_app.config["TIMEZONE"] = tf.timezone_at(
                 lat=current_app.config["LATITUDE"],
@@ -70,18 +61,14 @@ def config_page():
                 "theme": theme
             }, f, indent=2)
 
-        if request.accept_mimetypes['application/json']:
-            return jsonify({
-                "latitude": current_app.config.get("LATITUDE"),
-                "longitude": current_app.config.get("LONGITUDE"),
-                "altitude_m": current_app.config.get("ALTITUDE_M"),
-                "timezone": current_app.config.get("TIMEZONE"),
-                "theme": theme,
-                "saved_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            })
-
-        flash("Configuration saved successfully.", "success")
-        return redirect(url_for("config.config_page"))
+        return jsonify({
+            "latitude": current_app.config.get("LATITUDE"),
+            "longitude": current_app.config.get("LONGITUDE"),
+            "altitude_m": current_app.config.get("ALTITUDE_M"),
+            "timezone": current_app.config.get("TIMEZONE"),
+            "theme": theme,
+            "saved_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        })
 
     return render_template(
         "config/config.html",
