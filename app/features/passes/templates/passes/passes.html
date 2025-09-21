@@ -14,9 +14,14 @@
     {% else %}
       <p class="text-warning">No TLE data found.</p>
     {% endif %}
-    <button id="update-tle-btn" class="btn btn-primary">
+    <button id="update-tle-btn" class="btn btn-primary me-3">
       <span id="update-icon" class="me-2">🔄</span> Update TLE
     </button>
+
+    <!-- Recording toggle controls -->
+    <button id="enableBtn" class="btn btn-success me-2">Enable Recordings</button>
+    <button id="disableBtn" class="btn btn-danger">Disable Recordings</button>
+    <span id="statusText" class="ms-3 fw-bold"></span>
   </div>
 </div>
 
@@ -69,6 +74,7 @@
 {% endif %}
 
 <script>
+  // Update TLE button logic
   document.getElementById('update-tle-btn').addEventListener('click', function () {
     const btn = this;
     const icon = document.getElementById('update-icon');
@@ -88,5 +94,44 @@
         btn.disabled = false;
       });
   });
+
+  // Recording toggle logic
+  const statusText = document.getElementById('statusText');
+  const enableBtn = document.getElementById('enableBtn');
+  const disableBtn = document.getElementById('disableBtn');
+
+  async function updateStatus() {
+    try {
+      const res = await fetch('/recordings/status');
+      const data = await res.json();
+      const enabled = data.recording_enabled;
+
+      statusText.textContent = enabled
+        ? `✅ Enabled (PID: ${data.scheduler_pid || 'N/A'})`
+        : '❌ Disabled';
+
+      // Toggle button states
+      enableBtn.disabled = enabled;
+      disableBtn.disabled = !enabled;
+    } catch (err) {
+      statusText.textContent = '⚠️ Error fetching status';
+      enableBtn.disabled = false;
+      disableBtn.disabled = false;
+    }
+  }
+
+  enableBtn.addEventListener('click', async () => {
+    await fetch('/recordings/enable', { method: 'POST' });
+    updateStatus();
+  });
+
+  disableBtn.addEventListener('click', async () => {
+    await fetch('/recordings/disable', { method: 'POST' });
+    updateStatus();
+  });
+
+  // Poll status every 5 seconds
+  setInterval(updateStatus, 5000);
+  updateStatus();
 </script>
 {% endblock %}
