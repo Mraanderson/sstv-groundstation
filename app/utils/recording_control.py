@@ -1,13 +1,13 @@
-from flask import Flask, jsonify
+from flask import Blueprint, jsonify
 import json
 import subprocess
 import psutil
 from pathlib import Path
 
-app = Flask(__name__)
+recordings_bp = Blueprint('recordings', __name__)
 
 SETTINGS_FILE = Path("settings.json")
-SCHEDULER_SCRIPT = Path("app/utils/sd_scheduler.py")  # adjust if path differs
+SCHEDULER_SCRIPT = Path("app/utils/sd_scheduler.py")
 
 def load_settings():
     if SETTINGS_FILE.exists():
@@ -27,7 +27,7 @@ def find_scheduler_pid():
             continue
     return None
 
-@app.route("/recordings/enable", methods=["POST"])
+@recordings_bp.route("/enable", methods=["POST"])
 def enable_recordings():
     settings = load_settings()
     if settings.get("recording_enabled"):
@@ -36,11 +36,10 @@ def enable_recordings():
     settings["recording_enabled"] = True
     save_settings(settings)
 
-    # Launch scheduler in background
     subprocess.Popen(["python", str(SCHEDULER_SCRIPT)])
     return jsonify({"status": "enabled"}), 200
 
-@app.route("/recordings/disable", methods=["POST"])
+@recordings_bp.route("/disable", methods=["POST"])
 def disable_recordings():
     settings = load_settings()
     if not settings.get("recording_enabled"):
@@ -55,7 +54,7 @@ def disable_recordings():
         return jsonify({"status": "disabled", "pid": pid}), 200
     return jsonify({"status": "disabled", "pid": None}), 200
 
-@app.route("/recordings/status", methods=["GET"])
+@recordings_bp.route("/status", methods=["GET"])
 def status():
     settings = load_settings()
     pid = find_scheduler_pid()
@@ -63,7 +62,4 @@ def status():
         "recording_enabled": settings.get("recording_enabled", False),
         "scheduler_pid": pid
     })
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
     
