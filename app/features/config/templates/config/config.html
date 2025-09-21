@@ -44,14 +44,10 @@
   }).addTo(map);
 
   let marker;
-  let lastLat = null;
-  let lastLon = null;
 
   map.on('click', async function(e) {
     const lat = e.latlng.lat.toFixed(6);
     const lon = e.latlng.lng.toFixed(6);
-    lastLat = lat;
-    lastLon = lon;
 
     if (marker) { map.removeLayer(marker); }
     marker = L.marker([lat, lon]).addTo(map);
@@ -59,11 +55,12 @@
     document.getElementById('lat').value = lat;
     document.getElementById('lon').value = lon;
 
-    // Fetch altitude
+    // Fetch altitude from OpenTopoData
     try {
-      const altRes = await fetch(`https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lon}`);
+      const altRes = await fetch(`https://api.opentopodata.org/v1/srtm90m?locations=${lat},${lon}`);
       const altData = await altRes.json();
-      document.getElementById('alt').value = altData.results[0].elevation;
+      const elevation = altData.results?.[0]?.elevation;
+      document.getElementById('alt').value = typeof elevation === 'number' ? elevation : '';
     } catch {
       document.getElementById('alt').value = '';
     }
