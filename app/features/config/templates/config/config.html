@@ -60,9 +60,16 @@
       const altRes = await fetch(`https://api.opentopodata.org/v1/srtm90m?locations=${lat},${lon}`);
       const altData = await altRes.json();
       const elevation = altData.results?.[0]?.elevation;
-      document.getElementById('alt').value = typeof elevation === 'number' ? elevation : '';
-    } catch {
+
+      if (typeof elevation === 'number') {
+        document.getElementById('alt').value = elevation;
+      } else {
+        document.getElementById('alt').value = '';
+        alert('⚠️ Altitude could not be determined. Try again or check your connection.');
+      }
+    } catch (err) {
       document.getElementById('alt').value = '';
+      alert('❌ Altitude fetch failed. Please check your network or try a different browser.');
     }
 
     // Fetch timezone
