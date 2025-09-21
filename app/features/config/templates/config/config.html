@@ -72,11 +72,11 @@
       alert('❌ Altitude fetch failed. Please check your network or try a different browser.');
     }
 
-    // Fetch timezone
+    // Fetch timezone via Flask proxy
     try {
-      const tzRes = await fetch(`https://timeapi.io/api/TimeZone/coordinate?latitude=${lat}&longitude=${lon}`);
+      const tzRes = await fetch(`/config/timezone?lat=${lat}&lon=${lon}`);
       const tzData = await tzRes.json();
-      document.getElementById('tz').value = tzData.timeZone || '';
+      document.getElementById('tz').value = tzData.timezone || '';
     } catch {
       document.getElementById('tz').value = '';
     }
