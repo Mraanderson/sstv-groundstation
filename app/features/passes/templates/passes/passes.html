@@ -18,9 +18,8 @@
       <span id="update-icon" class="me-2">🔄</span> Update TLE
     </button>
 
-    <!-- Recording toggle controls -->
-    <button id="enableBtn" class="btn btn-success me-2">Enable Recordings</button>
-    <button id="disableBtn" class="btn btn-danger">Disable Recordings</button>
+    <!-- Single toggle button for recordings -->
+    <button id="toggleBtn" class="btn">Loading...</button>
     <span id="statusText" class="ms-3 fw-bold"></span>
   </div>
 </div>
@@ -95,10 +94,9 @@
       });
   });
 
-  // Recording toggle logic
+  // Single toggle button logic
+  const toggleBtn = document.getElementById('toggleBtn');
   const statusText = document.getElementById('statusText');
-  const enableBtn = document.getElementById('enableBtn');
-  const disableBtn = document.getElementById('disableBtn');
 
   async function updateStatus() {
     try {
@@ -110,25 +108,28 @@
         ? `✅ Enabled (PID: ${data.scheduler_pid || 'N/A'})`
         : '❌ Disabled';
 
-      // Toggle button states
-      enableBtn.disabled = enabled;
-      disableBtn.disabled = !enabled;
+      if (enabled) {
+        toggleBtn.textContent = 'Disable Recordings';
+        toggleBtn.className = 'btn btn-danger';
+        toggleBtn.onclick = async () => {
+          await fetch('/recordings/disable', { method: 'POST' });
+          updateStatus();
+        };
+      } else {
+        toggleBtn.textContent = 'Enable Recordings';
+        toggleBtn.className = 'btn btn-success';
+        toggleBtn.onclick = async () => {
+          await fetch('/recordings/enable', { method: 'POST' });
+          updateStatus();
+        };
+      }
     } catch (err) {
       statusText.textContent = '⚠️ Error fetching status';
-      enableBtn.disabled = false;
-      disableBtn.disabled = false;
+      toggleBtn.textContent = 'Retry';
+      toggleBtn.className = 'btn btn-secondary';
+      toggleBtn.onclick = updateStatus;
     }
   }
-
-  enableBtn.addEventListener('click', async () => {
-    await fetch('/recordings/enable', { method: 'POST' });
-    updateStatus();
-  });
-
-  disableBtn.addEventListener('click', async () => {
-    await fetch('/recordings/disable', { method: 'POST' });
-    updateStatus();
-  });
 
   // Poll status every 5 seconds
   setInterval(updateStatus, 5000);
