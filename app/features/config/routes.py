@@ -94,4 +94,19 @@ def get_altitude():
         return jsonify({"elevation": elevation})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-                
+
+@bp.route("/timezone", methods=["GET"])
+def get_timezone():
+    lat = request.args.get("lat")
+    lon = request.args.get("lon")
+
+    if not lat or not lon:
+        return jsonify({"error": "Missing coordinates"}), 400
+
+    try:
+        tf = TimezoneFinder()
+        tz = tf.timezone_at(lat=float(lat), lng=float(lon)) or "UTC"
+        return jsonify({"timezone": tz})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+        
