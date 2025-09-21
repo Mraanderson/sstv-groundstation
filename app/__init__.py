@@ -71,11 +71,13 @@ def create_app():
     from app.features.config import bp as config_bp
     from app.features.passes import bp as passes_bp
     from app.features.settings import bp as settings_bp
+    from app.utils.recording_control import recordings_bp   # ⬅️ NEW import
 
     app.register_blueprint(gallery_bp, url_prefix="/gallery")
     app.register_blueprint(config_bp, url_prefix="/config")
     app.register_blueprint(passes_bp, url_prefix="/passes")
     app.register_blueprint(settings_bp, url_prefix="/settings")
+    app.register_blueprint(recordings_bp, url_prefix="/recordings")  # ⬅️ NEW registration
 
     # Conditional home route
     @app.route("/")
