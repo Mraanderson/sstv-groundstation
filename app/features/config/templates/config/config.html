@@ -55,11 +55,11 @@
     document.getElementById('lat').value = lat;
     document.getElementById('lon').value = lon;
 
-    // Fetch altitude from OpenTopoData
+    // Fetch altitude via Flask proxy
     try {
-      const altRes = await fetch(`https://api.opentopodata.org/v1/srtm90m?locations=${lat},${lon}`);
+      const altRes = await fetch(`/config/altitude?lat=${lat}&lon=${lon}`);
       const altData = await altRes.json();
-      const elevation = altData.results?.[0]?.elevation;
+      const elevation = altData.elevation;
 
       if (typeof elevation === 'number') {
         document.getElementById('alt').value = elevation;
