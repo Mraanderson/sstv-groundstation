@@ -114,7 +114,7 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 
 This project has been a true collaboration between:
 
-- **Mraanderson** — The driving force and visionary behind the SSTV Groundstation 2.0 rebuild. Coming into this with no coding background, learning everything step‑by‑step, and steering the project’s goals and features.  
+- **Mraanderson** — The driving force and visionary behind the SSTV Groundstation 2.0 rebuild. Coming into this with little to none Python coding experience, learning everything step‑by‑step, and steering the project’s goals and features.  
 - **Microsoft Copilot** — Acting as a patient, persistent co‑pilot throughout the build, explaining concepts, writing code, troubleshooting issues, and structuring the project so it’s maintainable and expandable.  
 
 From the very first commit to the latest feature, this has been a journey of turning ideas into a working, modular application — proving that with the right guidance, you don’t need to start as a coder to build something powerful.
