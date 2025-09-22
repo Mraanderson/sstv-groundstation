@@ -99,8 +99,8 @@ After your choice, the script will:
 ## 📌 Notes
 
 - The `images/` and `tle/` folders are tracked with `.gitkeep` so they exist even when empty.  
-- All features are modular blueprints for easier maintenance and scaling.  
-- The `archive-layout` branch preserves your old code for reference.
+- All features are modular blueprints for easier maintenance and scaling.
+- Designed to be contained in a single folder that can be easily removed if no longer required.
 
 ---
 
