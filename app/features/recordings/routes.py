@@ -1,11 +1,31 @@
 import json
+import subprocess
+import psutil
 from pathlib import Path
 from flask import render_template, send_file, abort, jsonify, request
+from app.features.recordings import bp
 
 RECORDINGS_DIR = Path("recordings")
 SETTINGS_FILE = Path("settings.json")
+SCHEDULER_SCRIPT = Path("app/utils/sdr_scheduler.py")
 
-from app.features.recordings import bp
+def load_settings():
+    if SETTINGS_FILE.exists():
+        return json.loads(SETTINGS_FILE.read_text())
+    return {"recording_enabled": False}
+
+def save_settings(settings):
+    SETTINGS_FILE.write_text(json.dumps(settings, indent=2))
+
+def find_scheduler_pid():
+    """Find running scheduler process PID if any."""
+    for proc in psutil.process_iter(['pid', 'cmdline']):
+        try:
+            if proc.info['cmdline'] and "sdr_scheduler.py" in " ".join(proc.info['cmdline']):
+                return proc.info['pid']
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+    return None
 
 @bp.route("/", methods=["GET"])
 def recordings_list():
@@ -25,7 +45,6 @@ def recordings_list():
             })
         except Exception:
             continue
-    # Sort newest first
     recordings.sort(key=lambda r: r["meta"].get("timestamp", ""), reverse=True)
     return render_template("recordings/recordings.html", recordings=recordings)
 
@@ -46,15 +65,48 @@ def delete_recording(base):
             path.unlink()
     return jsonify({"status": "deleted"})
 
+@bp.route("/enable", methods=["POST"])
+def enable_recordings():
+    """Enable recordings and start scheduler."""
+    settings = load_settings()
+    if settings.get("recording_enabled"):
+        return jsonify({"status": "already enabled"}), 200
+
+    # Kill stray SDR processes before starting scheduler
+    for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+        try:
+            if proc.info['name'] in ('rtl_fm', 'sox'):
+                proc.terminate()
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+
+    settings["recording_enabled"] = True
+    save_settings(settings)
+
+    subprocess.Popen(["python3", str(SCHEDULER_SCRIPT)])
+    return jsonify({"status": "enabled"}), 200
+
+@bp.route("/disable", methods=["POST"])
+def disable_recordings():
+    """Disable recordings and stop scheduler."""
+    settings = load_settings()
+    if not settings.get("recording_enabled"):
+        return jsonify({"status": "already disabled"}), 200
+
+    settings["recording_enabled"] = False
+    save_settings(settings)
+
+    pid = find_scheduler_pid()
+    if pid:
+        psutil.Process(pid).terminate()
+        return jsonify({"status": "disabled", "pid": pid}), 200
+    return jsonify({"status": "disabled", "pid": None}), 200
+
 @bp.route("/status", methods=["GET"])
 def recordings_status():
     """Return basic recording status for polling (used by passes page)."""
-    recording_enabled = False
-    if SETTINGS_FILE.exists():
-        try:
-            recording_enabled = json.loads(SETTINGS_FILE.read_text()).get("recording_enabled", False)
-        except Exception:
-            pass
+    settings = load_settings()
+    pid = find_scheduler_pid()
 
     # Include last recording metadata if available
     last_meta = None
@@ -66,24 +118,9 @@ def recordings_status():
             pass
 
     return jsonify({
-        "recording_enabled": recording_enabled,
+        "recording_enabled": settings.get("recording_enabled", False),
         "recordings_count": len(list(RECORDINGS_DIR.glob("*.wav"))),
-        "last_recording": last_meta
+        "last_recording": last_meta,
+        "scheduler_pid": pid
     })
-
-@bp.route("/enable", methods=["POST"])
-def recordings_enable():
-    """Enable or disable recordings via web UI."""
-    data = request.get_json(silent=True) or {}
-    enable = bool(data.get("enable", True))
-
-    try:
-        settings = {}
-        if SETTINGS_FILE.exists():
-            settings = json.loads(SETTINGS_FILE.read_text())
-        settings["recording_enabled"] = enable
-        SETTINGS_FILE.write_text(json.dumps(settings, indent=2))
-        return jsonify({"status": "ok", "recording_enabled": enable})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-        
+    
