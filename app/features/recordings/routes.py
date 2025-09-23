@@ -1,6 +1,6 @@
-import os, json
-from flask import render_template, send_file, abort, jsonify, request
+import json
 from pathlib import Path
+from flask import render_template, send_file, abort, jsonify
 
 RECORDINGS_DIR = Path("recordings")
 
@@ -40,4 +40,4 @@ def delete_recording(base):
         if path.exists():
             path.unlink()
     return jsonify({"status": "deleted"})
-  
+    
