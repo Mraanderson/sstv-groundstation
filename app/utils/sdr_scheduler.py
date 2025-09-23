@@ -1,14 +1,14 @@
-import csv, datetime, time, subprocess, json, sys, threading, select, shutil, psutil, schedule
+import csv, datetime, time, subprocess, json, sys, threading, select, psutil, schedule, logging
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
-import logging
 import sdr
+import app.utils.tle_utils as tle_utils
+import app.utils.passes_utils as passes_utils
+from app.features.config import config_data
 
 # --- CONFIG ---
 SAT_FREQ = {"ISS": 145.800e6, "NOAA-19": 137.100e6}
-RECORDINGS_DIR = Path("recordings")
-LOG_DIR = Path("logs")
-SETTINGS_FILE = Path("settings.json")
+RECORDINGS_DIR, LOG_DIR, SETTINGS_FILE = Path("recordings"), Path("logs"), Path("settings.json")
 PASS_FILE = "predicted_passes.csv"
 SAMPLE_RATE, GAIN = 48000, 27.9
 ELEVATION_THRESHOLD, START_EARLY, STOP_LATE = 0, 30, 30
@@ -16,182 +16,104 @@ GREEN, RED, RESET = "\033[92m", "\033[91m", "\033[0m"
 
 RECORDINGS_DIR.mkdir(exist_ok=True)
 LOG_DIR.mkdir(exist_ok=True)
-
 logger = logging.getLogger("sstv_scheduler")
 logger.setLevel(logging.INFO)
 handler = RotatingFileHandler(LOG_DIR / "scheduler.log", maxBytes=1_000_000, backupCount=5)
 handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
 logger.addHandler(handler)
 
-def log_and_print(level, msg, pass_logger=None):
-    if level == "info" and "Next job in" in msg:
-        print(f"\r{msg}", end="", flush=True)
-    else:
-        print(msg)
+def log_and_print(level, msg, plog=None):
+    print(msg if "Next job" not in msg else f"\r{msg}", end="", flush=True)
     getattr(logger, level)(msg)
-    if pass_logger:
-        getattr(pass_logger, level)(msg)
-
-def create_pass_logger(path):
-    plogger = logging.getLogger(path.stem)
-    if not plogger.handlers:
-        h = RotatingFileHandler(path, maxBytes=200_000, backupCount=1)
-        h.setFormatter(handler.formatter)
-        plogger.addHandler(h)
-    plogger.setLevel(logging.INFO)
-    return plogger
+    if plog: getattr(plog, level)(msg)
 
 def recordings_enabled():
-    try:
-        return json.load(SETTINGS_FILE.open()).get("recording_enabled", False)
-    except FileNotFoundError:
-        return False
+    return SETTINGS_FILE.exists() and json.load(SETTINGS_FILE.open()).get("recording_enabled", False)
 
-def write_metadata(start_str, sat, aos, los, freq_hz, duration_s, size_mb, verdict, error):
-    meta_path = RECORDINGS_DIR / f"{start_str}_{sat}.json"
+def write_metadata(start_str, sat, aos, los, freq_hz, dur, size, verdict, error):
     meta = {
-        "satellite": sat,
-        "timestamp": aos.isoformat(),
-        "aos": aos.isoformat(),
-        "los": los.isoformat(),
-        "frequency": round(freq_hz / 1e6, 3),
-        "mode": "FM",
-        "duration_s": duration_s,
-        "file_mb": round(size_mb, 2),
-        "verdict": verdict,
-        "sstv_detected": False,
-        "callsigns": [],
-        "error": error or None
+        "satellite": sat, "timestamp": aos.isoformat(),
+        "aos": aos.isoformat(), "los": los.isoformat(),
+        "frequency": round(freq_hz / 1e6, 3), "mode": "FM",
+        "duration_s": dur, "file_mb": round(size, 2),
+        "verdict": verdict, "sstv_detected": False,
+        "callsigns": [], "error": error or None
     }
-    meta_path.write_text(json.dumps(meta, indent=2))
+    (RECORDINGS_DIR / f"{start_str}_{sat}.json").write_text(json.dumps(meta, indent=2))
 
 def record_pass(sat, aos, los):
     start_str = aos.strftime("%Y%m%d_%H%M")
     wav_path = RECORDINGS_DIR / f"{start_str}_{sat}.wav"
-    log_path = RECORDINGS_DIR / f"{start_str}_{sat}.log"
-    plog = create_pass_logger(log_path)
+    plog = logging.getLogger(start_str)
+    plog.setLevel(logging.INFO)
+    plog.addHandler(RotatingFileHandler(RECORDINGS_DIR / f"{start_str}_{sat}.log", maxBytes=200_000, backupCount=1))
 
     if not sdr.sdr_exists():
-        log_and_print("warning", f"[{sat}] SDR not detected — skipping.", plog)
-        return
-
-    freq_key = sat.split()[0]
-    freq = SAT_FREQ.get(freq_key)
+        return log_and_print("warning", f"[{sat}] SDR not detected — skipping.", plog)
+    freq = SAT_FREQ.get(sat.split()[0])
     if not freq:
-        log_and_print("warning", f"[{sat}] No frequency configured — skipping.", plog)
-        return
+        return log_and_print("warning", f"[{sat}] No frequency configured — skipping.", plog)
 
-    duration = int((los - aos).total_seconds()) + STOP_LATE
-    log_and_print("info", f"[{sat}] ▶ Recording for {duration}s at {freq/1e6} MHz...", plog)
-
-    cmd = ["rtl_fm", "-f", str(int(freq)), "-M", "fm", "-s", str(SAMPLE_RATE), "-g", str(GAIN)]
-    sox_cmd = ["sox", "-t", "raw", "-r", str(SAMPLE_RATE), "-e", "signed", "-b", "16", "-c", "1", "-", str(wav_path)]
-
+    dur = int((los - aos).total_seconds()) + STOP_LATE
+    log_and_print("info", f"[{sat}] ▶ Recording for {dur}s at {freq/1e6} MHz...", plog)
     error = None
-    fm = None
-    sox = None
     try:
-        fm = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-        sox = subprocess.Popen(sox_cmd, stdin=fm.stdout)
-        time.sleep(duration)
+        fm = subprocess.Popen(["rtl_fm", "-f", str(int(freq)), "-M", "fm", "-s", str(SAMPLE_RATE), "-g", str(GAIN)], stdout=subprocess.PIPE)
+        sox = subprocess.Popen(["sox", "-t", "raw", "-r", str(SAMPLE_RATE), "-e", "signed", "-b", "16", "-c", "1", "-", str(wav_path)], stdin=fm.stdout)
+        time.sleep(dur)
     except Exception as e:
         error = str(e)
-        log_and_print("error", f"[{sat}] Recording failed: {e}", plog)
     finally:
-        try:
-            if fm: fm.terminate()
-            if sox: sox.terminate()
-        except Exception:
-            pass
-
-        log_and_print("info", f"[{sat}] ✔ Saved to {wav_path}", plog)
-
+        for p in (fm, sox):
+            try: p.terminate()
+            except: pass
         size = wav_path.stat().st_size / (1024 * 1024) if wav_path.exists() else 0.0
-        summary = [
-            "", "===== PASS SUMMARY =====",
-            f"Satellite: {sat}", f"Start (AOS): {aos}", f"End (LOS):   {los}",
-            f"Duration:    {duration} seconds", f"Frequency:   {freq/1e6} MHz",
-            f"SDR Present: True", f"File Size:   {size:.2f} MB",
-            f"Errors:      {error if error else 'None'}", "========================", ""
-        ]
-        for line in summary:
-            log_and_print("info", line, plog)
-
         verdict = "PASS" if not error and size > 0 else "FAIL"
-        colour = GREEN if verdict == "PASS" else RED
-        print(f"{colour}[{sat}] PASS COMPLETE — Verdict: {verdict} — File: {size:.2f} MB{RESET}")
-
-        # Write metadata for web UI
-        write_metadata(start_str, sat, aos, los, freq, duration, size, verdict, error)
+        print(f"{GREEN if verdict=='PASS' else RED}[{sat}] PASS COMPLETE — Verdict: {verdict} — File: {size:.2f} MB{RESET}")
+        write_metadata(start_str, sat, aos, los, freq, dur, size, verdict, error)
 
 def load_pass_predictions(path):
-    passes = []
     with open(path, newline="") as f:
-        for row in csv.DictReader(f):
-            sat = row["satellite"]
-            aos = datetime.datetime.fromisoformat(row["aos"])
-            los = datetime.datetime.fromisoformat(row["los"])
-            elev = float(row["max_elev"])
-            if elev >= ELEVATION_THRESHOLD:
-                passes.append((sat, aos, los, elev))
-    return passes
+        return [(r["satellite"], datetime.datetime.fromisoformat(r["aos"]), datetime.datetime.fromisoformat(r["los"]), float(r["max_elev"]))
+                for r in csv.DictReader(f) if float(r["max_elev"]) >= ELEVATION_THRESHOLD]
 
 def schedule_passes(pass_list):
     for sat, aos, los, _ in pass_list:
         start = aos - datetime.timedelta(seconds=START_EARLY)
-        local_start = start.astimezone()
-        schedule.every().day.at(local_start.strftime("%H:%M")).do(record_pass, sat, aos, los)
-        log_and_print("info", f"📅 Scheduled {sat} at {local_start:%Y-%m-%d %H:%M:%S} {local_start.tzname()} "
-                              f"for {(los - aos).seconds}s.")
+        schedule.every().day.at(start.astimezone().strftime("%H:%M")).do(record_pass, sat, aos, los)
+        log_and_print("info", f"📅 Scheduled {sat} at {start:%Y-%m-%d %H:%M:%S} for {(los - aos).seconds}s.")
 
-def debug_monitor():
-    now = datetime.datetime.now()
-    jobs = schedule.get_jobs()
-    if jobs:
-        next_run = min(job.next_run for job in jobs)
-        countdown = (next_run - now).total_seconds()
-        h, rem = divmod(int(countdown), 3600)
-        m, s = divmod(rem, 60)
-        local_next = next_run.astimezone()
-        msg = f"[{now:%H:%M:%S}] Next job in {h}h {m}m {s}s ({local_next:%H:%M:%S} {local_next.tzname()}) — Press X to stop"
-    else:
-        msg = f"[{now:%H:%M:%S}] No jobs scheduled — Press X to stop"
-    print(f"\r{msg}", end="", flush=True)
+def auto_update_tle():
+    if not config_data.get("latitude") or not config_data.get("longitude"):
+        return log_and_print("warning", "No location set — skipping TLE refresh.")
+    tle_data = [tle_utils.fetch_tle(s) for s in tle_utils.TLE_SOURCES if tle_utils.fetch_tle(s)]
+    tle_utils.save_tle(tle_data)
+    passes_utils.generate_predictions(tle_data)
+    log_and_print("info", "📅 Pass predictions updated for next 24h.")
 
 def listen_for_keypress():
     while True:
-        if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
-            if sys.stdin.read(1).lower() == 'x':
-                log_and_print("info", "❌ 'x' pressed — disabling recordings and exiting.")
-                SETTINGS_FILE.write_text(json.dumps({"recording_enabled": False}))
-                sys.exit(0)
+        if sys.stdin in select.select([sys.stdin], [], [], 0)[0] and sys.stdin.read(1).lower() == 'x':
+            SETTINGS_FILE.write_text(json.dumps({"recording_enabled": False}))
+            sys.exit(0)
 
 if __name__ == "__main__":
     logger.info("Scheduler starting up — running prechecks...")
-    if not recordings_enabled():
-        log_and_print("info", "Recording disabled in settings.json — exiting.")
-        sys.exit(0)
+    if not recordings_enabled(): sys.exit(0)
     if not sdr.sdr_exists():
-        log_and_print("error", "No SDR detected — exiting.")
-        log_and_print("info", "Recording disabled due to missing SDR.")
-        SETTINGS_FILE.write_text(json.dumps({"recording_enabled": False}))
-        sys.exit(1)
+        SETTINGS_FILE.write_text(json.dumps({"recording_enabled": False})); sys.exit(1)
+
+    auto_update_tle()
+    schedule.every(6).hours.do(auto_update_tle)
 
     passes = load_pass_predictions(PASS_FILE)
-    if not passes:
-        log_and_print("warning", "No qualifying passes predicted — exiting.")
-        sys.exit(0)
-
+    if not passes: sys.exit(0)
     log_and_print("info", f"{len(passes)} passes found — scheduling...")
     schedule_passes(passes)
-    print("Press X to stop recording scheduler.")
     threading.Thread(target=listen_for_keypress, daemon=True).start()
 
     while True:
-        if not recordings_enabled():
-            log_and_print("info", "Recording disabled via web — shutting down.")
-            break
+        if not recordings_enabled(): break
         schedule.run_pending()
-        debug_monitor()
         time.sleep(5)
-        
+    
