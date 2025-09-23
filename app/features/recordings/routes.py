@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from flask import render_template, send_file, abort, jsonify
+from flask import render_template, send_file, abort, jsonify, request
 
 RECORDINGS_DIR = Path("recordings")
 SETTINGS_FILE = Path("settings.json")
@@ -70,4 +70,20 @@ def recordings_status():
         "recordings_count": len(list(RECORDINGS_DIR.glob("*.wav"))),
         "last_recording": last_meta
     })
-    
+
+@bp.route("/enable", methods=["POST"])
+def recordings_enable():
+    """Enable or disable recordings via web UI."""
+    data = request.get_json(silent=True) or {}
+    enable = bool(data.get("enable", True))
+
+    try:
+        settings = {}
+        if SETTINGS_FILE.exists():
+            settings = json.loads(SETTINGS_FILE.read_text())
+        settings["recording_enabled"] = enable
+        SETTINGS_FILE.write_text(json.dumps(settings, indent=2))
+        return jsonify({"status": "ok", "recording_enabled": enable})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+        
