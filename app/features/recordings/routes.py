@@ -5,10 +5,10 @@ from pathlib import Path
 from flask import render_template, send_file, abort, jsonify
 from app.features.recordings import bp
 
-# Direct imports from the actual utility modules
+# Direct imports from utility modules — adjust names if your files differ
 import app.utils.tle_utils as tle_utils
-import app.utils.passes_utils as passes_utils  # change to `passes` if that's the actual filename
-
+import app.utils.passes_utils as passes_utils
+from app.features.config import config_data  # wherever lat/lon/alt is stored
 
 RECORDINGS_DIR = Path("recordings")
 SETTINGS_FILE = Path("settings.json")
@@ -34,8 +34,6 @@ def find_scheduler_pid():
 
 def refresh_tle_and_predictions():
     """Fetch latest TLEs and regenerate pass predictions."""
-    # Only run if config has location
-    from app.features.config import config_data  # adjust if your config is elsewhere
     if not config_data.get("latitude") or not config_data.get("longitude"):
         print("⚠ No location set — skipping TLE refresh.")
         return
@@ -50,7 +48,7 @@ def refresh_tle_and_predictions():
             print(f"⚠ No TLE found for {sat_name}")
 
     tle_utils.save_tle(tle_data)
-    passes_utils.generate_predictions(tle_data)  # update predicted_passes.csv
+    passes_utils.generate_predictions(tle_data)
     print("📅 Pass predictions updated for next 24h.")
 
 @bp.route("/", methods=["GET"])
@@ -61,13 +59,11 @@ def recordings_list():
         try:
             meta = json.loads(meta_file.read_text())
             base = meta_file.stem
-            wav_file = RECORDINGS_DIR / f"{base}.wav"
-            log_file = RECORDINGS_DIR / f"{base}.log"
             recordings.append({
                 "base": base,
                 "meta": meta,
-                "wav_exists": wav_file.exists(),
-                "log_exists": log_file.exists()
+                "wav_exists": (RECORDINGS_DIR / f"{base}.wav").exists(),
+                "log_exists": (RECORDINGS_DIR / f"{base}.log").exists()
             })
         except Exception:
             continue
