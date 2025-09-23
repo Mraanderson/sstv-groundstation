@@ -2,8 +2,8 @@ import json
 from pathlib import Path
 from flask import render_template, send_file, abort, jsonify
 
-# Path to the recordings directory
 RECORDINGS_DIR = Path("recordings")
+SETTINGS_FILE = Path("settings.json")
 
 from app.features.recordings import bp
 
@@ -45,4 +45,29 @@ def delete_recording(base):
         if path.exists():
             path.unlink()
     return jsonify({"status": "deleted"})
+
+@bp.route("/status", methods=["GET"])
+def recordings_status():
+    """Return basic recording status for polling (used by passes page)."""
+    recording_enabled = False
+    if SETTINGS_FILE.exists():
+        try:
+            recording_enabled = json.loads(SETTINGS_FILE.read_text()).get("recording_enabled", False)
+        except Exception:
+            pass
+
+    # Include last recording metadata if available
+    last_meta = None
+    meta_files = sorted(RECORDINGS_DIR.glob("*.json"), reverse=True)
+    if meta_files:
+        try:
+            last_meta = json.loads(meta_files[0].read_text())
+        except Exception:
+            pass
+
+    return jsonify({
+        "recording_enabled": recording_enabled,
+        "recordings_count": len(list(RECORDINGS_DIR.glob("*.wav"))),
+        "last_recording": last_meta
+    })
     
