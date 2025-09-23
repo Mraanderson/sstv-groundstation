@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <h2>Recordings</h2>
+
 <table>
     <thead>
         <tr>
@@ -34,6 +35,7 @@
     {% endfor %}
     </tbody>
 </table>
+
 <script>
 function deleteRecording(base) {
     fetch(`/recordings/delete/${base}`, { method: "POST" })
