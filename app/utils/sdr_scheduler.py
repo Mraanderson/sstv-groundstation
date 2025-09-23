@@ -47,6 +47,24 @@ def recordings_enabled():
     except FileNotFoundError:
         return False
 
+def write_metadata(start_str, sat, aos, los, freq_hz, duration_s, size_mb, verdict, error):
+    meta_path = RECORDINGS_DIR / f"{start_str}_{sat}.json"
+    meta = {
+        "satellite": sat,
+        "timestamp": aos.isoformat(),
+        "aos": aos.isoformat(),
+        "los": los.isoformat(),
+        "frequency": round(freq_hz / 1e6, 3),
+        "mode": "FM",
+        "duration_s": duration_s,
+        "file_mb": round(size_mb, 2),
+        "verdict": verdict,
+        "sstv_detected": False,
+        "callsigns": [],
+        "error": error or None
+    }
+    meta_path.write_text(json.dumps(meta, indent=2))
+
 def record_pass(sat, aos, los):
     start_str = aos.strftime("%Y%m%d_%H%M")
     wav_path = RECORDINGS_DIR / f"{start_str}_{sat}.wav"
@@ -70,6 +88,8 @@ def record_pass(sat, aos, los):
     sox_cmd = ["sox", "-t", "raw", "-r", str(SAMPLE_RATE), "-e", "signed", "-b", "16", "-c", "1", "-", str(wav_path)]
 
     error = None
+    fm = None
+    sox = None
     try:
         fm = subprocess.Popen(cmd, stdout=subprocess.PIPE)
         sox = subprocess.Popen(sox_cmd, stdin=fm.stdout)
@@ -78,11 +98,15 @@ def record_pass(sat, aos, los):
         error = str(e)
         log_and_print("error", f"[{sat}] Recording failed: {e}", plog)
     finally:
-        fm.terminate()
-        sox.terminate()
+        try:
+            if fm: fm.terminate()
+            if sox: sox.terminate()
+        except Exception:
+            pass
+
         log_and_print("info", f"[{sat}] ✔ Saved to {wav_path}", plog)
 
-        size = wav_path.stat().st_size / (1024 * 1024) if wav_path.exists() else 0
+        size = wav_path.stat().st_size / (1024 * 1024) if wav_path.exists() else 0.0
         summary = [
             "", "===== PASS SUMMARY =====",
             f"Satellite: {sat}", f"Start (AOS): {aos}", f"End (LOS):   {los}",
@@ -96,6 +120,9 @@ def record_pass(sat, aos, los):
         verdict = "PASS" if not error and size > 0 else "FAIL"
         colour = GREEN if verdict == "PASS" else RED
         print(f"{colour}[{sat}] PASS COMPLETE — Verdict: {verdict} — File: {size:.2f} MB{RESET}")
+
+        # Write metadata for web UI
+        write_metadata(start_str, sat, aos, los, freq, duration, size, verdict, error)
 
 def load_pass_predictions(path):
     passes = []
@@ -167,4 +194,4 @@ if __name__ == "__main__":
         schedule.run_pending()
         debug_monitor()
         time.sleep(5)
-    
+        
