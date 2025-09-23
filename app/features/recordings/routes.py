@@ -5,8 +5,10 @@ from pathlib import Path
 from flask import render_template, send_file, abort, jsonify
 from app.features.recordings import bp
 
-# Import your TLE and pass prediction utilities
-from app.utils import tle_utils, passes_utils  # adjust import paths to match your project
+# Direct imports from the actual utility modules
+import app.utils.tle_utils as tle_utils
+import app.utils.passes_utils as passes_utils  # change to `passes` if that's the actual filename
+
 
 RECORDINGS_DIR = Path("recordings")
 SETTINGS_FILE = Path("settings.json")
