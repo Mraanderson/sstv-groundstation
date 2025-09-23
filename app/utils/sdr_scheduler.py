@@ -124,18 +124,12 @@ def debug_monitor():
         h, rem = divmod(int(countdown), 3600)
         m, s = divmod(rem, 60)
         local_next = next_run.astimezone()
-        log_and_print("info", f"[{now:%H:%M:%S}] Next job in {h}h {m}m {s}s "
-                              f"({local_next:%H:%M:%S} {local_next.tzname()})")
+        msg = f"[{now:%H:%M:%S}] Next job in {h}h {m}m {s}s ({local_next:%H:%M:%S} {local_next.tzname()}) — Press X to stop"
     else:
-        log_and_print("info", f"[{now:%H:%M:%S}] No jobs scheduled.")
-    log_and_print("info", f"SDR connected: {sdr.sdr_exists()}")
-    total, used, free = shutil.disk_usage(RECORDINGS_DIR)
-    log_and_print("info", f"Disk free: {free // (1024*1024)} MB")
-    log_and_print("info", f"CPU load: {psutil.cpu_percent()}%")
-    log_and_print("info", "-" * 40)
+        msg = f"[{now:%H:%M:%S}] No jobs scheduled — Press X to stop"
+    print(f"\r{msg}", end="", flush=True)
 
 def listen_for_keypress():
-    print("Press X to stop recording scheduler.")
     while True:
         if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
             if sys.stdin.read(1).lower() == 'x':
@@ -159,6 +153,7 @@ if __name__ == "__main__":
 
     log_and_print("info", f"{len(passes)} passes found — scheduling...")
     schedule_passes(passes)
+    print("Press X to stop recording scheduler.")
     threading.Thread(target=listen_for_keypress, daemon=True).start()
 
     while True:
