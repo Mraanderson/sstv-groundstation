@@ -9,6 +9,8 @@ import psutil
 import logging
 import json
 import sys
+import threading
+import select
 from logging.handlers import RotatingFileHandler
 import sdr  # your existing SDR detection module
 
@@ -36,24 +38,23 @@ RESET = "\033[0m"
 RECORDINGS_DIR.mkdir(exist_ok=True)
 LOG_DIR.mkdir(exist_ok=True)
 
-# Main rotating log
 logger = logging.getLogger("sstv_scheduler")
 logger.setLevel(logging.INFO)
-handler = RotatingFileHandler(LOG_DIR / "scheduler.log",
-                              maxBytes=1_000_000, backupCount=5)
+handler = RotatingFileHandler(LOG_DIR / "scheduler.log", maxBytes=1_000_000, backupCount=5)
 formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 def log_and_print(level, msg, pass_logger=None):
-    """Log to main log, optional per-pass log, and print."""
-    print(msg)
+    if level == "info" and "Next job in" in msg:
+        print(f"\r{msg}", end="", flush=True)
+    else:
+        print(msg)
     getattr(logger, level)(msg)
     if pass_logger:
         getattr(pass_logger, level)(msg)
 
 def create_pass_logger(log_path):
-    """Create a rotating logger for a specific pass."""
     plogger = logging.getLogger(log_path.stem)
     plogger.setLevel(logging.INFO)
     if not plogger.handlers:
@@ -63,14 +64,12 @@ def create_pass_logger(log_path):
     return plogger
 
 def recordings_enabled():
-    """Check settings.json for recording_enabled flag."""
     try:
         with open(SETTINGS_FILE) as f:
             return json.load(f).get("recording_enabled", False)
     except FileNotFoundError:
         return False
 
-# --- FUNCTIONS ---
 def record_pass(sat_name, aos, los):
     start_str = aos.strftime("%Y%m%d_%H%M")
     wav_path = RECORDINGS_DIR / f"{start_str}_{sat_name}.wav"
@@ -90,18 +89,8 @@ def record_pass(sat_name, aos, los):
     duration = int((los - aos).total_seconds()) + STOP_LATE
     log_and_print("info", f"[{sat_name}] ▶ Recording for {duration}s at {freq/1e6} MHz...", pass_logger)
 
-    cmd = [
-        "rtl_fm",
-        "-f", str(int(freq)),
-        "-M", "fm",
-        "-s", str(SAMPLE_RATE),
-        "-g", str(GAIN)
-    ]
-    sox_cmd = [
-        "sox", "-t", "raw", "-r", str(SAMPLE_RATE),
-        "-e", "signed", "-b", "16", "-c", "1", "-",
-        str(wav_path)
-    ]
+    cmd = ["rtl_fm", "-f", str(int(freq)), "-M", "fm", "-s", str(SAMPLE_RATE), "-g", str(GAIN)]
+    sox_cmd = ["sox", "-t", "raw", "-r", str(SAMPLE_RATE), "-e", "signed", "-b", "16", "-c", "1", "-", str(wav_path)]
 
     error_flag = None
     try:
@@ -116,7 +105,6 @@ def record_pass(sat_name, aos, los):
         sox_proc.terminate()
         log_and_print("info", f"[{sat_name}] ✔ Saved to {wav_path}", pass_logger)
 
-        # --- SUMMARY FOOTER ---
         file_size_mb = wav_path.stat().st_size / (1024 * 1024) if wav_path.exists() else 0
         summary_lines = [
             "",
@@ -155,11 +143,8 @@ def load_pass_predictions(csv_path):
 def schedule_passes(pass_list):
     for sat_name, aos, los, _ in pass_list:
         start_time = aos - datetime.timedelta(seconds=START_EARLY)
-        schedule.every().day.at(start_time.strftime("%H:%M")).do(
-            record_pass, sat_name, aos, los
-        )
-        log_and_print("info", f"📅 Scheduled {sat_name} at {start_time} "
-                              f"for {(los - aos).seconds}s.")
+        schedule.every().day.at(start_time.strftime("%H:%M")).do(record_pass, sat_name, aos, los)
+        log_and_print("info", f"📅 Scheduled {sat_name} at {start_time} for {(los - aos).seconds}s.")
 
 def debug_monitor():
     now = datetime.datetime.now()
@@ -167,8 +152,11 @@ def debug_monitor():
     if jobs:
         next_run = min(job.next_run for job in jobs)
         countdown = (next_run - now).total_seconds()
-        log_and_print("info", f"[{now:%H:%M:%S}] Next job in {countdown:.0f}s "
-                              f"({next_run.time()})")
+        hours, remainder = divmod(int(countdown), 3600)
+        minutes, seconds = divmod(remainder, 60)
+        local_next_run = next_run.astimezone()
+        log_and_print("info", f"[{now:%H:%M:%S}] Next job in {hours}h {minutes}m {seconds}s "
+                              f"({local_next_run:%H:%M:%S})")
     else:
         log_and_print("info", f"[{now:%H:%M:%S}] No jobs scheduled.")
 
@@ -178,21 +166,28 @@ def debug_monitor():
     log_and_print("info", f"CPU load: {psutil.cpu_percent()}%")
     log_and_print("info", "-" * 40)
 
+def listen_for_keypress():
+    print("Press X to stop recording scheduler.")
+    while True:
+        if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
+            key = sys.stdin.read(1)
+            if key.lower() == 'x':
+                log_and_print("info", "❌ 'x' pressed — disabling recordings and exiting.")
+                SETTINGS_FILE.write_text(json.dumps({"recording_enabled": False}))
+                sys.exit(0)
+
 # --- MAIN ---
 if __name__ == "__main__":
     logger.info("Scheduler starting up — running prechecks...")
 
-    # Precheck: recordings enabled
     if not recordings_enabled():
         log_and_print("info", "Recording disabled in settings.json — exiting.")
         sys.exit(0)
 
-    # Precheck: SDR present
     if not sdr.sdr_exists():
         log_and_print("error", "No SDR detected — exiting.")
         sys.exit(1)
 
-    # Precheck: passes available
     passes = load_pass_predictions(PASS_FILE)
     if not passes:
         log_and_print("warning", "No qualifying passes predicted — exiting.")
@@ -201,6 +196,8 @@ if __name__ == "__main__":
     log_and_print("info", f"{len(passes)} passes found — scheduling...")
     schedule_passes(passes)
 
+    threading.Thread(target=listen_for_keypress, daemon=True).start()
+
     while True:
         if not recordings_enabled():
             log_and_print("info", "Recording disabled via web — shutting down.")
@@ -208,4 +205,3 @@ if __name__ == "__main__":
         schedule.run_pending()
         debug_monitor()
         time.sleep(5)
-        
