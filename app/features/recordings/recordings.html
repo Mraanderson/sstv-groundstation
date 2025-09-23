@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Recordings</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Satellite</th>
+            <th>Time</th>
+            <th>Frequency</th>
+            <th>Mode</th>
+            <th>SSTV</th>
+            <th>Calls</th>
+            <th>Verdict</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for rec in recordings %}
+        <tr>
+            <td>{{ rec.meta.satellite }}</td>
+            <td>{{ rec.meta.timestamp }}</td>
+            <td>{{ rec.meta.frequency }} MHz</td>
+            <td>{{ rec.meta.mode }}</td>
+            <td>{% if rec.meta.sstv_detected %}✅{% else %}❌{% endif %}</td>
+            <td>{{ rec.meta.callsigns|join(', ') }}</td>
+            <td>{{ rec.meta.verdict }}</td>
+            <td>
+                {% if rec.wav_exists %}
+                    <a href="{{ url_for('recordings.download_recording', filename=rec.base + '.wav') }}">Download</a>
+                {% endif %}
+                <button onclick="deleteRecording('{{ rec.base }}')">Delete</button>
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+<script>
+function deleteRecording(base) {
+    fetch(`/recordings/delete/${base}`, { method: "POST" })
+        .then(() => location.reload());
+}
+</script>
+{% endblock %}
