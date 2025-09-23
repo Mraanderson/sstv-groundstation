@@ -33,6 +33,14 @@ def enable_recordings():
     if settings.get("recording_enabled"):
         return jsonify({"status": "already enabled"}), 200
 
+    # Kill stray SDR processes before starting scheduler
+    for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+        try:
+            if proc.info['name'] in ('rtl_fm', 'sox'):
+                proc.terminate()
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+
     settings["recording_enabled"] = True
     save_settings(settings)
 
