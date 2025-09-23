@@ -56,7 +56,9 @@ def record_pass(sat, aos, los):
     if not sdr.sdr_exists():
         log_and_print("warning", f"[{sat}] SDR not detected — skipping.", plog)
         return
-    freq = SAT_FREQ.get(sat)
+
+    freq_key = sat.split()[0]
+    freq = SAT_FREQ.get(freq_key)
     if not freq:
         log_and_print("warning", f"[{sat}] No frequency configured — skipping.", plog)
         return
@@ -165,4 +167,4 @@ if __name__ == "__main__":
         schedule.run_pending()
         debug_monitor()
         time.sleep(5)
-        
+    
