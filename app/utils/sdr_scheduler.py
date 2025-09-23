@@ -2,7 +2,7 @@ import csv, datetime, time, subprocess, json, sys, threading, select, psutil, sc
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
 import sdr
-import app.utils.tle_utils as tle_utils
+import app.utils.tle as tle_utils
 import app.utils.passes_utils as passes_utils
 from app.features.config import config_data
 
