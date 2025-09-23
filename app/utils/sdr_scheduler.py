@@ -144,6 +144,8 @@ if __name__ == "__main__":
         sys.exit(0)
     if not sdr.sdr_exists():
         log_and_print("error", "No SDR detected — exiting.")
+        log_and_print("info", "Recording disabled due to missing SDR.")
+        SETTINGS_FILE.write_text(json.dumps({"recording_enabled": False}))
         sys.exit(1)
 
     passes = load_pass_predictions(PASS_FILE)
