@@ -2,8 +2,11 @@ import json
 import subprocess
 import psutil
 from pathlib import Path
-from flask import render_template, send_file, abort, jsonify, request
+from flask import render_template, send_file, abort, jsonify
 from app.features.recordings import bp
+
+# Import your TLE and pass prediction utilities
+from app.utils import tle_utils, passes_utils  # adjust import paths to match your project
 
 RECORDINGS_DIR = Path("recordings")
 SETTINGS_FILE = Path("settings.json")
@@ -26,6 +29,27 @@ def find_scheduler_pid():
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
     return None
+
+def refresh_tle_and_predictions():
+    """Fetch latest TLEs and regenerate pass predictions."""
+    # Only run if config has location
+    from app.features.config import config_data  # adjust if your config is elsewhere
+    if not config_data.get("latitude") or not config_data.get("longitude"):
+        print("⚠ No location set — skipping TLE refresh.")
+        return
+
+    tle_data = []
+    for sat_name in tle_utils.TLE_SOURCES.keys():
+        tle = tle_utils.fetch_tle(sat_name)
+        if tle:
+            tle_data.append(tle)
+            print(f"✅ Fetched TLE for {sat_name}")
+        else:
+            print(f"⚠ No TLE found for {sat_name}")
+
+    tle_utils.save_tle(tle_data)
+    passes_utils.generate_predictions(tle_data)  # update predicted_passes.csv
+    print("📅 Pass predictions updated for next 24h.")
 
 @bp.route("/", methods=["GET"])
 def recordings_list():
@@ -67,7 +91,7 @@ def delete_recording(base):
 
 @bp.route("/enable", methods=["POST"])
 def enable_recordings():
-    """Enable recordings and start scheduler."""
+    """Enable recordings, refresh TLE, and start scheduler."""
     settings = load_settings()
     if settings.get("recording_enabled"):
         return jsonify({"status": "already enabled"}), 200
@@ -82,6 +106,9 @@ def enable_recordings():
 
     settings["recording_enabled"] = True
     save_settings(settings)
+
+    # Refresh TLE and predictions before starting scheduler
+    refresh_tle_and_predictions()
 
     subprocess.Popen(["python3", str(SCHEDULER_SCRIPT)])
     return jsonify({"status": "enabled"}), 200
@@ -108,7 +135,6 @@ def recordings_status():
     settings = load_settings()
     pid = find_scheduler_pid()
 
-    # Include last recording metadata if available
     last_meta = None
     meta_files = sorted(RECORDINGS_DIR.glob("*.json"), reverse=True)
     if meta_files:
