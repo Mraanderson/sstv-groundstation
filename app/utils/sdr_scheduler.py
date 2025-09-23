@@ -155,8 +155,9 @@ def debug_monitor():
         hours, remainder = divmod(int(countdown), 3600)
         minutes, seconds = divmod(remainder, 60)
         local_next_run = next_run.astimezone()
+        tz_name = local_next_run.tzname()
         log_and_print("info", f"[{now:%H:%M:%S}] Next job in {hours}h {minutes}m {seconds}s "
-                              f"({local_next_run:%H:%M:%S})")
+                              f"({local_next_run:%H:%M:%S} {tz_name})")
     else:
         log_and_print("info", f"[{now:%H:%M:%S}] No jobs scheduled.")
 
@@ -205,3 +206,4 @@ if __name__ == "__main__":
         schedule.run_pending()
         debug_monitor()
         time.sleep(5)
+        
