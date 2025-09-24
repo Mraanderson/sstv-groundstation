@@ -7,13 +7,17 @@
   <div class="card-body">
     {% if tle_info %}
       <p><strong>TLE File:</strong> {{ tle_info.filename }}</p>
-      <p><strong>Last Updated:</strong> {{ tle_info.last_updated }}
-        <span class="text-muted">({{ tle_info.age_days|round(1) }} days old)</span>
+      <p>
+        <strong>Last Updated:</strong> {{ tle_info.last_updated }}
+        {% if tle_info.age_days is not none %}
+          <span class="text-muted">({{ tle_info.age_days|round(1) }} days old)</span>
+        {% endif %}
       </p>
       <p><strong>Satellites in TLE:</strong> {{ satellites|length }}</p>
     {% else %}
       <p class="text-warning">No TLE data found.</p>
     {% endif %}
+
     <button id="update-tle-btn" class="btn btn-primary me-3">
       <span id="update-icon" class="me-2">🔄</span> Update TLE
     </button>
