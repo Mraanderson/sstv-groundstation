@@ -3,15 +3,12 @@ import subprocess
 import psutil
 import os
 from pathlib import Path
-from flask import render_template, send_file, abort, jsonify
+from flask import render_template, jsonify
 
-# ✅ import the Blueprint defined in __init__.py
 from app.features.recordings import bp
-
-# utility imports
 import app.utils.tle as tle_utils
 import app.utils.passes as passes_utils
-from app import config_paths   # for user_config.json
+from app import config_paths
 
 RECORDINGS_DIR = Path("recordings")
 SETTINGS_FILE = Path("settings.json")
@@ -94,11 +91,47 @@ def enable_recordings():
     settings["recording_enabled"] = True
     save_settings(settings)
 
-    # Refresh TLE and predictions before starting scheduler
     refresh_tle_and_predictions()
 
     # ✅ Run scheduler as a module so imports work
     subprocess.Popen(["python3", "-m", "app.utils.sdr_scheduler"])
 
     return jsonify({"status": "enabled"}), 200
+
+@bp.route("/disable", methods=["POST"])
+def disable_recordings():
+    """Disable recordings and kill scheduler."""
+    settings = load_settings()
+    settings["recording_enabled"] = False
+    save_settings(settings)
+
+    # Kill scheduler process
+    for proc in psutil.process_iter(['pid', 'cmdline']):
+        try:
+            if proc.info['cmdline'] and "app.utils.sdr_scheduler" in " ".join(proc.info['cmdline']):
+                proc.terminate()
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+
+    return jsonify({"status": "disabled"}), 200
+
+@bp.route("/status", methods=["GET"])
+def recordings_status():
+    """Return current recording scheduler status as JSON."""
+    settings = load_settings()
+    enabled = settings.get("recording_enabled", False)
+
+    scheduler_pid = None
+    for proc in psutil.process_iter(['pid', 'cmdline']):
+        try:
+            if proc.info['cmdline'] and "app.utils.sdr_scheduler" in " ".join(proc.info['cmdline']):
+                scheduler_pid = proc.info['pid']
+                break
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+
+    return jsonify({
+        "recording_enabled": enabled,
+        "scheduler_pid": scheduler_pid
+    })
     
