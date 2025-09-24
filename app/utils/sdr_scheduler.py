@@ -15,7 +15,7 @@ from logging.handlers import RotatingFileHandler
 from app.utils import sdr
 import app.utils.tle as tle_utils
 import app.utils.passes as passes_utils
-from app import config_paths  # ✅ FIXED import
+from app import config_paths
 
 # --- CONFIG ---
 SAT_FREQ = {"ISS": 145.800e6, "NOAA-19": 137.100e6}
@@ -41,8 +41,9 @@ logger.addHandler(handler)
 
 
 def load_config_data():
-    if config_paths.CONFIG_FILE.exists():
-        with open(config_paths.CONFIG_FILE) as f:
+    config_file = Path(config_paths.CONFIG_FILE)
+    if config_file.exists():
+        with open(config_file) as f:
             return json.load(f)
     return {}
 
