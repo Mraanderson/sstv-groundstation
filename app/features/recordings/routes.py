@@ -1,6 +1,7 @@
 import json
 import subprocess
 import psutil
+import os
 from pathlib import Path
 from flask import render_template, send_file, abort, jsonify
 from app.features.recordings import bp
@@ -8,7 +9,7 @@ from app.features.recordings import bp
 # Correct utility imports
 import app.utils.tle as tle_utils
 import app.utils.passes as passes_utils
-from app.features.config import config_data  # contains latitude/longitude/altitude/timezone
+from app import config_paths   # points to user_config.json
 
 RECORDINGS_DIR = Path("recordings")
 SETTINGS_FILE = Path("settings.json")
@@ -32,8 +33,16 @@ def find_scheduler_pid():
             continue
     return None
 
+def load_config_data():
+    """Load user location/timezone config from user_config.json."""
+    if os.path.exists(config_paths.CONFIG_FILE):
+        with open(config_paths.CONFIG_FILE) as f:
+            return json.load(f)
+    return {}
+
 def refresh_tle_and_predictions():
     """Fetch latest TLEs and regenerate pass predictions."""
+    config_data = load_config_data()
     if not config_data.get("latitude") or not config_data.get("longitude"):
         print("⚠ No location set — skipping TLE refresh.")
         return
@@ -49,11 +58,10 @@ def refresh_tle_and_predictions():
 
     tle_utils.save_tle(tle_data)
 
-    # Call the new utility with config values and TLE file path
     lat = config_data["latitude"]
     lon = config_data["longitude"]
     alt = config_data.get("altitude", 0)
-    tz = config_data.get("timezone", "UTC")
+    tz  = config_data.get("timezone", "UTC")
     tle_path = "app/static/tle/active.txt"
 
     passes_utils.generate_predictions(lat, lon, alt, tz, tle_path)
