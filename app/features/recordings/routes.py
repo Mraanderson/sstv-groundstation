@@ -5,10 +5,10 @@ from pathlib import Path
 from flask import render_template, send_file, abort, jsonify
 from app.features.recordings import bp
 
-# Direct imports from utility modules — adjust names if your files differ
+# Correct utility imports
 import app.utils.tle as tle_utils
-import app.utils.passes_utils as passes_utils
-from app.features.config import config_data  # wherever lat/lon/alt is stored
+import app.utils.passes as passes_utils
+from app.features.config import config_data  # contains latitude/longitude/altitude/timezone
 
 RECORDINGS_DIR = Path("recordings")
 SETTINGS_FILE = Path("settings.json")
@@ -48,7 +48,15 @@ def refresh_tle_and_predictions():
             print(f"⚠ No TLE found for {sat_name}")
 
     tle_utils.save_tle(tle_data)
-    passes_utils.generate_predictions(tle_data)
+
+    # Call the new utility with config values and TLE file path
+    lat = config_data["latitude"]
+    lon = config_data["longitude"]
+    alt = config_data.get("altitude", 0)
+    tz = config_data.get("timezone", "UTC")
+    tle_path = "app/static/tle/active.txt"
+
+    passes_utils.generate_predictions(lat, lon, alt, tz, tle_path)
     print("📅 Pass predictions updated for next 24h.")
 
 @bp.route("/", methods=["GET"])
