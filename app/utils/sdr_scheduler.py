@@ -15,7 +15,7 @@ from logging.handlers import RotatingFileHandler
 from app.utils import sdr
 import app.utils.tle as tle_utils
 import app.utils.passes as passes_utils
-from app.features.config import config_data
+from app import config_paths  # ✅ FIXED import
 
 # --- CONFIG ---
 SAT_FREQ = {"ISS": 145.800e6, "NOAA-19": 137.100e6}
@@ -26,8 +26,8 @@ PASS_FILE = Path("predicted_passes.csv")
 SAMPLE_RATE = 48000
 GAIN = 27.9
 ELEVATION_THRESHOLD = 0
-START_EARLY = 30      # seconds before AOS to start
-STOP_LATE = 30        # seconds after LOS to stop
+START_EARLY = 30
+STOP_LATE = 30
 GREEN, RED, RESET = "\033[92m", "\033[91m", "\033[0m"
 
 RECORDINGS_DIR.mkdir(exist_ok=True)
@@ -40,8 +40,14 @@ handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"
 logger.addHandler(handler)
 
 
+def load_config_data():
+    if config_paths.CONFIG_FILE.exists():
+        with open(config_paths.CONFIG_FILE) as f:
+            return json.load(f)
+    return {}
+
+
 def log_and_print(level, msg, plog=None):
-    # Show “Next job” updates on one line; otherwise print normally
     print(msg if "Next job" not in msg else f"\r{msg}", end="", flush=True)
     getattr(logger, level)(msg)
     if plog:
@@ -84,7 +90,7 @@ def record_pass(sat, aos, los):
     if not sdr.sdr_exists():
         return log_and_print("warning", f"[{sat}] SDR not detected — skipping.", plog)
 
-    freq_lookup_key = sat.split()[0]  # "ISS" from "ISS (ZARYA)"
+    freq_lookup_key = sat.split()[0]
     freq = SAT_FREQ.get(freq_lookup_key)
     if not freq:
         return log_and_print("warning", f"[{sat}] No frequency configured — skipping.", plog)
@@ -145,18 +151,17 @@ def load_pass_predictions(path):
 
 def schedule_passes(pass_list):
     for sat, aos, los, _ in pass_list:
-        # Convert AOS to local time for scheduling and start a bit early
         local_start = (aos.astimezone() - datetime.timedelta(seconds=START_EARLY))
-        time_str = local_start.strftime("%H:%M")  # schedule supports HH:MM; seconds optional in newer versions
+        time_str = local_start.strftime("%H:%M")
         schedule.every().day.at(time_str).do(record_pass, sat, aos, los)
         log_and_print("info", f"📅 Scheduled {sat} at {local_start:%Y-%m-%d %H:%M:%S} for {(los - aos).seconds}s.")
 
 
 def auto_update_tle():
+    config_data = load_config_data()
     if not config_data.get("latitude") or not config_data.get("longitude"):
         return log_and_print("warning", "No location set — skipping TLE refresh.")
 
-    # Fetch all configured TLEs (no double-fetch)
     tle_data = []
     for s in tle_utils.TLE_SOURCES:
         tle = tle_utils.fetch_tle(s)
@@ -166,10 +171,8 @@ def auto_update_tle():
         else:
             log_and_print("warning", f"⚠ No TLE found for {s}")
 
-    # Save to active.txt
     tle_utils.save_tle(tle_data)
 
-    # Regenerate predictions for the next 24h
     lat = config_data["latitude"]
     lon = config_data["longitude"]
     alt = config_data.get("altitude", 0)
@@ -179,7 +182,6 @@ def auto_update_tle():
 
 
 def listen_for_keypress():
-    # In many daemon contexts stdin may not be a TTY; keep this optional
     try:
         while True:
             if sys.stdin in select.select([sys.stdin], [], [], 0)[0] and sys.stdin.read(1).lower() == "x":
@@ -187,7 +189,6 @@ def listen_for_keypress():
                 sys.exit(0)
             time.sleep(0.1)
     except Exception:
-        # If stdin is not available, just return
         return
 
 
@@ -201,7 +202,6 @@ if __name__ == "__main__":
         SETTINGS_FILE.write_text(json.dumps({"recording_enabled": False}))
         sys.exit(1)
 
-    # Initial TLE refresh and schedule jobs
     auto_update_tle()
     schedule.every(6).hours.do(auto_update_tle)
 
