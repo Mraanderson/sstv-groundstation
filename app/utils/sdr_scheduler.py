@@ -5,7 +5,7 @@ from app.utils import sdr, tle as tle_utils, passes as passes_utils
 from app import config_paths
 
 # --- CONFIG ---
-SAT_FREQ = {"ISS": 145.800e6, "NOAA-19": 137.100e6}
+SAT_FREQ = {"ISS": 145.800e6}
 RECORDINGS_DIR, LOG_DIR, SETTINGS_FILE = Path("recordings"), Path("logs"), Path("settings.json")
 PASS_FILE, SAMPLE_RATE, GAIN = "predicted_passes.csv", 48000, 27.9
 ELEVATION_THRESHOLD, START_EARLY, STOP_LATE = 0, 30, 30
@@ -47,7 +47,6 @@ def record_pass(sat, aos, los):
     if not sdr.sdr_exists():
         return log_and_print("warning", f"[{sat}] SDR not detected — skipping.", plog)
 
-    # Normalise satellite name for lookup
     freq_lookup_key = sat.split()[0].replace(" ", "-")
     freq = SAT_FREQ.get(freq_lookup_key)
     if not freq:
@@ -58,12 +57,10 @@ def record_pass(sat, aos, los):
 
     error = None; fm = sox = None
     try:
-        # Force rtl_fm to output 48 kHz audio directly
         fm = subprocess.Popen(
             ["rtl_fm", "-f", str(int(freq)), "-M", "fm", "-s", "48000", "-g", str(GAIN)],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
-        # Pipe into sox to write a proper WAV file
         sox = subprocess.Popen(
             ["sox", "-t", "raw", "-r", "48000", "-e", "signed", "-b", "16", "-c", "1", "-", str(wav)],
             stdin=fm.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE
@@ -83,13 +80,22 @@ def record_pass(sat, aos, los):
 
 def load_pass_predictions(path):
     if not Path(path).exists(): return []
-    return [(r["satellite"], datetime.datetime.fromisoformat(r["aos"]),
-             datetime.datetime.fromisoformat(r["los"]), float(r["max_elev"]))
-            for r in csv.DictReader(open(path)) if float(r["max_elev"]) >= ELEVATION_THRESHOLD]
+    results = []
+    for r in csv.DictReader(open(path)):
+        try:
+            sat = r["satellite"]
+            aos = datetime.datetime.fromisoformat(r["aos"]).astimezone()
+            los = datetime.datetime.fromisoformat(r["los"]).astimezone()
+            max_elev = float(r["max_elev"])
+            if max_elev >= ELEVATION_THRESHOLD:
+                results.append((sat, aos, los, max_elev))
+        except Exception:
+            continue
+    return results
 
 def schedule_passes(passes):
     for sat, aos, los, _ in passes:
-        start = (aos.astimezone() - datetime.timedelta(seconds=START_EARLY))
+        start = (aos - datetime.timedelta(seconds=START_EARLY))
         schedule.every().day.at(start.strftime("%H:%M")).do(record_pass, sat, aos, los)
         log_and_print("info", f"📅 Scheduled {sat} at {start:%Y-%m-%d %H:%M:%S} for {(los - aos).seconds}s.")
 
@@ -97,10 +103,22 @@ def auto_update_tle():
     cfg = load_config_data()
     if not cfg.get("latitude") or not cfg.get("longitude"):
         return log_and_print("warning", "No location set — skipping TLE refresh.")
-    tle_data = [tle for s in tle_utils.TLE_SOURCES if (tle := tle_utils.fetch_tle(s))]
+
+    tle_data = []
+    for s in tle_utils.TLE_SOURCES:
+        if "ISS" in s.upper():  # ✅ only keep ISS
+            tle = tle_utils.fetch_tle(s)
+            if tle:
+                tle_data.append(tle)
+                log_and_print("info", f"✅ Updated TLE for {s}")
+            else:
+                log_and_print("warning", f"⚠ No TLE found for {s}")
+
     tle_utils.save_tle(tle_data)
-    passes_utils.generate_predictions(cfg["latitude"], cfg["longitude"], cfg.get("altitude", 0),
-                                      cfg.get("timezone", "UTC"), "app/static/tle/active.txt")
+    passes_utils.generate_predictions(
+        cfg["latitude"], cfg["longitude"], cfg.get("altitude", 0),
+        cfg.get("timezone", "UTC"), "app/static/tle/active.txt"
+    )
     log_and_print("info", "📅 Pass predictions updated for next 24h.")
 
 def listen_for_keypress():
@@ -124,7 +142,7 @@ if __name__ == "__main__":
         if not recordings_enabled(): break
         schedule.run_pending()
         if (nj := schedule.next_run()):
-            delta = nj - datetime.datetime.now()  # ✅ both naive
+            delta = nj - datetime.datetime.now()
             log_and_print("info", f"⏳ Next job in {int(delta.total_seconds())}s at {nj.strftime('%H:%M:%S')}")
         time.sleep(5)
-        
+            
