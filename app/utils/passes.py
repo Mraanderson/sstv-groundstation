@@ -3,10 +3,12 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 import csv
 from pathlib import Path
+import os
 
 PASS_FILE = Path("predicted_passes.csv")
 
 def save_predicted_passes(passes):
+    """Write passes to predicted_passes.csv for the scheduler."""
     with PASS_FILE.open("w", newline="") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(["satellite", "aos", "los", "max_elev"])
@@ -19,9 +21,9 @@ def save_predicted_passes(passes):
             ])
 
 def generate_predictions(lat, lon, alt, tz, tle_path):
-    """Generate passes for next 24h and save to predicted_passes.csv"""
+    """Generate passes for next 24h and save to predicted_passes.csv."""
     passes = []
-    if None in (lat, lon, alt, tz) or not tle_path:
+    if None in (lat, lon, alt, tz) or not tle_path or not os.path.exists(tle_path):
         return passes
 
     load = Loader("./skyfield_data")
@@ -44,7 +46,8 @@ def generate_predictions(lat, lon, alt, tz, tle_path):
             continue
 
         for j in range(0, len(events) - 2, 3):
-            if events[j:j+3] == [0,1,2]:
+            # FIX: convert NumPy slice to list before comparing
+            if list(events[j:j+3]) == [0, 1, 2]:
                 start = times[j].utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
                 end   = times[j+2].utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
                 peak_time = ts.from_datetime(times[j+1].utc_datetime())
@@ -59,3 +62,4 @@ def generate_predictions(lat, lon, alt, tz, tle_path):
     passes.sort(key=lambda p: p["start"])
     save_predicted_passes(passes)
     return passes
+    
