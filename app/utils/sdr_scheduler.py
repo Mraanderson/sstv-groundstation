@@ -49,6 +49,7 @@ def load_config_data():
 
 
 def log_and_print(level, msg, plog=None):
+    # Print inline updates for countdowns
     print(msg if "Next job" not in msg else f"\r{msg}", end="", flush=True)
     getattr(logger, level)(msg)
     if plog:
@@ -216,9 +217,18 @@ if __name__ == "__main__":
 
     threading.Thread(target=listen_for_keypress, daemon=True).start()
 
+    # ✅ Main loop with countdown
     while True:
         if not recordings_enabled():
             break
+
         schedule.run_pending()
-        time.sleep(1)
+
+        next_job = schedule.next_run()
+        if next_job:
+            delta = next_job - datetime.datetime.now().astimezone()
+            countdown = f"⏳ Next job in {int(delta.total_seconds())}s at {next_job.strftime('%H:%M:%S')}"
+            log_and_print("info", countdown)
+
+        time.sleep(5)
         
