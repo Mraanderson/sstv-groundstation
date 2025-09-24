@@ -12,7 +12,7 @@ import logging
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
 
-import sdr
+from app.utils import sdr
 import app.utils.tle as tle_utils
 import app.utils.passes as passes_utils
 from app.features.config import config_data
