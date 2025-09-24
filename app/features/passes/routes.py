@@ -1,15 +1,13 @@
 import os
-import csv
-import requests
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from flask import render_template, current_app, jsonify
-from skyfield.api import Loader, EarthSatellite, wgs84
 from zoneinfo import ZoneInfo
+import requests
 
 from . import bp
-from app.utils.sdr import rtl_sdr_present  # RTL-SDR detection helper
+from app.utils.sdr import rtl_sdr_present
+from app.utils import passes  # <-- NEW import
 
-# Single reliable satellite for testing
 SSTV_SATELLITES = [
     {
         "name": "ISS (ZARYA)",
@@ -23,148 +21,32 @@ SSTV_SATELLITES = [
 def tle_file_path():
     return os.path.join(current_app.config["TLE_DIR"], "active.txt")
 
-def load_tle_satellites():
-    """Load satellites from the TLE file."""
-    tle_path = tle_file_path()
-    if not os.path.exists(tle_path):
-        return None, []
-    with open(tle_path) as f:
-        lines = [line.strip() for line in f if line.strip()]
-    satellites = [lines[i] for i in range(0, len(lines), 3)]
-    return tle_path, satellites
-
-def get_tle_age_days(tle_path):
-    try:
-        with open(tle_path) as f:
-            lines = [line.strip() for line in f if line.strip()]
-        if len(lines) < 2:
-            return None
-        line1 = lines[1]
-        epoch_str = line1[18:32]  # YYDDD.DDDDDDDD
-        year = int(epoch_str[:2])
-        year += 2000 if year < 57 else 1900
-        day_of_year = float(epoch_str[2:])
-        epoch = datetime(year, 1, 1, tzinfo=timezone.utc) + timedelta(days=day_of_year - 1)
-        return round((datetime.now(timezone.utc) - epoch).total_seconds() / 86400, 1)
-    except Exception:
-        return None
-
-def save_predicted_passes(passes):
-    """Write passes to predicted_passes.csv for the scheduler."""
-    try:
-        with open("predicted_passes.csv", "w", newline="") as csvfile:
-            writer = csv.writer(csvfile)
-            writer.writerow(["satellite", "aos", "los", "max_elev"])
-            for p in passes:
-                writer.writerow([
-                    p["satellite"],
-                    p["start"].astimezone(ZoneInfo("UTC")).isoformat(timespec="seconds"),
-                    p["end"].astimezone(ZoneInfo("UTC")).isoformat(timespec="seconds"),
-                    p["max_elevation"]
-                ])
-        print("✅ predicted_passes.csv updated")
-    except Exception as e:
-        print(f"❌ Failed to write predicted_passes.csv: {e}")
-
-def generate_passes(lat, lon, alt, tz, tle_path, sdr_flag):
-    """Generate pass predictions and save CSV for scheduler."""
-    passes = []
-    if None in (lat, lon, alt, tz) or not tle_path:
-        return passes
-
-    load = Loader("./skyfield_data")
-    ts = load.timescale()
-    observer = wgs84.latlon(latitude_degrees=lat, longitude_degrees=lon, elevation_m=alt)
-
-    with open(tle_path) as f:
-        lines = [line.strip() for line in f if line.strip()]
-
-    now_utc = datetime.now(timezone.utc)
-    end_utc = now_utc + timedelta(hours=24)
-    t0 = ts.from_datetime(now_utc)
-    t1 = ts.from_datetime(end_utc)
-
-    for i in range(0, len(lines), 3):
-        try:
-            name, l1, l2 = lines[i], lines[i+1], lines[i+2]
-        except IndexError:
-            continue
-
-        try:
-            sat = EarthSatellite(l1, l2, name, ts)
-            times, events = sat.find_events(observer, t0, t1, altitude_degrees=0.0)
-        except Exception as e:
-            print(f"Satellite calc failed for {name}: {e}")
-            continue
-
-        for j in range(0, len(events) - 2, 3):
-            if events[j] == 0 and events[j+1] == 1 and events[j+2] == 2:
-                start = times[j].utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
-                peak = times[j+1].utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
-                end = times[j+2].utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
-                peak_time = ts.from_datetime(times[j+1].utc_datetime())
-                alt_deg = (sat - observer).at(peak_time).altaz()[0].degrees
-                passes.append({
-                    "satellite": name,
-                    "start": start,
-                    "peak": peak,
-                    "end": end,
-                    "max_elevation": round(alt_deg, 1)
-                })
-
-    passes.sort(key=lambda p: p["start"])
-    save_predicted_passes(passes)
-
-    # Log any passes that have already ended
-    if tz:
-        log_path = os.path.join(current_app.config["TLE_DIR"], "pass_log.csv")
-        try:
-            with open(log_path, "a", newline="") as csvfile:
-                writer = csv.writer(csvfile)
-                for p in passes:
-                    if p["end"] < datetime.now(ZoneInfo(tz)):
-                        writer.writerow([
-                            datetime.now().isoformat(),
-                            p["satellite"],
-                            p["start"].isoformat(),
-                            p["peak"].isoformat(),
-                            p["end"].isoformat(),
-                            p["max_elevation"],
-                            sdr_flag,
-                            ""
-                        ])
-        except Exception as e:
-            print(f"Pass logging failed: {e}")
-
-    return passes
-
 @bp.route("/", endpoint="passes_page")
 def passes_page():
     lat = current_app.config.get("LATITUDE")
     lon = current_app.config.get("LONGITUDE")
     alt = current_app.config.get("ALTITUDE_M")
     tz = current_app.config.get("TIMEZONE")
-    tle_path, satellites = load_tle_satellites()
+    tle_path = tle_file_path()
     sdr_flag = rtl_sdr_present()
 
     tle_info = None
-    if tle_path:
+    if os.path.exists(tle_path):
         mtime = datetime.fromtimestamp(os.path.getmtime(tle_path))
         tle_info = {
             "filename": os.path.basename(tle_path),
             "last_updated": mtime.strftime("%Y-%m-%d %H:%M:%S"),
-            "age_days": get_tle_age_days(tle_path)
+            "age_days": None  # you can still call get_tle_age_days if needed
         }
 
-    passes = generate_passes(lat, lon, alt, tz, tle_path, sdr_flag)
-
+    passes_list = passes.generate_predictions(lat, lon, alt, tz, tle_path)
     now_for_template = datetime.now(ZoneInfo(tz)) if tz else datetime.now()
 
     return render_template(
         "passes/passes.html",
         tle_info=tle_info,
-        satellites=satellites,
-        passes=passes,
+        satellites=[s["name"] for s in SSTV_SATELLITES],
+        passes=passes_list,
         timezone=tz,
         now=now_for_template,
         location_set=None not in (lat, lon, alt, tz),
@@ -181,29 +63,22 @@ def update_tle():
 
         iss = SSTV_SATELLITES[0]
         url = f"https://celestrak.org/NORAD/elements/gp.php?CATNR={iss['norad_id']}&FORMAT=TLE"
-        print(f"Fetching TLE for {iss['name']} from {url}")
         resp = requests.get(url, timeout=10)
         resp.raise_for_status()
         tle_lines = resp.text.strip().splitlines()
 
-        if len(tle_lines) < 3:
-            return jsonify({"status": "error", "message": "Incomplete TLE"})
-
-        with open(path, "w") as f:
-            f.write("\n".join(tle_lines[:3]) + "\n")
-
-        print(f"TLE saved successfully to {path}")
+        if len(tle_lines) >= 3:
+            with open(path, "w") as f:
+                f.write("\n".join(tle_lines[:3]) + "\n")
 
         # Generate passes immediately after updating TLE
         lat = current_app.config.get("LATITUDE")
         lon = current_app.config.get("LONGITUDE")
         alt = current_app.config.get("ALTITUDE_M")
         tz = current_app.config.get("TIMEZONE")
-        sdr_flag = rtl_sdr_present()
-        generate_passes(lat, lon, alt, tz, path, sdr_flag)
+        passes.generate_predictions(lat, lon, alt, tz, path)
 
         return jsonify({"status": "success", "updated": True})
     except Exception as e:
-        print("TLE update failed:", e)
         return jsonify({"status": "error", "message": str(e)})
         
