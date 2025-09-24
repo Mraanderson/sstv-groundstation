@@ -1,3 +1,17 @@
+import json
+import subprocess
+import psutil
+from pathlib import Path
+from flask import render_template, send_file, abort, jsonify
+
+# ✅ this import brings in the Blueprint defined in __init__.py
+from app.features.recordings import bp
+
+# utility imports
+import app.utils.tle as tle_utils
+import app.utils.passes as passes_utils
+from app import config_paths   # for user_config.json
+
 @bp.route("/enable", methods=["POST"])
 def enable_recordings():
     """Enable recordings, refresh TLE, and start scheduler."""
