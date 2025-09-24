@@ -49,12 +49,14 @@ def generate_predictions(lat, lon, alt, tz, tle_path):
             # FIX: convert NumPy slice to list before comparing
             if list(events[j:j+3]) == [0, 1, 2]:
                 start = times[j].utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
+                peak  = times[j+1].utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
                 end   = times[j+2].utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
                 peak_time = ts.from_datetime(times[j+1].utc_datetime())
                 alt_deg = (sat - observer).at(peak_time).altaz()[0].degrees
                 passes.append({
                     "satellite": name,
                     "start": start,
+                    "peak": peak,
                     "end": end,
                     "max_elevation": round(alt_deg, 1)
                 })
