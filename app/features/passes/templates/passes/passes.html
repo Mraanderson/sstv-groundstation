@@ -23,7 +23,7 @@
     </button>
 
     <!-- Single toggle button for recordings -->
-    <button id="toggleBtn" class="btn">Loading...</button>
+    <button id="toggleBtn" class="btn btn-secondary">Loading...</button>
     <span id="statusText" class="ms-3 fw-bold"></span>
   </div>
 </div>
@@ -36,7 +36,7 @@
 
 {% if not location_set %}
   <div class="alert alert-info">
-    Please set your location in the Config page to enable pass predictions.
+    Please set your location on the Config page to enable pass predictions.
   </div>
 {% endif %}
 
@@ -88,9 +88,7 @@
       .then(res => res.json())
       .then(data => {
         icon.textContent = '✅';
-        setTimeout(() => {
-          location.reload();
-        }, 1000);
+        setTimeout(() => { location.reload(); }, 800);
       })
       .catch(err => {
         icon.textContent = '⚠️';
@@ -98,18 +96,19 @@
       });
   });
 
-  // Single toggle button logic
+  // Single toggle button logic (uses /recordings/status, /recordings/enable, /recordings/disable)
   const toggleBtn = document.getElementById('toggleBtn');
   const statusText = document.getElementById('statusText');
 
   async function updateStatus() {
     try {
       const res = await fetch('/recordings/status');
+      if (!res.ok) throw new Error('status not ok');
       const data = await res.json();
       const enabled = data.recording_enabled;
 
       statusText.textContent = enabled
-        ? `✅ Enabled (PID: ${data.scheduler_pid || 'N/A'})`
+        ? `✅ Enabled${data.scheduler_pid ? ` (PID: ${data.scheduler_pid})` : ''}`
         : '❌ Disabled';
 
       if (enabled) {
