@@ -3,7 +3,7 @@ from pathlib import Path
 from logging.handlers import RotatingFileHandler
 import sdr
 import app.utils.tle as tle_utils
-import app.utils.passes_utils as passes_utils
+import app.utils.passes as passes_utils   # <-- FIXED import
 from app.features.config import config_data
 
 # --- CONFIG ---
@@ -58,8 +58,14 @@ def record_pass(sat, aos, los):
     log_and_print("info", f"[{sat}] ▶ Recording for {dur}s at {freq/1e6} MHz...", plog)
     error = None
     try:
-        fm = subprocess.Popen(["rtl_fm", "-f", str(int(freq)), "-M", "fm", "-s", str(SAMPLE_RATE), "-g", str(GAIN)], stdout=subprocess.PIPE)
-        sox = subprocess.Popen(["sox", "-t", "raw", "-r", str(SAMPLE_RATE), "-e", "signed", "-b", "16", "-c", "1", "-", str(wav_path)], stdin=fm.stdout)
+        fm = subprocess.Popen(
+            ["rtl_fm", "-f", str(int(freq)), "-M", "fm", "-s", str(SAMPLE_RATE), "-g", str(GAIN)],
+            stdout=subprocess.PIPE
+        )
+        sox = subprocess.Popen(
+            ["sox", "-t", "raw", "-r", str(SAMPLE_RATE), "-e", "signed", "-b", "16", "-c", "1", "-", str(wav_path)],
+            stdin=fm.stdout
+        )
         time.sleep(dur)
     except Exception as e:
         error = str(e)
@@ -74,8 +80,11 @@ def record_pass(sat, aos, los):
 
 def load_pass_predictions(path):
     with open(path, newline="") as f:
-        return [(r["satellite"], datetime.datetime.fromisoformat(r["aos"]), datetime.datetime.fromisoformat(r["los"]), float(r["max_elev"]))
-                for r in csv.DictReader(f) if float(r["max_elev"]) >= ELEVATION_THRESHOLD]
+        return [
+            (r["satellite"], datetime.datetime.fromisoformat(r["aos"]),
+             datetime.datetime.fromisoformat(r["los"]), float(r["max_elev"]))
+            for r in csv.DictReader(f) if float(r["max_elev"]) >= ELEVATION_THRESHOLD
+        ]
 
 def schedule_passes(pass_list):
     for sat, aos, los, _ in pass_list:
@@ -88,7 +97,10 @@ def auto_update_tle():
         return log_and_print("warning", "No location set — skipping TLE refresh.")
     tle_data = [tle_utils.fetch_tle(s) for s in tle_utils.TLE_SOURCES if tle_utils.fetch_tle(s)]
     tle_utils.save_tle(tle_data)
-    passes_utils.generate_predictions(tle_data)
+    # Call the new utility with config values and TLE file path
+    lat, lon, alt = config_data["latitude"], config_data["longitude"], config_data.get("altitude", 0)
+    tz = config_data.get("timezone", "UTC")
+    passes_utils.generate_predictions(lat, lon, alt, tz, "app/static/tle/active.txt")
     log_and_print("info", "📅 Pass predictions updated for next 24h.")
 
 def listen_for_keypress():
@@ -116,4 +128,3 @@ if __name__ == "__main__":
         if not recordings_enabled(): break
         schedule.run_pending()
         time.sleep(5)
-    
