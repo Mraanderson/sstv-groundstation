@@ -84,6 +84,7 @@ def load_pass_predictions(path):
     for r in csv.DictReader(open(path)):
         try:
             sat = r["satellite"]
+            # Convert UTC (+00:00) to local time
             aos = datetime.datetime.fromisoformat(r["aos"]).astimezone()
             los = datetime.datetime.fromisoformat(r["los"]).astimezone()
             max_elev = float(r["max_elev"])
@@ -145,4 +146,4 @@ if __name__ == "__main__":
             delta = nj - datetime.datetime.now()
             log_and_print("info", f"⏳ Next job in {int(delta.total_seconds())}s at {nj.strftime('%H:%M:%S')}")
         time.sleep(5)
-            
+        
