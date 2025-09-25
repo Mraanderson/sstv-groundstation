@@ -1,4 +1,4 @@
-import csv, datetime, time, subprocess, json, sys, threading, select, psutil, schedule, logging
+import csv, datetime, time, subprocess, json, sys, threading, select, psutil, schedule, logging, re
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
 from app.utils import sdr, tle as tle_utils, passes as passes_utils
@@ -36,13 +36,20 @@ def write_metadata(start_str, sat, aos, los, freq_hz, dur, size, verdict, error)
     meta = {"satellite": sat, "timestamp": aos.isoformat(), "aos": aos.isoformat(), "los": los.isoformat(),
             "frequency": round(freq_hz/1e6,3), "mode":"FM","duration_s":dur,"file_mb":round(size,2),
             "verdict":verdict,"sstv_detected":False,"callsigns":[],"error":error or None}
-    (RECORDINGS_DIR/f"{start_str}_{sat}.json").write_text(json.dumps(meta, indent=2))
+    # ✅ JSON file uses the same safe filename stem
+    safe_sat = re.sub(r'[^A-Za-z0-9_-]', '_', sat)
+    (RECORDINGS_DIR/f"{start_str}_{safe_sat}.json").write_text(json.dumps(meta, indent=2))
 
 def record_pass(sat, aos, los):
     start_str = aos.strftime("%Y%m%d_%H%M")
-    wav = RECORDINGS_DIR / f"{start_str}_{sat}.wav"
+
+    # ✅ Sanitize satellite name for filenames
+    safe_sat = re.sub(r'[^A-Za-z0-9_-]', '_', sat)
+
+    wav = RECORDINGS_DIR / f"{start_str}_{safe_sat}.wav"
     plog = logging.getLogger(start_str); plog.setLevel(logging.INFO)
-    plog.addHandler(RotatingFileHandler(RECORDINGS_DIR/f"{start_str}_{sat}.log", maxBytes=200_000, backupCount=1))
+    plog.addHandler(RotatingFileHandler(RECORDINGS_DIR/f"{start_str}_{safe_sat}.log",
+                                        maxBytes=200_000, backupCount=1))
 
     if not sdr.sdr_exists():
         return log_and_print("warning", f"[{sat}] SDR not detected — skipping.", plog)
@@ -84,7 +91,6 @@ def load_pass_predictions(path):
     for r in csv.DictReader(open(path)):
         try:
             sat = r["satellite"]
-            # Convert UTC (+00:00) to local time
             aos = datetime.datetime.fromisoformat(r["aos"]).astimezone()
             los = datetime.datetime.fromisoformat(r["los"]).astimezone()
             max_elev = float(r["max_elev"])
@@ -107,7 +113,7 @@ def auto_update_tle():
 
     tle_data = []
     for s in tle_utils.TLE_SOURCES:
-        if "ISS" in s.upper():  # ✅ only keep ISS
+        if "ISS" in s.upper():
             tle = tle_utils.fetch_tle(s)
             if tle:
                 tle_data.append(tle)
@@ -146,4 +152,3 @@ if __name__ == "__main__":
             delta = nj - datetime.datetime.now()
             log_and_print("info", f"⏳ Next job in {int(delta.total_seconds())}s at {nj.strftime('%H:%M:%S')}")
         time.sleep(5)
-        
