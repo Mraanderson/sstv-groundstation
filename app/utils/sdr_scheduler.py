@@ -7,7 +7,7 @@ from app import config_paths
 # --- CONFIG ---
 SAT_FREQ = {"ISS": 145.800e6}
 RECORDINGS_DIR, LOG_DIR, SETTINGS_FILE = Path("recordings"), Path("logs"), Path("settings.json")
-PASS_FILE, SAMPLE_RATE, GAIN = "predicted_passes.csv", 48000, 27.9
+PASS_FILE, SAMPLE_RATE, GAIN = "predicted_passes.csv", 48000, 29.7
 ELEVATION_THRESHOLD, START_EARLY, STOP_LATE = 0, 30, 30
 GREEN, RED, RESET = "\033[92m", "\033[91m", "\033[0m"
 RECORDINGS_DIR.mkdir(exist_ok=True); LOG_DIR.mkdir(exist_ok=True)
