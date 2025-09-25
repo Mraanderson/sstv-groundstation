@@ -63,9 +63,9 @@
             <tr>
               <td>{{ p.satellite }}</td>
               <td>{{ p.max_elevation }}</td>
-              <td>{{ p.start.strftime("%Y-%m-%d %H:%M:%S") }}</td>
-              <td>{{ p.peak.strftime("%Y-%m-%d %H:%M:%S") }}</td>
-              <td>{{ p.end.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+              <td data-utc="{{ p.start.isoformat() }}"></td>
+              <td data-utc="{{ p.peak.isoformat() }}"></td>
+              <td data-utc="{{ p.end.isoformat() }}"></td>
             </tr>
           {% endfor %}
         </tbody>
@@ -137,5 +137,17 @@
   // Poll status every 5 seconds
   setInterval(updateStatus, 5000);
   updateStatus();
+
+  // Convert UTC datetimes in table to local time
+  function formatLocal(iso) {
+    const d = new Date(iso);
+    return d.toLocaleString(undefined, {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
+  }
+  document.querySelectorAll('[data-utc]').forEach(el => {
+    el.textContent = formatLocal(el.dataset.utc);
+  });
 </script>
 {% endblock %}
