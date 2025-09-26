@@ -10,7 +10,8 @@ import app.utils.tle as tle_utils
 import app.utils.passes as passes_utils
 from app import config_paths
 
-RECORDINGS_DIR = Path("recordings")
+# Always resolve to the actual recordings directory, regardless of CWD
+RECORDINGS_DIR = (Path(__file__).resolve().parent.parent.parent / "recordings").resolve()
 SETTINGS_FILE = Path("settings.json")
 
 def load_settings():
@@ -74,7 +75,7 @@ def recordings_list():
     return render_template(
         "recordings/recordings.html",
         recordings=recordings,
-        rec_dir=RECORDINGS_DIR.resolve()
+        rec_dir=RECORDINGS_DIR
     )
 
 @bp.route("/files/<path:filename>")
@@ -102,7 +103,7 @@ def enable_recordings():
 
     refresh_tle_and_predictions()
 
-    # ✅ Run scheduler as a module so imports work
+    # Run scheduler as a module so imports work
     subprocess.Popen(["python3", "-m", "app.utils.sdr_scheduler"])
 
     return jsonify({"status": "enabled"}), 200
@@ -143,3 +144,4 @@ def recordings_status():
         "recording_enabled": enabled,
         "scheduler_pid": scheduler_pid
     })
+    
