@@ -3,6 +3,9 @@
 {% block content %}
 <h1 class="mb-4">Recorded Passes</h1>
 
+<h5>Recordings directory: {{ rec_dir }}</h5>
+<button class="btn btn-primary mb-3" onclick="location.reload()">🔄 Refresh</button>
+
 {% if recordings %}
   <div class="card shadow-sm">
     <div class="card-body">
@@ -20,25 +23,25 @@
         <tbody>
           {% for r in recordings %}
             <tr>
-              <td>{{ r.meta.satellite }}</td>
-              <td>{{ r.meta.aos }}</td>
-              <td>{{ r.meta.duration_s }}</td>
-              <td>{{ r.meta.file_mb }}</td>
+              <td>{{ r.meta.satellite or "?" }}</td>
+              <td>{{ r.meta.aos or "?" }}</td>
+              <td>{{ r.meta.duration_s or "?" }}</td>
+              <td>{{ r.meta.file_mb or "?" }}</td>
               <td>
                 {% if r.meta.verdict == "PASS" %}
                   <span class="text-success">{{ r.meta.verdict }}</span>
                 {% else %}
-                  <span class="text-danger">{{ r.meta.verdict }}</span>
+                  <span class="text-danger">{{ r.meta.verdict or "?" }}</span>
                 {% endif %}
               </td>
               <td>
                 {% if r.wav_exists %}
-                  <a href="{{ url_for('static', filename='../../recordings/' ~ r.base ~ '.wav') }}" download>WAV</a>
+                  <a href="{{ url_for('recordings.recordings_file', filename=r.base ~ '.wav') }}" download>WAV</a>
                 {% endif %}
                 {% if r.log_exists %}
-                  | <a href="{{ url_for('static', filename='../../recordings/' ~ r.base ~ '.log') }}" target="_blank">Log</a>
+                  | <a href="{{ url_for('recordings.recordings_file', filename=r.base ~ '.log') }}" target="_blank">Log</a>
                 {% endif %}
-                | <a href="{{ url_for('static', filename='../../recordings/' ~ r.base ~ '.json') }}" target="_blank">JSON</a>
+                | <a href="{{ url_for('recordings.recordings_file', filename=r.base ~ '.json') }}" target="_blank">JSON</a>
               </td>
             </tr>
           {% endfor %}
