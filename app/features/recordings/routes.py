@@ -3,7 +3,7 @@ import subprocess
 import psutil
 import os
 from pathlib import Path
-from flask import render_template, jsonify
+from flask import render_template, jsonify, send_from_directory
 
 from app.features.recordings import bp
 import app.utils.tle as tle_utils
@@ -71,7 +71,16 @@ def recordings_list():
         except Exception:
             continue
     recordings.sort(key=lambda r: r["meta"].get("timestamp", ""), reverse=True)
-    return render_template("recordings/recordings.html", recordings=recordings)
+    return render_template(
+        "recordings/recordings.html",
+        recordings=recordings,
+        rec_dir=RECORDINGS_DIR.resolve()
+    )
+
+@bp.route("/files/<path:filename>")
+def recordings_file(filename):
+    """Serve individual recording files safely."""
+    return send_from_directory(RECORDINGS_DIR, filename, as_attachment=False)
 
 @bp.route("/enable", methods=["POST"])
 def enable_recordings():
@@ -134,4 +143,3 @@ def recordings_status():
         "recording_enabled": enabled,
         "scheduler_pid": scheduler_pid
     })
-    
