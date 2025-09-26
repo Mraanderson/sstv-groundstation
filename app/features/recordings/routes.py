@@ -10,8 +10,10 @@ import app.utils.tle as tle_utils
 import app.utils.passes as passes_utils
 from app import config_paths
 
-# Always resolve to the actual recordings directory, regardless of CWD
-RECORDINGS_DIR = (Path(__file__).resolve().parent.parent.parent / "recordings").resolve()
+# ✅ Always resolve to the top-level recordings directory, regardless of CWD
+# __file__ = .../sstv-groundstation/app/routes/recordings.py
+# parent.parent.parent.parent = project root (sstv-groundstation)
+RECORDINGS_DIR = (Path(__file__).resolve().parent.parent.parent.parent / "recordings").resolve()
 SETTINGS_FILE = Path("settings.json")
 
 def load_settings():
