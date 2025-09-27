@@ -65,21 +65,29 @@ def recordings_list():
         try:
             meta = json.loads(meta_file.read_text())
             base = meta_file.stem
+
+            # Find any sibling files with the same prefix
+            wav_file = next(RECORDINGS_DIR.glob(f"{base}*.wav"), None)
+            png_file = next(RECORDINGS_DIR.glob(f"{base}*.png"), None)
+            log_file = next(RECORDINGS_DIR.glob(f"{base}*.log"), None)
+
             recordings.append({
                 "base": base,
                 "meta": meta,
-                "wav_exists": (RECORDINGS_DIR / f"{base}.wav").exists(),
-                "png_exists": (RECORDINGS_DIR / f"{base}.png").exists(),
-                "log_exists": (RECORDINGS_DIR / f"{base}.log").exists()
+                "wav_exists": bool(wav_file),
+                "png_exists": bool(png_file),
+                "log_exists": bool(log_file)
             })
         except Exception:
             continue
+
     recordings.sort(key=lambda r: r["meta"].get("timestamp", ""), reverse=True)
     return render_template(
         "recordings/recordings.html",
         recordings=recordings,
         rec_dir=RECORDINGS_DIR
     )
+
 
 @bp.route("/files/<path:filename>")
 def recordings_file(filename):
