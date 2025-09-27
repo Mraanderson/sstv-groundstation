@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}RTL-SDR V3 Diagnostics{% endblock %}
+{% block content %}
+<h1 class="mb-4">RTL‑SDR V3 Setup & Configuration Check</h1>
+
+<p>This page helps confirm your RTL‑SDR dongle is correctly installed and ready to use.</p>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h4>1. Hardware Detection</h4>
+    <pre><code>lsusb</code></pre>
+    <p>You should see something like: <code>Realtek Semiconductor Corp. RTL2838 DVB-T</code></p>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h4>2. Check for Conflicting Kernel Drivers</h4>
+    <pre><code>lsmod | grep rtl28</code></pre>
+    <p>If you see <code>dvb_usb_rtl28xxu</code>, unload it:</p>
+    <pre><code>sudo rmmod dvb_usb_rtl28xxu rtl2832</code></pre>
+    <p>Blacklist permanently:</p>
+    <pre><code>echo "blacklist dvb_usb_rtl28xxu" | sudo tee /etc/modprobe.d/blacklist-rtl.conf</code></pre>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h4>3. Confirm Driver & Library Install</h4>
+    <pre><code>rtl_test -t</code></pre>
+    <p>Expected output includes:</p>
+    <ul>
+      <li>Device detected (RTL2838 / R820T)</li>
+      <li><em>“PLL not locked / No E4000 tuner found”</em> — this is normal</li>
+      <li><strong>“Reading samples in async mode…”</strong> with a counter ticking up</li>
+    </ul>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h4>4. Sanity‑Check Sample Capture</h4>
+    <pre><code>rtl_sdr -s 2048000 -f 137912500 test.iq</code></pre>
+    <p>After 5–10 seconds, <code>test.iq</code> should be several MB in size.</p>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h4>5. Audio Test</h4>
+    <pre><code>rtl_fm -f 145800000 -M wbfm -s 192000 -g 29.7 - | \
+sox -t raw -r 192000 -e signed -b 16 -c 1 -L - test.wav rate 48000</code></pre>
+    <p>After ~10 seconds, <code>test.wav</code> should be >1 MB and playable.</p>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h4>6. Troubleshooting</h4>
+    <ul>
+      <li><strong>0‑byte files</strong>: check DVB driver blacklisting.</li>
+      <li><strong>Device not found</strong>: check <code>lsusb</code> and permissions.</li>
+      <li><strong>Still failing</strong>: try another USB port, powered hub, or another machine.</li>
+    </ul>
+  </div>
+</div>
+
+{% endblock %}
