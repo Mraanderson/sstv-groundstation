@@ -36,7 +36,10 @@
               </td>
               <td>
                 {% if r.wav_exists %}
-                  <a href="{{ url_for('recordings.recordings_file', filename=r.base ~ '.wav') }}" download>WAV</a>
+                  <a href="{{ url_for('recordings.recordings_file', filename=r.base ~ '.wav') }}" target="_blank">WAV</a>
+                {% endif %}
+                {% if r.png_exists %}
+                  | <a href="{{ url_for('recordings.recordings_file', filename=r.base ~ '.png') }}" target="_blank">Spectrogram</a>
                 {% endif %}
                 {% if r.log_exists %}
                   | <a href="{{ url_for('recordings.recordings_file', filename=r.base ~ '.log') }}" target="_blank">Log</a>
