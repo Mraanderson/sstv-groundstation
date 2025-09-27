@@ -32,29 +32,31 @@ def recordings_enabled():
     except:
         return False
 
-def write_metadata(start_str, sat, aos, los, freq_hz, dur, size, verdict, error, base_name=None):
+def write_metadata(start_str, sat, aos, los, freq_hz, dur, size, verdict, error, base_name):
+    """Write JSON metadata alongside WAV/PNG/LOG using the same base_name."""
     meta = {
         "satellite": sat,
         "timestamp": aos.isoformat(),
         "aos": aos.isoformat(),
         "los": los.isoformat(),
-        "frequency": round(freq_hz/1e6,3),
+        "frequency": round(freq_hz/1e6, 3),
         "mode": "FM",
         "duration_s": dur,
-        "file_mb": round(size,2),
+        "file_mb": round(size, 2),
         "verdict": verdict,
         "sstv_detected": False,
         "callsigns": [],
         "error": error or None,
-    }
-    if base_name:
-        meta["files"] = {
+        "files": {
             "wav": f"{base_name}.wav",
             "png": f"{base_name}.png",
+            "log": f"{base_name}.log",
             "json": f"{base_name}.json"
         }
-    safe_sat = re.sub(r'[^A-Za-z0-9_-]', '_', sat)
-    (RECORDINGS_DIR/f"{start_str}_{safe_sat}.json").write_text(json.dumps(meta, indent=2))
+    }
+
+    # Save JSON with the same base_name as the other files
+    (RECORDINGS_DIR / f"{base_name}.json").write_text(json.dumps(meta, indent=2))
 
 def record_pass(sat, aos, los):
     start_str = aos.strftime("%Y%m%d_%H%M")
