@@ -1,4 +1,4 @@
-import csv, datetime, time, subprocess, json, sys, threading, select, psutil, schedule, logging, re
+import csv, datetime, time, subprocess, json, sys, threading, select, psutil, schedule, logging, re, os
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
 from app.utils import sdr, tle as tle_utils, passes as passes_utils
@@ -36,54 +36,66 @@ def write_metadata(start_str, sat, aos, los, freq_hz, dur, size, verdict, error)
     meta = {"satellite": sat, "timestamp": aos.isoformat(), "aos": aos.isoformat(), "los": los.isoformat(),
             "frequency": round(freq_hz/1e6,3), "mode":"FM","duration_s":dur,"file_mb":round(size,2),
             "verdict":verdict,"sstv_detected":False,"callsigns":[],"error":error or None}
-    # ✅ JSON file uses the same safe filename stem
     safe_sat = re.sub(r'[^A-Za-z0-9_-]', '_', sat)
     (RECORDINGS_DIR/f"{start_str}_{safe_sat}.json").write_text(json.dumps(meta, indent=2))
 
 def record_pass(sat, aos, los):
     start_str = aos.strftime("%Y%m%d_%H%M")
-
-    # ✅ Sanitize satellite name for filenames
     safe_sat = re.sub(r'[^A-Za-z0-9_-]', '_', sat)
 
-    wav = RECORDINGS_DIR / f"{start_str}_{safe_sat}.wav"
+    # Lookup frequency
+    freq_lookup_key = sat.split()[0].replace(" ", "-")
+    freq = SAT_FREQ.get(freq_lookup_key)
+    if not freq:
+        return log_and_print("warning", f"[{sat}] No frequency configured — skipping.")
+
+    # Auto‑naming: timestamp + satellite + frequency in MHz
+    freq_mhz = f"{freq/1e6:.3f}MHz"
+    base_name = f"{start_str}_{safe_sat}_{freq_mhz}"
+    wav = RECORDINGS_DIR / f"{base_name}.wav"
+    iqfile = RECORDINGS_DIR / f"{base_name}.iq"
+
     plog = logging.getLogger(start_str); plog.setLevel(logging.INFO)
-    plog.addHandler(RotatingFileHandler(RECORDINGS_DIR/f"{start_str}_{safe_sat}.log",
+    plog.addHandler(RotatingFileHandler(RECORDINGS_DIR/f"{base_name}.log",
                                         maxBytes=200_000, backupCount=1))
 
     if not sdr.sdr_exists():
         return log_and_print("warning", f"[{sat}] SDR not detected — skipping.", plog)
 
-    freq_lookup_key = sat.split()[0].replace(" ", "-")
-    freq = SAT_FREQ.get(freq_lookup_key)
-    if not freq:
-        return log_and_print("warning", f"[{sat}] No frequency configured — skipping.", plog)
+    # Disk space check (≥ 3 GB free)
+    statvfs = os.statvfs(str(RECORDINGS_DIR))
+    free_gb = (statvfs.f_frsize * statvfs.f_bavail) / (1024**3)
+    if free_gb < 3:
+        return log_and_print("warning", f"[{sat}] Not enough disk space ({free_gb:.2f} GB free) — skipping.", plog)
 
     dur = int((los - aos).total_seconds()) + STOP_LATE
-    log_and_print("info", f"[{sat}] ▶ Recording for {dur}s at {freq/1e6:.3f} MHz", plog)
+    log_and_print("info", f"[{sat}] ▶ IQ capture for {dur}s at {freq/1e6:.3f} MHz", plog)
 
-    error = None; fm = sox = None
+    error = None; size = 0.0
     try:
-        fm = subprocess.Popen(
-            ["rtl_fm", "-f", str(int(freq)), "-M", "fm", "-s", "48000", "-g", str(GAIN)],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
-        sox = subprocess.Popen(
-            ["sox", "-t", "raw", "-r", "48000", "-e", "signed", "-b", "16", "-c", "1", "-", str(wav)],
-            stdin=fm.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
-        time.sleep(dur)
+        # Capture IQ
+        subprocess.run([
+            "rtl_sdr", "-f", str(int(freq)), "-s", "2048000",
+            "-n", str(2048000 * dur), str(iqfile)
+        ], check=True)
+
+        # Convert IQ → WAV
+        subprocess.run([
+            "sox", "-t", "raw", "-r", "2048000", "-e", "unsigned", "-b", "8", "-c", "2",
+            str(iqfile), "-r", "48000", str(wav), "rate"
+        ], check=True)
+
+        # Remove IQ to save space
+        iqfile.unlink(missing_ok=True)
+
+        size = wav.stat().st_size / (1024*1024) if wav.exists() else 0.0
+
     except Exception as e:
         error = str(e)
-    finally:
-        for p in (sox, fm):
-            try:
-                if p: p.terminate()
-            except: pass
-        size = wav.stat().st_size/(1024*1024) if wav.exists() else 0.0
-        verdict = "PASS" if not error and size > 0 else "FAIL"
-        print(f"{GREEN if verdict=='PASS' else RED}[{sat}] PASS COMPLETE — {verdict} — {size:.2f} MB{RESET}")
-        write_metadata(start_str, sat, aos, los, freq, dur, size, verdict, error)
+
+    verdict = "PASS" if not error and size > 0 else "FAIL"
+    print(f"{GREEN if verdict=='PASS' else RED}[{sat}] PASS COMPLETE — {verdict} — {size:.2f} MB{RESET}")
+    write_metadata(start_str, sat, aos, los, freq, dur, size, verdict, error)
 
 def load_pass_predictions(path):
     if not Path(path).exists(): return []
@@ -152,3 +164,4 @@ if __name__ == "__main__":
             delta = nj - datetime.datetime.now()
             log_and_print("info", f"⏳ Next job in {int(delta.total_seconds())}s at {nj.strftime('%H:%M:%S')}")
         time.sleep(5)
+        
