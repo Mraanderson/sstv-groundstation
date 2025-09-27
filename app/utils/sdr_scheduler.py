@@ -32,24 +32,37 @@ def recordings_enabled():
     except:
         return False
 
-def write_metadata(start_str, sat, aos, los, freq_hz, dur, size, verdict, error):
-    meta = {"satellite": sat, "timestamp": aos.isoformat(), "aos": aos.isoformat(), "los": los.isoformat(),
-            "frequency": round(freq_hz/1e6,3), "mode":"FM","duration_s":dur,"file_mb":round(size,2),
-            "verdict":verdict,"sstv_detected":False,"callsigns":[],"error":error or None}
+def write_metadata(start_str, sat, aos, los, freq_hz, dur, size, verdict, error, base_name=None):
+    meta = {
+        "satellite": sat,
+        "timestamp": aos.isoformat(),
+        "aos": aos.isoformat(),
+        "los": los.isoformat(),
+        "frequency": round(freq_hz/1e6,3),
+        "mode": "FM",
+        "duration_s": dur,
+        "file_mb": round(size,2),
+        "verdict": verdict,
+        "sstv_detected": False,
+        "callsigns": [],
+        "error": error or None,
+    }
+    if base_name:
+        meta["files"] = {
+            "wav": f"{base_name}.wav",
+            "png": f"{base_name}.png",
+            "json": f"{base_name}.json"
+        }
     safe_sat = re.sub(r'[^A-Za-z0-9_-]', '_', sat)
     (RECORDINGS_DIR/f"{start_str}_{safe_sat}.json").write_text(json.dumps(meta, indent=2))
-
-def record_pass(sat, aos, los):
+    def record_pass(sat, aos, los):
     start_str = aos.strftime("%Y%m%d_%H%M")
     safe_sat = re.sub(r'[^A-Za-z0-9_-]', '_', sat)
 
-    # Lookup frequency
-    freq_lookup_key = sat.split()[0].replace(" ", "-")
-    freq = SAT_FREQ.get(freq_lookup_key)
+    freq = SAT_FREQ.get(sat.split()[0].replace(" ", "-"))
     if not freq:
         return log_and_print("warning", f"[{sat}] No frequency configured — skipping.")
 
-    # Auto‑naming: timestamp + satellite + frequency in MHz
     freq_mhz = f"{freq/1e6:.3f}MHz"
     base_name = f"{start_str}_{safe_sat}_{freq_mhz}"
     wav = RECORDINGS_DIR / f"{base_name}.wav"
@@ -73,21 +86,21 @@ def record_pass(sat, aos, los):
 
     error = None; size = 0.0
     try:
-        # Capture IQ
         subprocess.run([
             "rtl_sdr", "-f", str(int(freq)), "-s", "2048000",
             "-n", str(2048000 * dur), str(iqfile)
         ], check=True)
 
-        # Convert IQ → WAV
         subprocess.run([
             "sox", "-t", "raw", "-r", "2048000", "-e", "unsigned", "-b", "8", "-c", "2",
             str(iqfile), "-r", "48000", str(wav), "rate"
         ], check=True)
 
-        # Remove IQ to save space
-        iqfile.unlink(missing_ok=True)
+        subprocess.run([
+            "sox", str(wav), "-n", "spectrogram", "-o", str(RECORDINGS_DIR / f"{base_name}.png")
+        ], check=True)
 
+        iqfile.unlink(missing_ok=True)
         size = wav.stat().st_size / (1024*1024) if wav.exists() else 0.0
 
     except Exception as e:
@@ -95,7 +108,8 @@ def record_pass(sat, aos, los):
 
     verdict = "PASS" if not error and size > 0 else "FAIL"
     print(f"{GREEN if verdict=='PASS' else RED}[{sat}] PASS COMPLETE — {verdict} — {size:.2f} MB{RESET}")
-    write_metadata(start_str, sat, aos, los, freq, dur, size, verdict, error)
+    write_metadata(start_str, sat, aos, los, freq, dur, size, verdict, error, base_name)
+
 
 def load_pass_predictions(path):
     if not Path(path).exists(): return []
@@ -164,4 +178,3 @@ if __name__ == "__main__":
             delta = nj - datetime.datetime.now()
             log_and_print("info", f"⏳ Next job in {int(delta.total_seconds())}s at {nj.strftime('%H:%M:%S')}")
         time.sleep(5)
-        
