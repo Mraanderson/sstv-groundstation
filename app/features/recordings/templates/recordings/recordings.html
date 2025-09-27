@@ -36,18 +36,19 @@
               </td>
               <td>
   {% if r.wav_file %}
-    <a href="{{ url_for('recordings.recordings_file', filename=r.wav_file.name) }}" target="_blank">{{ r.wav_file.name }}</a>
+    <a href="{{ url_for('recordings.recordings_file', filename=r.wav_file.name) }}" target="_blank" title="{{ r.wav_file.name }}">🎵</a>
   {% endif %}
   {% if r.png_file %}
-    | <a href="{{ url_for('recordings.recordings_file', filename=r.png_file.name) }}" target="_blank">{{ r.png_file.name }}</a>
+    | <a href="{{ url_for('recordings.recordings_file', filename=r.png_file.name) }}" target="_blank" title="{{ r.png_file.name }}">🖼️</a>
   {% endif %}
   {% if r.log_file %}
-    | <a href="{{ url_for('recordings.recordings_file', filename=r.log_file.name) }}" target="_blank">{{ r.log_file.name }}</a>
+    | <a href="{{ url_for('recordings.recordings_file', filename=r.log_file.name) }}" target="_blank" title="{{ r.log_file.name }}">📄</a>
   {% endif %}
   {% if r.json_file %}
-    | <a href="{{ url_for('recordings.recordings_file', filename=r.json_file.name) }}" target="_blank">{{ r.json_file.name }}</a>
+    | <a href="{{ url_for('recordings.recordings_file', filename=r.json_file.name) }}" target="_blank" title="{{ r.json_file.name }}">🧾</a>
   {% endif %}
 </td>
+
 
             </tr>
           {% endfor %}
