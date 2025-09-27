@@ -11,7 +11,7 @@ import app.utils.passes as passes_utils
 from app import config_paths
 
 # ✅ Always resolve to the top-level recordings directory, regardless of CWD
-# __file__ = .../sstv-groundstation/app/routes/recordings.py
+# __file__ = .../sstv-groundstation/app/features/recordings/routes.py
 # parent.parent.parent.parent = project root (sstv-groundstation)
 RECORDINGS_DIR = (Path(__file__).resolve().parent.parent.parent.parent / "recordings").resolve()
 SETTINGS_FILE = Path("settings.json")
@@ -69,6 +69,7 @@ def recordings_list():
                 "base": base,
                 "meta": meta,
                 "wav_exists": (RECORDINGS_DIR / f"{base}.wav").exists(),
+                "png_exists": (RECORDINGS_DIR / f"{base}.png").exists(),
                 "log_exists": (RECORDINGS_DIR / f"{base}.log").exists()
             })
         except Exception:
