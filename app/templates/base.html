@@ -34,15 +34,17 @@
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('gallery.gallery') }}">Gallery</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('config.config_page') }}">Config</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('passes.passes_page') }}">Passes</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('recordings.recordings_list') }}">Recordings</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('settings.import_settings') }}">Import</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('settings.export_settings') }}">Export</a></li>
-                </ul>
-            </div>
+    <ul class="navbar-nav ms-auto">
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('gallery.gallery') }}">Gallery</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('config.config_page') }}">Config</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('passes.passes_page') }}">Passes</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('recordings.recordings_list') }}">Recordings</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('settings.import_settings') }}">Import</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('settings.export_settings') }}">Export</a></li>
+        <!-- 🔹 New Diagnostics link -->
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('diagnostics.diagnostics_page') }}">Diagnostics</a></li>
+    </ul>
+</div>
         </div>
     </nav>
 
