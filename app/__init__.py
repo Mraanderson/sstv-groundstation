@@ -71,15 +71,15 @@ def create_app():
     from app.features.config import bp as config_bp
     from app.features.passes import bp as passes_bp
     from app.features.settings import bp as settings_bp
-    from app.features.recordings import bp as recordings_bp   # ⬅️ NEW import
+    from app.features.recordings import bp as recordings_bp
+    from app.features.diagnostics import bp as diagnostics_bp   # ⬅️ NEW import
 
-
-    
     app.register_blueprint(gallery_bp, url_prefix="/gallery")
     app.register_blueprint(config_bp, url_prefix="/config")
     app.register_blueprint(passes_bp, url_prefix="/passes")
     app.register_blueprint(settings_bp, url_prefix="/settings")
-    app.register_blueprint(recordings_bp, url_prefix="/recordings")  # ⬅️ NEW registration
+    app.register_blueprint(recordings_bp, url_prefix="/recordings")
+    app.register_blueprint(diagnostics_bp, url_prefix="/diagnostics")  # ⬅️ NEW registration
 
     # Conditional home route
     @app.route("/")
