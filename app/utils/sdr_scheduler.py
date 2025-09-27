@@ -55,7 +55,8 @@ def write_metadata(start_str, sat, aos, los, freq_hz, dur, size, verdict, error,
         }
     safe_sat = re.sub(r'[^A-Za-z0-9_-]', '_', sat)
     (RECORDINGS_DIR/f"{start_str}_{safe_sat}.json").write_text(json.dumps(meta, indent=2))
-    def record_pass(sat, aos, los):
+
+def record_pass(sat, aos, los):
     start_str = aos.strftime("%Y%m%d_%H%M")
     safe_sat = re.sub(r'[^A-Za-z0-9_-]', '_', sat)
 
