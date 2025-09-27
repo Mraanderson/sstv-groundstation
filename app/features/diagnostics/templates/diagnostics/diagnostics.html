@@ -1,68 +1,36 @@
 {% extends "base.html" %}
-{% block title %}RTL-SDR V3 Diagnostics{% endblock %}
+{% block title %}Diagnostics{% endblock %}
 {% block content %}
-<h1 class="mb-4">RTL‑SDR V3 Setup & Configuration Check</h1>
+<h1>RTL‑SDR Diagnostics</h1>
 
-<p>This page helps confirm your RTL‑SDR dongle is correctly installed and ready to use.</p>
+<p>Click the button below to check if your RTL‑SDR dongle is present and streaming.</p>
 
-<div class="card mb-3">
-  <div class="card-body">
-    <h4>1. Hardware Detection</h4>
-    <pre><code>lsusb</code></pre>
-    <p>You should see something like: <code>Realtek Semiconductor Corp. RTL2838 DVB-T</code></p>
-  </div>
-</div>
+<button id="checkBtn" class="btn btn-primary">Run Check</button>
+<span id="statusBadge" class="badge bg-secondary ms-2">Not checked</span>
 
-<div class="card mb-3">
-  <div class="card-body">
-    <h4>2. Check for Conflicting Kernel Drivers</h4>
-    <pre><code>lsmod | grep rtl28</code></pre>
-    <p>If you see <code>dvb_usb_rtl28xxu</code>, unload it:</p>
-    <pre><code>sudo rmmod dvb_usb_rtl28xxu rtl2832</code></pre>
-    <p>Blacklist permanently:</p>
-    <pre><code>echo "blacklist dvb_usb_rtl28xxu" | sudo tee /etc/modprobe.d/blacklist-rtl.conf</code></pre>
-  </div>
-</div>
+<pre id="outputBox" class="mt-3"></pre>
 
-<div class="card mb-3">
-  <div class="card-body">
-    <h4>3. Confirm Driver & Library Install</h4>
-    <pre><code>rtl_test -t</code></pre>
-    <p>Expected output includes:</p>
-    <ul>
-      <li>Device detected (RTL2838 / R820T)</li>
-      <li><em>“PLL not locked / No E4000 tuner found”</em> — this is normal</li>
-      <li><strong>“Reading samples in async mode…”</strong> with a counter ticking up</li>
-    </ul>
-  </div>
-</div>
-
-<div class="card mb-3">
-  <div class="card-body">
-    <h4>4. Sanity‑Check Sample Capture</h4>
-    <pre><code>rtl_sdr -s 2048000 -f 137912500 test.iq</code></pre>
-    <p>After 5–10 seconds, <code>test.iq</code> should be several MB in size.</p>
-  </div>
-</div>
-
-<div class="card mb-3">
-  <div class="card-body">
-    <h4>5. Audio Test</h4>
-    <pre><code>rtl_fm -f 145800000 -M wbfm -s 192000 -g 29.7 - | \
-sox -t raw -r 192000 -e signed -b 16 -c 1 -L - test.wav rate 48000</code></pre>
-    <p>After ~10 seconds, <code>test.wav</code> should be >1 MB and playable.</p>
-  </div>
-</div>
-
-<div class="card mb-3">
-  <div class="card-body">
-    <h4>6. Troubleshooting</h4>
-    <ul>
-      <li><strong>0‑byte files</strong>: check DVB driver blacklisting.</li>
-      <li><strong>Device not found</strong>: check <code>lsusb</code> and permissions.</li>
-      <li><strong>Still failing</strong>: try another USB port, powered hub, or another machine.</li>
-    </ul>
-  </div>
-</div>
-
+<script>
+document.getElementById("checkBtn").addEventListener("click", () => {
+  fetch("{{ url_for('diagnostics.diagnostics_check') }}")
+    .then(r => r.json())
+    .then(data => {
+      const badge = document.getElementById("statusBadge");
+      const output = document.getElementById("outputBox");
+      if (data.success) {
+        badge.textContent = "Dongle Present";
+        badge.className = "badge bg-success ms-2";
+      } else {
+        badge.textContent = "Not Detected";
+        badge.className = "badge bg-danger ms-2";
+      }
+      output.textContent = data.output;
+    })
+    .catch(err => {
+      document.getElementById("statusBadge").textContent = "Error";
+      document.getElementById("statusBadge").className = "badge bg-warning ms-2";
+      document.getElementById("outputBox").textContent = err;
+    });
+});
+</script>
 {% endblock %}
