@@ -22,15 +22,16 @@ def save_user_config(data):
     with open(CONFIG_FILE, "w") as f:
         json.dump(data, f, indent=2)
 
-def datetimeformat(value, format="%Y-%m-%d %H:%M:%S"):
-    """Format timestamps for templates."""
-    if isinstance(value, (int, float)):
-        return datetime.fromtimestamp(value).strftime(format)
-    if isinstance(value, datetime):
-        return value.strftime(format)
+def datetimeformat(value, format="%Y-%m-%d %H:%M", tz=None):
+    """Format timestamps with optional timezone conversion."""
+    from dateutil import parser
+    import pytz
+
     try:
-        from dateutil import parser
-        return parser.parse(str(value)).strftime(format)
+        dt = parser.parse(str(value))
+        if tz:
+            dt = dt.astimezone(pytz.timezone(tz))
+        return dt.strftime(format)
     except Exception:
         return str(value)
 
@@ -53,8 +54,8 @@ def create_app():
     os.makedirs(tle_dir, exist_ok=True)
     app.config["TLE_DIR"] = tle_dir
 
-    # Register Jinja filter
-    app.jinja_env.filters["datetimeformat"] = datetimeformat
+    # Register Jinja filter with timezone support
+    app.jinja_env.filters["datetimeformat"] = lambda value, format="%Y-%m-%d %H:%M": datetimeformat(value, format, app.config.get("TIMEZONE"))
 
     # Attach save function
     app.save_user_config = lambda: save_user_config({
