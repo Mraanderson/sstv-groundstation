@@ -2,10 +2,9 @@ import os
 import json
 from datetime import datetime
 from flask import Flask, redirect, url_for, current_app
-from app.config_paths import CONFIG_FILE  # shared config file path
+from app.config_paths import CONFIG_FILE
 
 def load_user_config():
-    """Load user config from JSON file or return defaults."""
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, "r") as f:
             return json.load(f)
@@ -18,12 +17,10 @@ def load_user_config():
     }
 
 def save_user_config(data):
-    """Save user config to JSON file."""
     with open(CONFIG_FILE, "w") as f:
         json.dump(data, f, indent=2)
 
 def datetimeformat(value, format="%Y-%m-%d %H:%M", tz=None):
-    """Format timestamps with optional timezone conversion."""
     from dateutil import parser
     import pytz
 
@@ -49,13 +46,16 @@ def create_app():
         THEME=user_cfg.get("theme", "auto")
     )
 
-    # 🔹 Ensure TLE directory exists and is configured
+    # Ensure TLE directory exists
     tle_dir = os.path.join(app.root_path, "static", "tle")
     os.makedirs(tle_dir, exist_ok=True)
     app.config["TLE_DIR"] = tle_dir
 
-    # Register Jinja filter with timezone support
-    app.jinja_env.filters["datetimeformat"] = lambda value, format="%Y-%m-%d %H:%M": datetimeformat(value, format, app.config.get("TIMEZONE"))
+    # Register Jinja filter with timezone fallback
+    def datetimeformat_with_config(value, format="%Y-%m-%d %H:%M"):
+        tz = app.config.get("TIMEZONE")
+        return datetimeformat(value, format, tz)
+    app.jinja_env.filters["datetimeformat"] = datetimeformat_with_config
 
     # Attach save function
     app.save_user_config = lambda: save_user_config({
@@ -66,7 +66,7 @@ def create_app():
         "theme": app.config["THEME"]
     })
 
-    # 🔹 Inject theme into all templates so base.html can use {{ theme }}
+    # Inject theme into templates
     @app.context_processor
     def inject_theme():
         return dict(theme=current_app.config.get("THEME", "auto"))
@@ -86,7 +86,7 @@ def create_app():
     app.register_blueprint(recordings_bp, url_prefix="/recordings")
     app.register_blueprint(diagnostics_bp, url_prefix="/diagnostics")
 
-    # Conditional home route
+    # Home route
     @app.route("/")
     def home():
         if not app.config.get("LATITUDE") \
