@@ -28,7 +28,11 @@ def datetimeformat(value, format="%Y-%m-%d %H:%M:%S"):
         return datetime.fromtimestamp(value).strftime(format)
     if isinstance(value, datetime):
         return value.strftime(format)
-    return str(value)
+    try:
+        from dateutil import parser
+        return parser.parse(str(value)).strftime(format)
+    except Exception:
+        return str(value)
 
 def create_app():
     app = Flask(__name__)
@@ -72,14 +76,14 @@ def create_app():
     from app.features.passes import bp as passes_bp
     from app.features.settings import bp as settings_bp
     from app.features.recordings import bp as recordings_bp
-    from app.features.diagnostics import bp as diagnostics_bp   # ⬅️ NEW import
+    from app.features.diagnostics import bp as diagnostics_bp
 
     app.register_blueprint(gallery_bp, url_prefix="/gallery")
     app.register_blueprint(config_bp, url_prefix="/config")
     app.register_blueprint(passes_bp, url_prefix="/passes")
     app.register_blueprint(settings_bp, url_prefix="/settings")
     app.register_blueprint(recordings_bp, url_prefix="/recordings")
-    app.register_blueprint(diagnostics_bp, url_prefix="/diagnostics")  # ⬅️ NEW registration
+    app.register_blueprint(diagnostics_bp, url_prefix="/diagnostics")
 
     # Conditional home route
     @app.route("/")
