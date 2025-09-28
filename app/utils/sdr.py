@@ -29,9 +29,18 @@ def rtl_sdr_present() -> bool:
         return False
 
 
+def sdr_exists() -> bool:
+    """
+    Alias for rtl_sdr_present() to maintain compatibility with
+    existing code that calls sdr_exists().
+    """
+    return rtl_sdr_present()
+
+
 if __name__ == "__main__":
     # Simple CLI test
     if rtl_sdr_present():
         print("✅ RTL-SDR detected and ready.")
     else:
         print("❌ No RTL-SDR detected.")
+        

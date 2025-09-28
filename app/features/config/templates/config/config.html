@@ -55,46 +55,61 @@
     document.getElementById('lat').value = lat;
     document.getElementById('lon').value = lon;
 
-    // Fetch altitude from Open-Elevation
+    // Fetch altitude via Flask proxy
     try {
-      const altRes = await fetch(`https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lon}`);
+      const altRes = await fetch(`/config/altitude?lat=${lat}&lon=${lon}`);
       const altData = await altRes.json();
-      document.getElementById('alt').value = altData.results[0].elevation;
-    } catch {
+      const elevation = altData.elevation;
+
+      if (typeof elevation === 'number') {
+        document.getElementById('alt').value = elevation;
+      } else {
+        document.getElementById('alt').value = '';
+        alert('⚠️ Altitude could not be determined. Try again or check your connection.');
+      }
+    } catch (err) {
       document.getElementById('alt').value = '';
+      alert('❌ Altitude fetch failed. Please check your network or try a different browser.');
     }
 
-    document.getElementById('tz').value = '';
+    // Fetch timezone via Flask proxy
+    try {
+      const tzRes = await fetch(`/config/timezone?lat=${lat}&lon=${lon}`);
+      const tzData = await tzRes.json();
+      document.getElementById('tz').value = tzData.timezone || '';
+    } catch {
+      document.getElementById('tz').value = '';
+    }
   });
 
-  // AJAX save handler
-  document.getElementById('location-form').addEventListener('submit', function(e) {
+  document.getElementById('location-form').addEventListener('submit', async function(e) {
     e.preventDefault();
 
-    fetch(this.action, {
+    const alt = document.getElementById('alt').value;
+    const tz = document.getElementById('tz').value;
+
+    if (!alt || !tz) {
+      alert('⏳ Please wait for altitude and timezone to load before saving.');
+      return;
+    }
+
+    const res = await fetch(this.action, {
       method: 'POST',
       headers: { 'Accept': 'application/json' },
       body: new FormData(this)
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data.error) {
-        alert('❌ ' + data.error);
-        return;
-      }
-
-      // Show confirmation
-      const confirmBox = document.createElement('div');
-      confirmBox.className = 'alert alert-success mt-3';
-      confirmBox.textContent = `✅ Config saved successfully at ${data.saved_time}`;
-      this.parentNode.insertBefore(confirmBox, this);
-
-      // Remove after 3 seconds
-      setTimeout(() => confirmBox.remove(), 3000);
-    })
-    .catch(err => {
-      alert('❌ Error saving config: ' + err);
     });
+
+    const data = await res.json();
+    if (data.error) {
+      alert('❌ ' + data.error);
+      return;
+    }
+
+    const confirmBox = document.createElement('div');
+    confirmBox.className = 'alert alert-success mt-3';
+    confirmBox.textContent = `✅ Config saved successfully at ${data.saved_time}`;
+    this.parentNode.insertBefore(confirmBox, this);
+    setTimeout(() => confirmBox.remove(), 3000);
   });
 </script>
 {% endblock %}

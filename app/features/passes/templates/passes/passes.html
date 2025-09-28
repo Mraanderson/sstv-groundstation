@@ -7,16 +7,24 @@
   <div class="card-body">
     {% if tle_info %}
       <p><strong>TLE File:</strong> {{ tle_info.filename }}</p>
-      <p><strong>Last Updated:</strong> {{ tle_info.last_updated }}
-        <span class="text-muted">({{ tle_info.age_days|round(1) }} days old)</span>
+      <p>
+        <strong>Last Updated:</strong> {{ tle_info.last_updated }}
+        {% if tle_info.age_days is not none %}
+          <span class="text-muted">({{ tle_info.age_days|round(1) }} days old)</span>
+        {% endif %}
       </p>
       <p><strong>Satellites in TLE:</strong> {{ satellites|length }}</p>
     {% else %}
       <p class="text-warning">No TLE data found.</p>
     {% endif %}
-    <button id="update-tle-btn" class="btn btn-primary">
+
+    <button id="update-tle-btn" class="btn btn-primary me-3">
       <span id="update-icon" class="me-2">🔄</span> Update TLE
     </button>
+
+    <!-- Single toggle button for recordings -->
+    <button id="toggleBtn" class="btn btn-secondary">Loading...</button>
+    <span id="statusText" class="ms-3 fw-bold"></span>
   </div>
 </div>
 
@@ -28,7 +36,7 @@
 
 {% if not location_set %}
   <div class="alert alert-info">
-    Please set your location in the Config page to enable pass predictions.
+    Please set your location on the Config page to enable pass predictions.
   </div>
 {% endif %}
 
@@ -55,9 +63,9 @@
             <tr>
               <td>{{ p.satellite }}</td>
               <td>{{ p.max_elevation }}</td>
-              <td>{{ p.start.strftime("%Y-%m-%d %H:%M:%S") }}</td>
-              <td>{{ p.peak.strftime("%Y-%m-%d %H:%M:%S") }}</td>
-              <td>{{ p.end.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+              <td data-utc="{{ p.start.isoformat() }}"></td>
+              <td data-utc="{{ p.peak.isoformat() }}"></td>
+              <td data-utc="{{ p.end.isoformat() }}"></td>
             </tr>
           {% endfor %}
         </tbody>
@@ -69,6 +77,7 @@
 {% endif %}
 
 <script>
+  // Update TLE button logic
   document.getElementById('update-tle-btn').addEventListener('click', function () {
     const btn = this;
     const icon = document.getElementById('update-icon');
@@ -79,14 +88,66 @@
       .then(res => res.json())
       .then(data => {
         icon.textContent = '✅';
-        setTimeout(() => {
-          location.reload();
-        }, 1000);
+        setTimeout(() => { location.reload(); }, 800);
       })
       .catch(err => {
         icon.textContent = '⚠️';
         btn.disabled = false;
       });
+  });
+
+  // Single toggle button logic (uses /recordings/status, /recordings/enable, /recordings/disable)
+  const toggleBtn = document.getElementById('toggleBtn');
+  const statusText = document.getElementById('statusText');
+
+  async function updateStatus() {
+    try {
+      const res = await fetch('/recordings/status');
+      if (!res.ok) throw new Error('status not ok');
+      const data = await res.json();
+      const enabled = data.recording_enabled;
+
+      statusText.textContent = enabled
+        ? `✅ Enabled${data.scheduler_pid ? ` (PID: ${data.scheduler_pid})` : ''}`
+        : '❌ Disabled';
+
+      if (enabled) {
+        toggleBtn.textContent = 'Disable Recordings';
+        toggleBtn.className = 'btn btn-danger';
+        toggleBtn.onclick = async () => {
+          await fetch('/recordings/disable', { method: 'POST' });
+          updateStatus();
+        };
+      } else {
+        toggleBtn.textContent = 'Enable Recordings';
+        toggleBtn.className = 'btn btn-success';
+        toggleBtn.onclick = async () => {
+          await fetch('/recordings/enable', { method: 'POST' });
+          updateStatus();
+        };
+      }
+    } catch (err) {
+      statusText.textContent = '⚠️ Error fetching status';
+      toggleBtn.textContent = 'Retry';
+      toggleBtn.className = 'btn btn-secondary';
+      toggleBtn.onclick = updateStatus;
+    }
+  }
+
+  // Poll status every 5 seconds
+  setInterval(updateStatus, 5000);
+  updateStatus();
+
+  // Convert UTC datetimes in table to local time
+  function formatLocal(iso) {
+    const d = new Date(iso);
+    return d.toLocaleString(undefined, {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
+  }
+  document.querySelectorAll('[data-utc]').forEach(el => {
+    el.textContent = formatLocal(el.dataset.utc);
   });
 </script>
 {% endblock %}

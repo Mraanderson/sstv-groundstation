@@ -2,10 +2,9 @@ import os
 import json
 from datetime import datetime
 from flask import Flask, redirect, url_for, current_app
-from app.config_paths import CONFIG_FILE  # shared config file path
+from app.config_paths import CONFIG_FILE
 
 def load_user_config():
-    """Load user config from JSON file or return defaults."""
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, "r") as f:
             return json.load(f)
@@ -18,17 +17,20 @@ def load_user_config():
     }
 
 def save_user_config(data):
-    """Save user config to JSON file."""
     with open(CONFIG_FILE, "w") as f:
         json.dump(data, f, indent=2)
 
-def datetimeformat(value, format="%Y-%m-%d %H:%M:%S"):
-    """Format timestamps for templates."""
-    if isinstance(value, (int, float)):
-        return datetime.fromtimestamp(value).strftime(format)
-    if isinstance(value, datetime):
-        return value.strftime(format)
-    return str(value)
+def datetimeformat(value, format="%Y-%m-%d %H:%M", tz=None):
+    from dateutil import parser
+    import pytz
+
+    try:
+        dt = parser.parse(str(value))
+        if tz:
+            dt = dt.astimezone(pytz.timezone(tz))
+        return dt.strftime(format)
+    except Exception:
+        return str(value)
 
 def create_app():
     app = Flask(__name__)
@@ -44,13 +46,16 @@ def create_app():
         THEME=user_cfg.get("theme", "auto")
     )
 
-    # 🔹 Ensure TLE directory exists and is configured
+    # Ensure TLE directory exists
     tle_dir = os.path.join(app.root_path, "static", "tle")
     os.makedirs(tle_dir, exist_ok=True)
     app.config["TLE_DIR"] = tle_dir
 
-    # Register Jinja filter
-    app.jinja_env.filters["datetimeformat"] = datetimeformat
+    # Register Jinja filter with timezone fallback
+    def datetimeformat_with_config(value, format="%Y-%m-%d %H:%M"):
+        tz = app.config.get("TIMEZONE")
+        return datetimeformat(value, format, tz)
+    app.jinja_env.filters["datetimeformat"] = datetimeformat_with_config
 
     # Attach save function
     app.save_user_config = lambda: save_user_config({
@@ -61,7 +66,7 @@ def create_app():
         "theme": app.config["THEME"]
     })
 
-    # 🔹 Inject theme into all templates so base.html can use {{ theme }}
+    # Inject theme into templates
     @app.context_processor
     def inject_theme():
         return dict(theme=current_app.config.get("THEME", "auto"))
@@ -71,13 +76,17 @@ def create_app():
     from app.features.config import bp as config_bp
     from app.features.passes import bp as passes_bp
     from app.features.settings import bp as settings_bp
+    from app.features.recordings import bp as recordings_bp
+    from app.features.diagnostics import bp as diagnostics_bp
 
     app.register_blueprint(gallery_bp, url_prefix="/gallery")
     app.register_blueprint(config_bp, url_prefix="/config")
     app.register_blueprint(passes_bp, url_prefix="/passes")
     app.register_blueprint(settings_bp, url_prefix="/settings")
+    app.register_blueprint(recordings_bp, url_prefix="/recordings")
+    app.register_blueprint(diagnostics_bp, url_prefix="/diagnostics")
 
-    # Conditional home route
+    # Home route
     @app.route("/")
     def home():
         if not app.config.get("LATITUDE") \
