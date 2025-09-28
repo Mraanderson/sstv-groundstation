@@ -87,6 +87,28 @@ def recordings_list():
         rec_dir=RECORDINGS_DIR
     )
 
+@bp.route("/delete", methods=["POST"])
+def delete_recording():
+    """Delete all files associated with a single recording."""
+    base = request.form.get("base")
+    if base:
+        for ext in [".wav", ".png", ".log", ".json"]:
+            f = RECORDINGS_DIR / f"{base}{ext}"
+            if f.exists():
+                f.unlink()
+    return recordings_list()
+
+@bp.route("/bulk-delete", methods=["POST"])
+def bulk_delete():
+    """Delete multiple recordings selected via checkboxes."""
+    bases = request.form.getlist("bases")
+    for base in bases:
+        for ext in [".wav", ".png", ".log", ".json"]:
+            f = RECORDINGS_DIR / f"{base}{ext}"
+            if f.exists():
+                f.unlink()
+    return recordings_list()
+
 @bp.route("/files/<path:filename>")
 def recordings_file(filename):
     """Serve individual recording files safely."""
