@@ -92,9 +92,8 @@ def delete_recording():
     """Delete all files associated with a single recording."""
     base = request.form.get("base")
     if base:
-        for ext in [".wav", ".png", ".log", ".json"]:
-            f = RECORDINGS_DIR / f"{base}{ext}"
-            if f.exists():
+        for f in RECORDINGS_DIR.glob(f"{base}*"):
+            if f.is_file():
                 f.unlink()
     return recordings_list()
 
@@ -103,9 +102,8 @@ def bulk_delete():
     """Delete multiple recordings selected via checkboxes."""
     bases = request.form.getlist("bases")
     for base in bases:
-        for ext in [".wav", ".png", ".log", ".json"]:
-            f = RECORDINGS_DIR / f"{base}{ext}"
-            if f.exists():
+        for f in RECORDINGS_DIR.glob(f"{base}*"):
+            if f.is_file():
                 f.unlink()
     return recordings_list()
 
