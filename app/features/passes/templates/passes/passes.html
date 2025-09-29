@@ -65,11 +65,11 @@
           <tbody>
             {% set current_day = None %}
             {% for p in passes %}
-              {% if current_day != p.start.date() %}
+              {% if current_day != p.start.strftime("%Y-%m-%d") %}
                 <tr class="table-secondary">
                   <td colspan="6">{{ p.start | datetimeformat("%A %d %B") }}</td>
                 </tr>
-                {% set current_day = p.start.date() %}
+                {% set current_day = p.start.strftime("%Y-%m-%d") %}
               {% endif %}
               <tr>
                 <td>{{ p.satellite }}</td>
@@ -96,9 +96,9 @@
       <div class="d-md-none">
         {% set current_day = None %}
         {% for p in passes %}
-          {% if current_day != p.start.date() %}
+          {% if current_day != p.start.strftime("%Y-%m-%d") %}
             <h6 class="mt-3 text-muted">{{ p.start | datetimeformat("%A %d %B") }}</h6>
-            {% set current_day = p.start.date() %}
+            {% set current_day = p.start.strftime("%Y-%m-%d") %}
           {% endif %}
           <div class="card mb-2 shadow-sm">
             <div class="card-body">
