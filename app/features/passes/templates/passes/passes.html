@@ -94,7 +94,12 @@
 
       <!-- Mobile cards -->
       <div class="d-md-none">
+        {% set current_day = None %}
         {% for p in passes %}
+          {% if current_day != p.start.date() %}
+            <h6 class="mt-3 text-muted">{{ p.start | datetimeformat("%A %d %B") }}</h6>
+            {% set current_day = p.start.date() %}
+          {% endif %}
           <div class="card mb-2 shadow-sm">
             <div class="card-body">
               <h5 class="card-title">
