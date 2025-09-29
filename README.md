@@ -118,3 +118,7 @@ This project has been a true collaboration between:
 - **Microsoft Copilot** — Acting as a patient, persistent co‑pilot throughout the build, explaining concepts, writing code, troubleshooting issues, and structuring the project so it’s maintainable and expandable.  
 
 From the very first commit to the latest feature, this has been a journey of turning ideas into a working, modular application — proving that with the right guidance, you don’t need to start as a coder to build something powerful.
+
+---
+
+<img width="1915" height="857" alt="image" src="https://github.com/user-attachments/assets/7055340c-1476-4fd4-b925-dcbe472d4514" />
