@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Satellite Passes{% endblock %}
+{% block title %}Satellite Pass Predictions{% endblock %}
 {% block content %}
-<h1 class="mb-4">Satellite Pass Predictions</h1>
+<h1 class="mb-4">🛰️ Satellite Pass Predictions</h1>
 
 <div class="card shadow-sm mb-4">
   <div class="card-body">
@@ -48,28 +48,74 @@
   <div class="card shadow-sm">
     <div class="card-body">
       <h5>Next 24 Hours of Passes</h5>
-      <table class="table table-striped">
-        <thead>
-          <tr>
-            <th>Satellite</th>
-            <th>Max Elev (°)</th>
-            <th>Start</th>
-            <th>Peak</th>
-            <th>End</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for p in passes %}
+
+      <!-- Desktop table -->
+      <div class="table-responsive d-none d-md-block">
+        <table class="table table-striped align-middle">
+          <thead class="table-dark">
             <tr>
-              <td>{{ p.satellite }}</td>
-              <td>{{ p.max_elevation }}</td>
-              <td data-utc="{{ p.start.isoformat() }}"></td>
-              <td data-utc="{{ p.peak.isoformat() }}"></td>
-              <td data-utc="{{ p.end.isoformat() }}"></td>
+              <th>🛰️ Satellite</th>
+              <th>⏫ Max Elev</th>
+              <th>▶ Start</th>
+              <th>🔝 Peak</th>
+              <th>⏹ End</th>
+              <th>⏳ Duration</th>
             </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {% set ns = namespace(current_day=None) %}
+            {% for p in passes %}
+              {% if ns.current_day != p.start.strftime("%Y-%m-%d") %}
+                <tr class="table-secondary">
+                  <td colspan="6">{{ p.start | datetimeformat("%A %d %B") }}</td>
+                </tr>
+                {% set ns.current_day = p.start.strftime("%Y-%m-%d") %}
+              {% endif %}
+              <tr>
+                <td>{{ p.satellite }}</td>
+                <td class="{% if p.max_elevation > 50 %}text-success fw-bold{% elif p.max_elevation > 20 %}text-warning{% else %}text-muted{% endif %}">
+                  {{ "%.1f"|format(p.max_elevation) }}°
+                </td>
+                <td title="{{ p.start | datetimeformat('%Y-%m-%d %H:%M:%S') }}">
+                  {{ p.start | datetimeformat('%H:%M') }}
+                </td>
+                <td title="{{ p.peak | datetimeformat('%Y-%m-%d %H:%M:%S') }}">
+                  {{ p.peak | datetimeformat('%H:%M') }}
+                </td>
+                <td title="{{ p.end | datetimeformat('%Y-%m-%d %H:%M:%S') }}">
+                  {{ p.end | datetimeformat('%H:%M') }}
+                </td>
+                <td>{{ ((p.end - p.start).seconds // 60) }} min</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Mobile cards -->
+      <div class="d-md-none">
+        {% set ns = namespace(current_day=None) %}
+        {% for p in passes %}
+          {% if ns.current_day != p.start.strftime("%Y-%m-%d") %}
+            <h6 class="mt-3 text-muted">{{ p.start | datetimeformat("%A %d %B") }}</h6>
+            {% set ns.current_day = p.start.strftime("%Y-%m-%d") %}
+          {% endif %}
+          <div class="card mb-2 shadow-sm">
+            <div class="card-body">
+              <h5 class="card-title">
+                {{ p.satellite }} —
+                <span class="{% if p.max_elevation > 50 %}text-success{% elif p.max_elevation > 20 %}text-warning{% else %}text-muted{% endif %}">
+                  ⏫ {{ "%.1f"|format(p.max_elevation) }}°
+                </span>
+              </h5>
+              <p class="card-text mb-1">▶ Start: {{ p.start | datetimeformat('%H:%M') }}</p>
+              <p class="card-text mb-1">🔝 Peak: {{ p.peak | datetimeformat('%H:%M') }}</p>
+              <p class="card-text mb-1">⏹ End: {{ p.end | datetimeformat('%H:%M') }}</p>
+              <p class="card-text">⏳ Duration: {{ ((p.end - p.start).seconds // 60) }} min</p>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
     </div>
   </div>
 {% elif tle_info and not error %}
@@ -96,7 +142,7 @@
       });
   });
 
-  // Single toggle button logic (uses /recordings/status, /recordings/enable, /recordings/disable)
+  // Recording toggle button logic
   const toggleBtn = document.getElementById('toggleBtn');
   const statusText = document.getElementById('statusText');
 
@@ -137,17 +183,5 @@
   // Poll status every 5 seconds
   setInterval(updateStatus, 5000);
   updateStatus();
-
-  // Convert UTC datetimes in table to local time
-  function formatLocal(iso) {
-    const d = new Date(iso);
-    return d.toLocaleString(undefined, {
-      year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit', second: '2-digit'
-    });
-  }
-  document.querySelectorAll('[data-utc]').forEach(el => {
-    el.textContent = formatLocal(el.dataset.utc);
-  });
 </script>
 {% endblock %}
