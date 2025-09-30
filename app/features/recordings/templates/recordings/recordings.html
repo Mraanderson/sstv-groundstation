@@ -10,7 +10,7 @@
   <form method="post" action="{{ url_for('recordings.bulk_delete') }}">
     <button type="submit" class="btn btn-danger btn-sm mb-3">🗑️ Delete Selected</button>
 
-    <!-- Desktop table -->
+    <!-- Desktop table (transparent to respect system theme) -->
     <div class="card shadow-sm bg-transparent d-none d-md-block">
       <div class="card-body table-responsive">
         <table class="table table-striped align-middle">
@@ -38,18 +38,10 @@
                 <td>{{ r.meta.duration_s or "?" }} s</td>
                 <td>{{ r.meta.file_mb or "?" }} MB</td>
                 <td>
-                  {% if r.wav_file %}
-                    <a href="{{ url_for('recordings.recordings_file', filename=r.wav_file.name) }}" target="_blank" title="{{ r.wav_file.name }}">🎵</a>
-                  {% endif %}
-                  {% if r.png_file %}
-                    | <a href="{{ url_for('recordings.recordings_file', filename=r.png_file.name) }}" target="_blank" title="{{ r.png_file.name }}">🖼️</a>
-                  {% endif %}
-                  {% if r.log_file %}
-                    | <a href="{{ url_for('recordings.recordings_file', filename=r.log_file.name) }}" target="_blank" title="{{ r.log_file.name }}">📄</a>
-                  {% endif %}
-                  {% if r.json_file %}
-                    | <a href="{{ url_for('recordings.recordings_file', filename=r.json_file.name) }}" target="_blank" title="{{ r.json_file.name }}">🧾</a>
-                  {% endif %}
+                  {% if r.wav_file %}<a href="{{ url_for('recordings.recordings_file', filename=r.wav_file.name) }}" target="_blank">🎵</a>{% endif %}
+                  {% if r.png_file %} | <a href="{{ url_for('recordings.recordings_file', filename=r.png_file.name) }}" target="_blank">🖼️</a>{% endif %}
+                  {% if r.log_file %} | <a href="{{ url_for('recordings.recordings_file', filename=r.log_file.name) }}" target="_blank">📄</a>{% endif %}
+                  {% if r.json_file %} | <a href="{{ url_for('recordings.recordings_file', filename=r.json_file.name) }}" target="_blank">🧾</a>{% endif %}
                 </td>
               </tr>
             {% endfor %}
@@ -58,7 +50,7 @@
       </div>
     </div>
 
-    <!-- Mobile cards -->
+    <!-- Mobile app-like cards (Media style only) -->
     <div class="d-md-none">
       {% set ns = namespace(current_sat=None) %}
       {% for r in recordings %}
@@ -67,33 +59,26 @@
           {% set ns.current_sat = r.meta.satellite or "?" %}
         {% endif %}
         <div class="card mb-2 shadow-sm bg-transparent">
-          <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <input type="checkbox" name="bases" value="{{ r.base }}">
-              <span class="small text-muted">
-                {{ r.meta.aos | datetimeformat("%H:%M") }}–{{ r.meta.los | datetimeformat("%H:%M") }}
-              </span>
+          <div class="card-body d-flex">
+            <div class="me-3 fs-3">🎙️</div>
+            <div class="flex-grow-1">
+              <div class="d-flex justify-content-between align-items-center">
+                <strong>{{ r.meta.aos | datetimeformat("%H:%M") }}–{{ r.meta.los | datetimeformat("%H:%M") }}</strong>
+                <input type="checkbox" name="bases" value="{{ r.base }}">
+              </div>
+              <small class="text-muted d-block mt-1">⏳ {{ r.meta.duration_s or "?" }} s · 💾 {{ r.meta.file_mb or "?" }} MB</small>
+              <div class="mt-2 d-flex gap-2">
+                {% if r.wav_file %}<a href="{{ url_for('recordings.recordings_file', filename=r.wav_file.name) }}" target="_blank" title="{{ r.wav_file.name }}">🎵</a>{% endif %}
+                {% if r.png_file %}<a href="{{ url_for('recordings.recordings_file', filename=r.png_file.name) }}" target="_blank" title="{{ r.png_file.name }}">🖼️</a>{% endif %}
+                {% if r.log_file %}<a href="{{ url_for('recordings.recordings_file', filename=r.log_file.name) }}" target="_blank" title="{{ r.log_file.name }}">📄</a>{% endif %}
+                {% if r.json_file %}<a href="{{ url_for('recordings.recordings_file', filename=r.json_file.name) }}" target="_blank" title="{{ r.json_file.name }}">🧾</a>{% endif %}
+              </div>
             </div>
-            <p class="card-text mb-1">⏳ {{ r.meta.duration_s or "?" }} s</p>
-            <p class="card-text mb-1">💾 {{ r.meta.file_mb or "?" }} MB</p>
-            <p class="card-text">
-              {% if r.wav_file %}
-                <a href="{{ url_for('recordings.recordings_file', filename=r.wav_file.name) }}" target="_blank" title="{{ r.wav_file.name }}">🎵</a>
-              {% endif %}
-              {% if r.png_file %}
-                | <a href="{{ url_for('recordings.recordings_file', filename=r.png_file.name) }}" target="_blank" title="{{ r.png_file.name }}">🖼️</a>
-              {% endif %}
-              {% if r.log_file %}
-                | <a href="{{ url_for('recordings.recordings_file', filename=r.log_file.name) }}" target="_blank" title="{{ r.log_file.name }}">📄</a>
-              {% endif %}
-              {% if r.json_file %}
-                | <a href="{{ url_for('recordings.recordings_file', filename=r.json_file.name) }}" target="_blank" title="{{ r.json_file.name }}">🧾</a>
-              {% endif %}
-            </p>
           </div>
         </div>
       {% endfor %}
     </div>
+
   </form>
 {% else %}
   <p>No recordings found yet. Once the scheduler runs during a pass, they’ll appear here.</p>
