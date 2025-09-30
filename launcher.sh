@@ -1,5 +1,5 @@
 #!/bin/bash
-# SSTV Groundstation Launcher (dual-mode: simple vs admin)
+# SSTV Groundstation Launcher (simplified: no Start+TLE)
 
 set -euo pipefail
 APP_DIR="$HOME/sstv-groundstation"
@@ -10,7 +10,6 @@ GREEN="\033[92m"; RED="\033[91m"; RESET="\033[0m"
 
 msg(){ echo -e "$1$2${RESET}"; }
 have_repo(){ [ -d "$APP_DIR/.git" ]; }
-json_get(){ grep -o "\"$1\"[[:space:]]*:[[:space:]]*[^,}]*" "$2"|sed 's/.*: *//;s/[\",]//g'; }
 
 status_line(){
   if ! have_repo; then
@@ -98,23 +97,12 @@ ensure_venv(){
   [ -f requirements.txt ] && pip install -q --upgrade pip -r requirements.txt
 }
 
-# --- Run modes ---
+# --- Run mode ---
 run_local(){
   have_repo || { msg "$RED" "No install"; return; }
   ensure_venv
   status_line
   FLASK_APP=run.py FLASK_ENV=$ENV flask run --host=0.0.0.0 --port=$PORT
-}
-start_with_tle(){
-  have_repo || { msg "$RED" "No install"; return; }
-  ensure_venv
-  f="$APP_DIR/settings.json"
-  [ -f "$f" ] || { msg "$RED" "settings.json missing"; return; }
-  LAT=$(json_get latitude "$f"); LON=$(json_get longitude "$f")
-  [ -z "$LAT" -o -z "$LON" ] && { msg "$RED" "Location not set"; return; }
-  source "$APP_DIR/venv/bin/activate"
-  python3 -m app.utils.tle_updater || true
-  python3 app/utils/sdr_scheduler.py
 }
 
 # --- Menus ---
@@ -156,15 +144,13 @@ main_menu(){
       esac
     else
       echo "1) Run"
-      echo "2) Start+TLE"
-      echo "3) Admin"
-      echo "4) Exit"
+      echo "2) Admin"
+      echo "3) Exit"
       read -rp "> " c
       case $c in
         1) run_local ;;
-        2) start_with_tle ;;
-        3) admin_menu ;;
-        4) exit 0 ;;
+        2) admin_menu ;;
+        3) exit 0 ;;
       esac
     fi
   done
@@ -174,7 +160,6 @@ main_menu(){
 while [[ $# -gt 0 ]]; do
   case $1 in
     -r) run_local; exit ;;
-    -s) start_with_tle; exit ;;
     -u) pull_update; exit ;;
     -b) switch_branch; exit ;;
     --backup) do_backup; exit ;;
@@ -182,7 +167,7 @@ while [[ $# -gt 0 ]]; do
     --reclone) do_reclone; exit ;;
     -p) PORT=$2; shift 2 ;;
     -e) ENV=$2; shift 2 ;;
-    -h|--help) echo "Options: -r run -s start -u update -b switch --backup --restore --reclone"; exit ;;
+    -h|--help) echo "Options: -r run -u update -b switch --backup --restore --reclone"; exit ;;
     *) echo "Unknown $1"; exit 1 ;;
   esac
 done
