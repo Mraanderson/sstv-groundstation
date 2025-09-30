@@ -1,5 +1,5 @@
 #!/bin/bash
-# SSTV Groundstation Launcher (robust reclone, no jq)
+# SSTV Groundstation Launcher (robust reclone, jq-free, improved branch switcher)
 
 set -euo pipefail
 
@@ -50,11 +50,31 @@ pull_update() {
 }
 
 switch_branch() {
-  local branch=$1
   cd "$APP_DIR"
-  git fetch origin "$branch"
-  git checkout "$branch" || git checkout -b "$branch" "origin/$branch"
-  git pull --ff-only origin "$branch"
+  git fetch origin
+
+  current=$(git rev-parse --abbrev-ref HEAD)
+  echo "Current branch: $current"
+  echo "Available branches:"
+
+  # Build a list of remote branches (excluding HEAD pointer)
+  mapfile -t branches < <(git branch -r | grep -v '\->' | sed 's|origin/||' | sort -u)
+
+  select br in "${branches[@]}"; do
+    if [ -n "$br" ]; then
+      echo "Switching to $br..."
+      if git show-ref --verify --quiet "refs/heads/$br"; then
+        git checkout "$br"
+      else
+        git checkout -b "$br" "origin/$br"
+      fi
+      git pull --ff-only origin "$br" || true
+      echo "Now on branch: $(git rev-parse --abbrev-ref HEAD)"
+      break
+    else
+      echo "Invalid choice"
+    fi
+  done
 }
 
 # --- Backup & restore ---
@@ -143,7 +163,7 @@ admin_menu() {
     read -r -p "Choice: " c
     case $c in
       1) pull_update ;;
-      2) read -r -p "Branch: " br; switch_branch "$br" ;;
+      2) switch_branch ;;
       3) do_backup ;;
       4) do_restore ;;
       5) do_reclone ;;
@@ -178,7 +198,7 @@ while [[ $# -gt 0 ]]; do
     -r) run_local; exit 0 ;;
     -s) start_with_tle_and_recording; exit 0 ;;
     -u) pull_update; exit 0 ;;
-    -b) switch_branch "$2"; exit 0 ;;
+    -b) switch_branch; exit 0 ;;
     --backup) do_backup; exit 0 ;;
     --restore) do_restore; exit 0 ;;
     --reclone) do_reclone; exit 0 ;;
