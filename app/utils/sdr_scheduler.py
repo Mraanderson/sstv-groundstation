@@ -138,22 +138,21 @@ def record_pass(sat, aos, los):
     print(f"{GREEN if verdict=='PASS' else RED}[{sat}] PASS COMPLETE — {verdict} — {size:.2f} MB{RESET}")
     write_metadata(start_str, sat, aos, los, freq, dur, size, verdict, error, base_name)
 
-    # Clear pass state
-    mark_pass_end()
-    def load_pass_predictions(path):
+def load_pass_predictions(path):
     if not Path(path).exists():
         return []
     results = []
-    for r in csv.DictReader(open(path)):
-        try:
-            sat = r["satellite"]
-            aos = datetime.datetime.fromisoformat(r["aos"]).astimezone()
-            los = datetime.datetime.fromisoformat(r["los"]).astimezone()
-            max_elev = float(r["max_elev"])
-            if max_elev >= ELEVATION_THRESHOLD:
-                results.append((sat, aos, los, max_elev))
-        except Exception:
-            continue
+    with open(path, newline="") as f:
+        for r in csv.DictReader(f):
+            try:
+                sat = r["satellite"]
+                aos = datetime.datetime.fromisoformat(r["aos"]).astimezone()
+                los = datetime.datetime.fromisoformat(r["los"]).astimezone()
+                max_elev = float(r["max_elev"])
+                if max_elev >= ELEVATION_THRESHOLD:
+                    results.append((sat, aos, los, max_elev))
+            except Exception:
+                continue
     return results
 
 def schedule_passes(passes):
