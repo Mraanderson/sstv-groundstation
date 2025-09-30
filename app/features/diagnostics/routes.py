@@ -2,11 +2,14 @@ import os
 import json
 import shutil
 import subprocess
-from flask import render_template, jsonify
+from pathlib import Path
+from flask import render_template, jsonify, request
 from app.features.diagnostics import bp
 
 # File where the scheduler writes current pass info
 STATE_FILE = os.path.expanduser("~/sstv-groundstation/current_pass.json")
+RECORDINGS_DIR = Path("recordings")
+LOW_SPACE_GB = 2  # threshold for auto-cleanup
 
 @bp.route("/")
 def diagnostics_page():
@@ -29,8 +32,8 @@ def diagnostics_check():
 @bp.route("/status")
 def diagnostics_status():
     """
-    Return current pass info (if any) and free disk space in GB.
-    Adds IQ file size if the file exists.
+    Return current pass info (if any), free disk space in GB,
+    and any orphan IQ files. Auto-delete orphans if disk < LOW_SPACE_GB.
     """
     # Disk usage
     total, used, free = shutil.disk_usage("/")
@@ -52,8 +55,39 @@ def diagnostics_status():
         except Exception as e:
             pass_info = {"error": f"Could not read pass state: {e}"}
 
+    # Orphan IQ files
+    orphan_iq = []
+    for f in RECORDINGS_DIR.glob("*.iq"):
+        if not pass_info or str(f) != pass_info.get("iq_file"):
+            size_mb = f.stat().st_size / (1024*1024)
+            entry = {"path": str(f), "size_mb": round(size_mb, 2)}
+            # Auto-delete if dangerously low on space
+            if free_gb < LOW_SPACE_GB:
+                try:
+                    os.remove(f)
+                    entry["deleted"] = True
+                except Exception as e:
+                    entry["delete_error"] = str(e)
+            orphan_iq.append(entry)
+
     return jsonify({
         "disk_free_gb": free_gb,
-        "pass_info": pass_info
+        "pass_info": pass_info,
+        "orphan_iq": orphan_iq
     })
-    
+
+@bp.route("/delete_iq", methods=["POST"])
+def delete_iq():
+    """
+    Manually delete a specified orphan IQ file.
+    """
+    try:
+        data = request.get_json()
+        path = data.get("path")
+        if path and os.path.exists(path) and path.endswith(".iq"):
+            os.remove(path)
+            return jsonify({"success": True, "message": f"Deleted {path}"})
+        return jsonify({"success": False, "message": "File not found"})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)})
+        
