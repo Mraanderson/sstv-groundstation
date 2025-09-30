@@ -9,7 +9,7 @@
 {% if recordings %}
   <form method="post" action="{{ url_for('recordings.bulk_delete') }}">
     <button type="submit" class="btn btn-danger btn-sm mb-3">🗑️ Delete Selected</button>
-    <div class="card shadow-sm">
+    <div class="card shadow-sm bg-transparent">
       <div class="card-body table-responsive">
         <table class="table table-striped align-middle">
           <thead>
