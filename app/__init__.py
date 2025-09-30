@@ -3,6 +3,9 @@ import json
 from datetime import datetime
 from flask import Flask, redirect, url_for, current_app
 from app.config_paths import CONFIG_FILE
+from zoneinfo import ZoneInfo
+from dateutil import parser  # still useful for parsing arbitrary strings
+
 
 def load_user_config():
     if os.path.exists(CONFIG_FILE):
@@ -16,21 +19,25 @@ def load_user_config():
         "theme": "auto"
     }
 
+
 def save_user_config(data):
     with open(CONFIG_FILE, "w") as f:
         json.dump(data, f, indent=2)
 
-def datetimeformat(value, format="%Y-%m-%d %H:%M", tz=None):
-    from dateutil import parser
-    import pytz
 
+def datetimeformat(value, format="%Y-%m-%d %H:%M", tz: str | None = None):
+    """
+    Parse a datetime-like value and format it, optionally converting to a given timezone.
+    tz should be an IANA timezone string like "Europe/London".
+    """
     try:
         dt = parser.parse(str(value))
         if tz:
-            dt = dt.astimezone(pytz.timezone(tz))
+            dt = dt.astimezone(ZoneInfo(tz))
         return dt.strftime(format)
     except Exception:
         return str(value)
+
 
 def create_app():
     app = Flask(__name__)
@@ -55,6 +62,7 @@ def create_app():
     def datetimeformat_with_config(value, format="%Y-%m-%d %H:%M"):
         tz = app.config.get("TIMEZONE")
         return datetimeformat(value, format, tz)
+
     app.jinja_env.filters["datetimeformat"] = datetimeformat_with_config
 
     # Attach save function
