@@ -2,11 +2,11 @@
 Flask==3.0.3
 
 # HTTP requests for fetching TLEs
-requests==2.32.3
+requests
 
 # Astronomy & orbital mechanics
-skyfield==1.49
-sgp4==2.23
+skyfield
+sgp4
 
 # Timezone support (zoneinfo is built-in for Python >=3.9)
 # Only include this if running on Python < 3.9
@@ -17,4 +17,4 @@ timezonefinder==6.2.0
 psutil
 schedule
 python-dateutil
-pytz
+# pytz
