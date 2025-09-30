@@ -16,6 +16,9 @@
 <p id="diskInfo">Disk free: …</p>
 <p id="passInfo">Pass status: …</p>
 
+<h2>Orphan IQ Files</h2>
+<ul id="orphanList"><li>Loading…</li></ul>
+
 <script>
 document.getElementById("checkBtn").addEventListener("click", () => {
   fetch("{{ url_for('diagnostics.diagnostics_check') }}")
@@ -60,9 +63,46 @@ async function updateStatus() {
     } else {
       document.getElementById("passInfo").innerText = "No pass in progress";
     }
+
+    // Orphan IQ files
+    const list = document.getElementById("orphanList");
+    list.innerHTML = "";
+    if (data.orphan_iq && data.orphan_iq.length > 0) {
+      data.orphan_iq.forEach(file => {
+        const li = document.createElement("li");
+        let text = file.path + " (" + file.size_mb + " MB)";
+        if (file.deleted) {
+          text += " — auto‑deleted (low disk space)";
+        }
+        if (file.delete_error) {
+          text += " — error: " + file.delete_error;
+        }
+        li.textContent = text;
+
+        if (!file.deleted) {
+          const btn = document.createElement("button");
+          btn.textContent = "Delete";
+          btn.className = "btn btn-sm btn-danger ms-2";
+          btn.onclick = async () => {
+            await fetch("{{ url_for('diagnostics.delete_iq') }}", {
+              method: "POST",
+              headers: {"Content-Type": "application/json"},
+              body: JSON.stringify({path: file.path})
+            });
+            updateStatus();
+          };
+          li.appendChild(btn);
+        }
+        list.appendChild(li);
+      });
+    } else {
+      list.innerHTML = "<li>No orphan IQ files</li>";
+    }
+
   } catch (err) {
     document.getElementById("diskInfo").innerText = "Disk free: error";
     document.getElementById("passInfo").innerText = "Pass status: error";
+    document.getElementById("orphanList").innerHTML = "<li>Error loading orphan files</li>";
   }
 }
 setInterval(updateStatus, 5000);
