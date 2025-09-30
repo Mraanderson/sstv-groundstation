@@ -44,12 +44,19 @@ async function updateStatus() {
   try {
     const res = await fetch("{{ url_for('diagnostics.diagnostics_status') }}");
     const data = await res.json();
+
+    // Disk free
     document.getElementById("diskInfo").innerText =
       "Disk free: " + data.disk_free_gb + " GB";
+
+    // Pass info
     if (data.pass_info) {
-      document.getElementById("passInfo").innerText =
-        "Pass in progress: " + data.pass_info.satellite +
-        " (IQ: " + data.pass_info.iq_file + ")";
+      let msg = "Pass in progress: " + data.pass_info.satellite +
+                " (IQ: " + data.pass_info.iq_file + ")";
+      if (data.pass_info.iq_size_mb !== undefined) {
+        msg += " — size: " + data.pass_info.iq_size_mb + " MB";
+      }
+      document.getElementById("passInfo").innerText = msg;
     } else {
       document.getElementById("passInfo").innerText = "No pass in progress";
     }
