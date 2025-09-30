@@ -17,6 +17,30 @@ handler = RotatingFileHandler(LOG_DIR / "scheduler.log", maxBytes=1_000_000, bac
 handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
 logger.addHandler(handler)
 
+# --- Pass state file for diagnostics ---
+STATE_FILE = os.path.expanduser("~/sstv-groundstation/current_pass.json")
+
+def mark_pass_start(sat, iq_file, los):
+    data = {
+        "satellite": sat,
+        "iq_file": str(iq_file),
+        "end_time": los.isoformat(),
+        "started": datetime.datetime.now().isoformat()
+    }
+    try:
+        with open(STATE_FILE, "w") as f:
+            json.dump(data, f)
+    except Exception as e:
+        logger.warning(f"Could not write pass state: {e}")
+
+def mark_pass_end():
+    try:
+        if os.path.exists(STATE_FILE):
+            os.remove(STATE_FILE)
+    except Exception as e:
+        logger.warning(f"Could not remove pass state: {e}")
+
+# --- Helpers ---
 def load_config_data():
     f = Path(config_paths.CONFIG_FILE)
     return json.load(open(f)) if f.exists() else {}
@@ -33,7 +57,6 @@ def recordings_enabled():
         return False
 
 def write_metadata(start_str, sat, aos, los, freq_hz, dur, size, verdict, error, base_name):
-    """Write JSON metadata alongside WAV/PNG/LOG using the same base_name."""
     meta = {
         "satellite": sat,
         "timestamp": aos.isoformat(),
@@ -54,10 +77,9 @@ def write_metadata(start_str, sat, aos, los, freq_hz, dur, size, verdict, error,
             "json": f"{base_name}.json"
         }
     }
-
-    # Save JSON with the same base_name as the other files
     (RECORDINGS_DIR / f"{base_name}.json").write_text(json.dumps(meta, indent=2))
 
+# --- Main recording function ---
 def record_pass(sat, aos, los):
     start_str = aos.strftime("%Y%m%d_%H%M")
     safe_sat = re.sub(r'[^A-Za-z0-9_-]', '_', sat)
@@ -87,6 +109,9 @@ def record_pass(sat, aos, los):
     dur = int((los - aos).total_seconds()) + STOP_LATE
     log_and_print("info", f"[{sat}] ▶ IQ capture for {dur}s at {freq/1e6:.3f} MHz", plog)
 
+    # Mark pass start for diagnostics
+    mark_pass_start(sat, iqfile, los)
+
     error = None; size = 0.0
     try:
         subprocess.run([
@@ -113,9 +138,11 @@ def record_pass(sat, aos, los):
     print(f"{GREEN if verdict=='PASS' else RED}[{sat}] PASS COMPLETE — {verdict} — {size:.2f} MB{RESET}")
     write_metadata(start_str, sat, aos, los, freq, dur, size, verdict, error, base_name)
 
-
-def load_pass_predictions(path):
-    if not Path(path).exists(): return []
+    # Clear pass state
+    mark_pass_end()
+    def load_pass_predictions(path):
+    if not Path(path).exists():
+        return []
     results = []
     for r in csv.DictReader(open(path)):
         try:
@@ -133,7 +160,9 @@ def schedule_passes(passes):
     for sat, aos, los, _ in passes:
         start = (aos - datetime.timedelta(seconds=START_EARLY))
         schedule.every().day.at(start.strftime("%H:%M")).do(record_pass, sat, aos, los)
-        log_and_print("info", f"📅 Scheduled {sat} at {start:%Y-%m-%d %H:%M:%S} for {(los - aos).seconds}s.")
+        log_and_print("info",
+            f"📅 Scheduled {sat} at {start:%Y-%m-%d %H:%M:%S} for {(los - aos).seconds}s."
+        )
 
 def auto_update_tle():
     cfg = load_config_data()
@@ -160,24 +189,43 @@ def auto_update_tle():
 def listen_for_keypress():
     try:
         while True:
-            if sys.stdin in select.select([sys.stdin], [], [], 0)[0] and sys.stdin.read(1).lower() == "x":
-                SETTINGS_FILE.write_text(json.dumps({"recording_enabled": False})); sys.exit(0)
+            if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
+                if sys.stdin.read(1).lower() == "x":
+                    SETTINGS_FILE.write_text(json.dumps({"recording_enabled": False}))
+                    sys.exit(0)
             time.sleep(0.1)
-    except: return
+    except:
+        return
 
 if __name__ == "__main__":
     logger.info("Scheduler starting up — running prechecks...")
-    if not recordings_enabled(): sys.exit(0)
-    if not sdr.sdr_exists(): SETTINGS_FILE.write_text(json.dumps({"recording_enabled": False})); sys.exit(1)
-    auto_update_tle(); schedule.every(6).hours.do(auto_update_tle)
+    if not recordings_enabled():
+        sys.exit(0)
+    if not sdr.sdr_exists():
+        SETTINGS_FILE.write_text(json.dumps({"recording_enabled": False}))
+        sys.exit(1)
+
+    auto_update_tle()
+    schedule.every(6).hours.do(auto_update_tle)
+
     passes = load_pass_predictions(PASS_FILE)
-    if not passes: log_and_print("warning", "No passes found — exiting."); sys.exit(0)
-    log_and_print("info", f"{len(passes)} passes found — scheduling..."); schedule_passes(passes)
+    if not passes:
+        log_and_print("warning", "No passes found — exiting.")
+        sys.exit(0)
+
+    log_and_print("info", f"{len(passes)} passes found — scheduling...")
+    schedule_passes(passes)
+
     threading.Thread(target=listen_for_keypress, daemon=True).start()
+
     while True:
-        if not recordings_enabled(): break
+        if not recordings_enabled():
+            break
         schedule.run_pending()
         if (nj := schedule.next_run()):
             delta = nj - datetime.datetime.now()
-            log_and_print("info", f"⏳ Next job in {int(delta.total_seconds())}s at {nj.strftime('%H:%M:%S')}")
+            log_and_print("info",
+                f"⏳ Next job in {int(delta.total_seconds())}s at {nj.strftime('%H:%M:%S')}"
+            )
         time.sleep(5)
+    
