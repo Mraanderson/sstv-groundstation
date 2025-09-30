@@ -17,4 +17,4 @@ timezonefinder==6.2.0
 psutil
 schedule
 python-dateutil
-pytz
+# pytz
