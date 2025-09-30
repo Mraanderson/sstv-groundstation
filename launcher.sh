@@ -1,10 +1,10 @@
 #!/bin/bash
-# SSTV Groundstation Launcher (simplified: no Start+TLE)
+# SSTV Groundstation Launcher (simplified backup/restore)
 
 set -euo pipefail
 APP_DIR="$HOME/sstv-groundstation"
 REPO_URL="https://github.com/Mraanderson/sstv-groundstation.git"
-BACKUP_ROOT="$HOME/sstv-backups"
+FILES_DIR="$HOME/sstv-files"
 PORT="${PORT:-5000}" ENV="${ENV:-development}"
 GREEN="\033[92m"; RED="\033[91m"; RESET="\033[0m"
 
@@ -42,28 +42,18 @@ switch_branch(){
   done
 }
 
-# --- Backup/restore ---
+# --- Backup/restore (images + recordings only) ---
 do_backup(){
-  mkdir -p "$BACKUP_ROOT"
-  d="$BACKUP_ROOT/$(date +%Y%m%d_%H%M%S)"
-  mkdir -p "$d"
-  [ -d "$APP_DIR/recordings" ] && cp -r "$APP_DIR/recordings" "$d/"
-  [ -d "$APP_DIR/app/static/gallery" ] && cp -r "$APP_DIR/app/static/gallery" "$d/"
-  msg "$GREEN" "Backup -> $d"
+  mkdir -p "$FILES_DIR"
+  [ -d "$APP_DIR/images" ] && cp -r "$APP_DIR/images" "$FILES_DIR/"
+  [ -d "$APP_DIR/recordings" ] && cp -r "$APP_DIR/recordings" "$FILES_DIR/"
+  msg "$GREEN" "Backup complete -> $FILES_DIR (images + recordings only)"
 }
 do_restore(){
-  shopt -s nullglob
-  b=("$BACKUP_ROOT"/*)
-  shopt -u nullglob
-  [ ${#b[@]} -eq 0 ] && { msg "$RED" "No backups"; return; }
-  select d in "${b[@]}"; do
-    if [ -n "$d" ]; then
-      cp -r "$d/recordings" "$APP_DIR/" 2>/dev/null || :
-      cp -r "$d/gallery" "$APP_DIR/app/static/" 2>/dev/null || :
-      msg "$GREEN" "Restored from $d"
-      break
-    fi
-  done
+  [ ! -d "$FILES_DIR" ] && { msg "$RED" "No backup folder at $FILES_DIR"; return; }
+  [ -d "$FILES_DIR/images" ] && cp -r "$FILES_DIR/images" "$APP_DIR/"
+  [ -d "$FILES_DIR/recordings" ] && cp -r "$FILES_DIR/recordings" "$APP_DIR/"
+  msg "$GREEN" "Restore complete from $FILES_DIR (images + recordings only)"
 }
 
 # --- Install/Reclone ---
@@ -78,7 +68,7 @@ do_reclone(){
   cd ~
   git ls-remote --heads "$REPO_URL" | awk '{print $2}'|sed 's|refs/heads/||'|sort -u > /tmp/branches.txt
   mapfile -t b < /tmp/branches.txt
-  echo "Choose branch:"
+  echo "Choose branch to install:"
   select br in "${b[@]}"; do
     if [ -n "$br" ]; then
       git clone -b "$br" "$REPO_URL" "$APP_DIR"
@@ -112,8 +102,8 @@ admin_menu(){
     status_line
     echo "1) Pull latest"
     echo "2) Switch branch"
-    echo "3) Backup"
-    echo "4) Restore"
+    echo "3) Backup (images + recordings -> ~/sstv-files)"
+    echo "4) Restore (from ~/sstv-files)"
     echo "5) Clear & Reclone (choose branch)"
     echo "6) Back"
     read -rp "> " c
