@@ -10,6 +10,12 @@
 
 <pre id="outputBox" class="mt-3"></pre>
 
+<hr>
+
+<h2>System Status</h2>
+<p id="diskInfo">Disk free: …</p>
+<p id="passInfo">Pass status: …</p>
+
 <script>
 document.getElementById("checkBtn").addEventListener("click", () => {
   fetch("{{ url_for('diagnostics.diagnostics_check') }}")
@@ -32,5 +38,27 @@ document.getElementById("checkBtn").addEventListener("click", () => {
       document.getElementById("outputBox").textContent = err;
     });
 });
+
+// Poll /status every 5 seconds
+async function updateStatus() {
+  try {
+    const res = await fetch("{{ url_for('diagnostics.diagnostics_status') }}");
+    const data = await res.json();
+    document.getElementById("diskInfo").innerText =
+      "Disk free: " + data.disk_free_gb + " GB";
+    if (data.pass_info) {
+      document.getElementById("passInfo").innerText =
+        "Pass in progress: " + data.pass_info.satellite +
+        " (IQ: " + data.pass_info.iq_file + ")";
+    } else {
+      document.getElementById("passInfo").innerText = "No pass in progress";
+    }
+  } catch (err) {
+    document.getElementById("diskInfo").innerText = "Disk free: error";
+    document.getElementById("passInfo").innerText = "Pass status: error";
+  }
+}
+setInterval(updateStatus, 5000);
+updateStatus();
 </script>
 {% endblock %}
