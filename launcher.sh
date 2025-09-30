@@ -1,5 +1,5 @@
 #!/bin/bash
-# SSTV Groundstation Launcher (jq-free)
+# SSTV Groundstation Launcher (robust reclone, no jq)
 
 set -euo pipefail
 
@@ -83,12 +83,22 @@ do_restore() {
   done
 }
 
+# --- Reclone (patched) ---
 do_reclone() {
-  read -r -p "Backup before delete? (y/n): " ans
+  msg "$YELLOW" "This will replace $APP_DIR with a fresh clone."
+  read -r -p "Backup recordings/images first? (y/n): " ans
   [[ "$ans" =~ ^[Yy]$ ]] && do_backup
-  rm -rf "$APP_DIR"
+
+  if [ -d "$APP_DIR" ]; then
+    TS=$(date +%Y%m%d_%H%M%S)
+    OLD="${APP_DIR}_old_$TS"
+    mv "$APP_DIR" "$OLD"
+    msg "$YELLOW" "Moved existing folder to $OLD"
+  fi
+
   git clone -b main "$REPO_URL" "$APP_DIR"
   ensure_venv
+  msg "$GREEN" "Fresh clone complete."
 }
 
 # --- Run app ---
