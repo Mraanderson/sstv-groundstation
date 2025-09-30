@@ -5,7 +5,7 @@ import subprocess
 from flask import render_template, jsonify
 from app.features.diagnostics import bp
 
-# File where the scheduler can write current pass info
+# File where the scheduler writes current pass info
 STATE_FILE = os.path.expanduser("~/sstv-groundstation/current_pass.json")
 
 @bp.route("/")
@@ -30,7 +30,7 @@ def diagnostics_check():
 def diagnostics_status():
     """
     Return current pass info (if any) and free disk space in GB.
-    Expects the scheduler to write/remove STATE_FILE during passes.
+    Adds IQ file size if the file exists.
     """
     # Disk usage
     total, used, free = shutil.disk_usage("/")
@@ -42,10 +42,18 @@ def diagnostics_status():
         try:
             with open(STATE_FILE) as f:
                 pass_info = json.load(f)
-        except Exception:
-            pass_info = {"error": "Could not read pass state"}
+
+            # Add file size if IQ file exists
+            iq_path = pass_info.get("iq_file")
+            if iq_path and os.path.exists(iq_path):
+                size_mb = os.path.getsize(iq_path) / (1024*1024)
+                pass_info["iq_size_mb"] = round(size_mb, 2)
+
+        except Exception as e:
+            pass_info = {"error": f"Could not read pass state: {e}"}
 
     return jsonify({
         "disk_free_gb": free_gb,
         "pass_info": pass_info
     })
+    
