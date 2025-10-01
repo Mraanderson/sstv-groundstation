@@ -1,5 +1,5 @@
 # Core web framework
-Flask==3.0.3
+Flask
 
 # HTTP requests for fetching TLEs
 requests
@@ -17,7 +17,11 @@ timezonefinder==6.2.0
 psutil
 schedule
 python-dateutil
-
-# SSTV decode
 Pillow==10.2.0
 scipy
+numpy
+pydub
+
+
+# SSTV decoder from GitHub
+git+https://github.com/colaclanth/sstv.git
