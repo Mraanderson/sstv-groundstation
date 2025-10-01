@@ -17,4 +17,6 @@ timezonefinder==6.2.0
 psutil
 schedule
 python-dateutil
-# pytz
+
+# SSTV decode
+Pillow==10.2.0
