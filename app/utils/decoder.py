@@ -4,9 +4,9 @@ import numpy as np
 from scipy.io import wavfile
 from datetime import datetime
 
-# --- Folder paths based on your setup ---
-RECORDINGS_DIR = Path("sstv-groundstation/recordings")
-IMAGES_DIR = Path("sstv-groundstation/images")
+# --- Folder paths relative to project root ---
+RECORDINGS_DIR = Path("recordings")
+IMAGES_DIR = Path("images")
 
 RECORDINGS_DIR.mkdir(exist_ok=True)
 IMAGES_DIR.mkdir(exist_ok=True)
@@ -66,4 +66,4 @@ def process_uploaded_wav(wav_path: Path):
     print(f"📄 Metadata: {meta_path.name}")
     if image_path:
         print(f"🖼️ Image saved: {image_path.name}")
-      
+        
