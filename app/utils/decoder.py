@@ -45,17 +45,34 @@ def save_placeholder_image(base_name: str):
     return img_path
 
 def decode_sstv_image(wav_path: Path, output_path: Path):
-    """Decode SSTV image from WAV using the CLI `sstv` tool."""
+    """
+    Decode SSTV image:
+    - Try `sstv` CLI first (Martin/Scottie/Robot).
+    - If it fails with unsupported VIS (e.g. PD120), fall back to `rxsstv`.
+    """
     try:
-        subprocess.run([
-            "sstv", "-d", str(wav_path), "-o", str(output_path)
-        ], check=True)
+        subprocess.run(
+            ["sstv", "-d", str(wav_path), "-o", str(output_path)],
+            check=True, capture_output=True, text=True
+        )
         return output_path
     except subprocess.CalledProcessError as e:
+        stderr = e.stderr or ""
+        if "unsupported (VIS: 95)" in stderr or "unsupported (VIS: 95)" in str(e):
+            print("⚠️ Detected PD120 (VIS 95) — retrying with rxsstv")
+            try:
+                subprocess.run(
+                    ["rxsstv", "-o", str(output_path), str(wav_path)],
+                    check=True
+                )
+                return output_path
+            except Exception as e2:
+                print(f"❌ rxsstv decode failed: {e2}")
+                return None
         print(f"❌ SSTV decode failed: {e}")
         return None
     except FileNotFoundError:
-        print("❌ `sstv` CLI tool not found. Make sure it’s installed in your venv or system PATH.")
+        print("❌ Neither `sstv` nor `rxsstv` found in PATH. Install them in your venv.")
         return None
 
 def write_metadata(base_name: str, wav_path: Path, sstv_detected: bool, image_path: Path | None):
