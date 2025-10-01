@@ -1,4 +1,4 @@
-import subprocess, json
+import subprocess, json, shutil
 from pathlib import Path
 import numpy as np
 from scipy.io import wavfile
@@ -28,21 +28,21 @@ def detect_sstv_tone(wav_path: Path) -> bool:
     peak_freq = freqs[np.argmax(fft)]
     return 1850 < peak_freq < 1950
 
-def save_placeholder_image(base_name: str):
-    """Create a placeholder SSTV image (to be replaced with real decoding)."""
-    from PIL import Image, ImageDraw
-    img = Image.new("RGB", (320, 256), color="black")
-    draw = ImageDraw.Draw(img)
-    draw.text((10, 10), "SSTV Detected", fill="white")
-    img_path = IMAGES_DIR / f"{base_name}_sstv.png"
-    img.save(img_path)
-    return img_path
+def decode_sstv_image(wav_path: Path, output_path: Path):
+    """Use minisat to decode SSTV image from WAV."""
+    if not shutil.which("minisat"):
+        raise RuntimeError("minisat is not installed or not in PATH")
+    subprocess.run([
+        "minisat", "-i", str(wav_path), "-o", str(output_path)
+    ], check=True)
+    return output_path
 
 def write_metadata(base_name: str, wav_path: Path, sstv_detected: bool, image_path: Path | None):
     """Write metadata JSON for uploaded audio."""
     meta = {
         "filename": wav_path.name,
-        "sstv_detected": bool(sstv_detected),   # ✅ force to Python bool
+        "size_kb": round(wav_path.stat().st_size / 1024, 1),
+        "sstv_detected": bool(sstv_detected),
         "callsigns": [],
         "decoded_image": image_path.name if image_path else None,
         "timestamp": datetime.now().isoformat(),
@@ -59,7 +59,16 @@ def process_uploaded_wav(wav_path: Path):
     resample_wav(wav_path, resampled)
 
     sstv_detected = detect_sstv_tone(resampled)
-    image_path = save_placeholder_image(base_name) if sstv_detected else None
+    image_path = None
+
+    if sstv_detected:
+        try:
+            image_path = IMAGES_DIR / f"{base_name}_sstv.png"
+            decode_sstv_image(resampled, image_path)
+        except Exception as e:
+            print(f"⚠️ SSTV decode failed: {e}")
+            image_path = None
+
     meta_path = write_metadata(base_name, wav_path, sstv_detected, image_path)
 
     print(f"✅ Processed {wav_path.name} — SSTV: {sstv_detected}")
