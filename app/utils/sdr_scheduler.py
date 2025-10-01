@@ -1,5 +1,6 @@
 import csv, datetime, time, subprocess, json, sys, threading, select, psutil, schedule, logging, re, os
 from pathlib import Path
+from zoneinfo import ZoneInfo
 from logging.handlers import RotatingFileHandler
 from app.utils import sdr, tle as tle_utils, passes as passes_utils
 from app import config_paths
@@ -12,10 +13,13 @@ ELEVATION_THRESHOLD, START_EARLY, STOP_LATE = 0, 30, 30
 GREEN, RED, RESET = "\033[92m", "\033[91m", "\033[0m"
 RECORDINGS_DIR.mkdir(exist_ok=True); LOG_DIR.mkdir(exist_ok=True)
 
-logger = logging.getLogger("sstv_scheduler"); logger.setLevel(logging.INFO)
-handler = RotatingFileHandler(LOG_DIR / "scheduler.log", maxBytes=1_000_000, backupCount=5)
-handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
-logger.addHandler(handler)
+logger = logging.getLogger("sstv_scheduler")
+logger.setLevel(logging.INFO)
+# Avoid adding multiple handlers if this module is imported multiple times
+if not logger.handlers:
+    handler = RotatingFileHandler(LOG_DIR / "scheduler.log", maxBytes=1_000_000, backupCount=5)
+    handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+    logger.addHandler(handler)
 
 # --- Pass state file for diagnostics ---
 STATE_FILE = os.path.expanduser("~/sstv-groundstation/current_pass.json")
@@ -30,20 +34,28 @@ def mark_pass_start(sat, iq_file, los):
     try:
         with open(STATE_FILE, "w") as f:
             json.dump(data, f)
-    except Exception as e:
+    except (OSError, IOError, json.JSONDecodeError) as e:
         logger.warning(f"Could not write pass state: {e}")
 
 def mark_pass_end():
     try:
         if os.path.exists(STATE_FILE):
             os.remove(STATE_FILE)
-    except Exception as e:
+    except (OSError, IOError) as e:
         logger.warning(f"Could not remove pass state: {e}")
 
 # --- Helpers ---
 def load_config_data():
     f = Path(config_paths.CONFIG_FILE)
-    return json.load(open(f)) if f.exists() else {}
+    try:
+        if f.exists():
+            with open(f) as file:
+                return json.load(file)
+        else:
+            return {}
+    except (OSError, IOError, json.JSONDecodeError) as e:
+        logger.warning(f"Could not load config data: {e}")
+        return {}
 
 def log_and_print(level, msg, plog=None):
     print(msg if "Next job" not in msg else f"\r{msg}", end="", flush=True)
@@ -52,8 +64,12 @@ def log_and_print(level, msg, plog=None):
 
 def recordings_enabled():
     try:
-        return SETTINGS_FILE.exists() and json.load(open(SETTINGS_FILE)).get("recording_enabled", False)
-    except:
+        if SETTINGS_FILE.exists():
+            with open(SETTINGS_FILE) as f:
+                return json.load(f).get("recording_enabled", False)
+        return False
+    except (OSError, IOError, json.JSONDecodeError) as e:
+        logger.warning(f"Could not check if recordings are enabled: {e}")
         return False
 
 def write_metadata(start_str, sat, aos, los, freq_hz, dur, size, verdict, error, base_name):
@@ -142,25 +158,36 @@ def load_pass_predictions(path):
     if not Path(path).exists():
         return []
     results = []
-    with open(path, newline="") as f:
-        for r in csv.DictReader(f):
-            try:
-                sat = r["satellite"]
-                aos = datetime.datetime.fromisoformat(r["aos"]).astimezone()
-                los = datetime.datetime.fromisoformat(r["los"]).astimezone()
-                max_elev = float(r["max_elev"])
-                if max_elev >= ELEVATION_THRESHOLD:
-                    results.append((sat, aos, los, max_elev))
-            except Exception:
-                continue
+    try:
+        with open(path, newline="") as f:
+            for r in csv.DictReader(f):
+                try:
+                    sat = r["satellite"]
+                    aos = datetime.datetime.fromisoformat(r["aos"]).astimezone()
+                    los = datetime.datetime.fromisoformat(r["los"]).astimezone()
+                    max_elev = float(r["max_elev"])
+                    if max_elev >= ELEVATION_THRESHOLD:
+                        results.append((sat, aos, los, max_elev))
+                except (KeyError, ValueError) as e:
+                    logger.warning(f"Skipping invalid pass prediction row: {e}")
+                    continue
+    except (OSError, IOError, csv.Error) as e:
+        logger.warning(f"Could not load pass predictions: {e}")
     return results
 
 def schedule_passes(passes):
+    cfg = load_config_data()
+    user_tz = cfg.get("timezone", "UTC")
+    tzinfo = ZoneInfo(user_tz)
     for sat, aos, los, _ in passes:
-        start = (aos - datetime.timedelta(seconds=START_EARLY))
+        # Convert AOS/LOS to user timezone
+        aos_local = aos.astimezone(tzinfo)
+        los_local = los.astimezone(tzinfo)
+        start = (aos_local - datetime.timedelta(seconds=START_EARLY))
+        # Schedule using local time (as schedule lib uses system local time)
         schedule.every().day.at(start.strftime("%H:%M")).do(record_pass, sat, aos, los)
         log_and_print("info",
-            f"📅 Scheduled {sat} at {start:%Y-%m-%d %H:%M:%S} for {(los - aos).seconds}s."
+            f"📅 Scheduled {sat} at {start:%Y-%m-%d %H:%M:%S} {user_tz} for {(los - aos).seconds}s."
         )
 
 def auto_update_tle():
@@ -190,10 +217,14 @@ def listen_for_keypress():
         while True:
             if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
                 if sys.stdin.read(1).lower() == "x":
-                    SETTINGS_FILE.write_text(json.dumps({"recording_enabled": False}))
+                    try:
+                        SETTINGS_FILE.write_text(json.dumps({"recording_enabled": False}))
+                    except (OSError, IOError) as e:
+                        logger.warning(f"Could not update settings file: {e}")
                     sys.exit(0)
             time.sleep(0.1)
-    except:
+    except (OSError, IOError, ValueError, select.error) as e:
+        logger.warning(f"Error in keypress listener: {e}")
         return
 
 if __name__ == "__main__":
@@ -221,10 +252,17 @@ if __name__ == "__main__":
         if not recordings_enabled():
             break
         schedule.run_pending()
+        # Show next job time in user timezone
         if (nj := schedule.next_run()):
-            delta = nj - datetime.datetime.now()
+            cfg = load_config_data()
+            user_tz = cfg.get("timezone", "UTC")
+            tzinfo = ZoneInfo(user_tz)
+            now_local = datetime.datetime.now(tzinfo)
+            # schedule.next_run() returns naive local time, so localize it
+            nj_local = nj.replace(tzinfo=tzinfo)
+            delta = (nj_local - now_local)
             log_and_print("info",
-                f"⏳ Next job in {int(delta.total_seconds())}s at {nj.strftime('%H:%M:%S')}"
+                f"⏳ Next job in {int(delta.total_seconds())}s at {nj_local.strftime('%H:%M:%S')} {user_tz}"
             )
         time.sleep(5)
     
