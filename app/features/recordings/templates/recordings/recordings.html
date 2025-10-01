@@ -3,6 +3,15 @@
 {% block content %}
 <h1 class="mb-4">🎙️ Recorded Passes</h1>
 
+<!-- 📤 WAV Upload Form -->
+<h5>Upload SSTV Audio (WAV)</h5>
+<form method="post" action="{{ url_for('recordings.upload_wav') }}" enctype="multipart/form-data" class="mb-4">
+  <div class="input-group">
+    <input type="file" name="wav_file" accept=".wav" class="form-control" required>
+    <button type="submit" class="btn btn-success">📤 Upload & Decode</button>
+  </div>
+</form>
+
 <h5>Recordings directory: {{ rec_dir }}</h5>
 <button class="btn btn-primary mb-3" onclick="location.reload()">🔄 Refresh</button>
 
@@ -10,7 +19,7 @@
   <form method="post" action="{{ url_for('recordings.bulk_delete') }}">
     <button type="submit" class="btn btn-danger btn-sm mb-3">🗑️ Delete Selected</button>
 
-    <!-- Desktop table (transparent to respect system theme) -->
+    <!-- Desktop table -->
     <div class="card shadow-sm bg-transparent d-none d-md-block">
       <div class="card-body table-responsive">
         <table class="table table-striped align-middle">
@@ -50,7 +59,7 @@
       </div>
     </div>
 
-    <!-- Mobile app-like cards (Media style only) -->
+    <!-- Mobile cards -->
     <div class="d-md-none">
       {% set ns = namespace(current_sat=None) %}
       {% for r in recordings %}
