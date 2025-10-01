@@ -1,0 +1,69 @@
+import subprocess, json
+from pathlib import Path
+import numpy as np
+from scipy.io import wavfile
+from datetime import datetime
+
+# --- Folder paths based on your setup ---
+RECORDINGS_DIR = Path("sstv-groundstation/recordings")
+IMAGES_DIR = Path("sstv-groundstation/images")
+
+RECORDINGS_DIR.mkdir(exist_ok=True)
+IMAGES_DIR.mkdir(exist_ok=True)
+
+def resample_wav(input_path: Path, output_path: Path):
+    """Resample WAV to 11025 Hz mono for SSTV decoding."""
+    subprocess.run([
+        "sox", str(input_path),
+        "-r", "11025", "-c", "1", str(output_path)
+    ], check=True)
+
+def detect_sstv_tone(wav_path: Path) -> bool:
+    """Detect SSTV sync tone (~1900 Hz) using FFT."""
+    sr, data = wavfile.read(wav_path)
+    if data.ndim > 1:
+        data = data.mean(axis=1)
+    fft = np.abs(np.fft.rfft(data))
+    freqs = np.fft.rfftfreq(len(data), 1/sr)
+    peak_freq = freqs[np.argmax(fft)]
+    return 1850 < peak_freq < 1950
+
+def save_placeholder_image(base_name: str):
+    """Create a placeholder SSTV image (to be replaced with real decoding)."""
+    from PIL import Image, ImageDraw
+    img = Image.new("RGB", (320, 256), color="black")
+    draw = ImageDraw.Draw(img)
+    draw.text((10, 10), "SSTV Detected", fill="white")
+    img_path = IMAGES_DIR / f"{base_name}_sstv.png"
+    img.save(img_path)
+    return img_path
+
+def write_metadata(base_name: str, wav_path: Path, sstv_detected: bool, image_path: Path | None):
+    """Write metadata JSON for uploaded audio."""
+    meta = {
+        "filename": wav_path.name,
+        "sstv_detected": sstv_detected,
+        "callsigns": [],
+        "decoded_image": image_path.name if image_path else None,
+        "timestamp": datetime.now().isoformat(),
+        "source": "user_upload"
+    }
+    meta_path = RECORDINGS_DIR / f"{base_name}.json"
+    meta_path.write_text(json.dumps(meta, indent=2))
+    return meta_path
+
+def process_uploaded_wav(wav_path: Path):
+    """Main entry point: resample, detect SSTV, decode, and log."""
+    base_name = wav_path.stem
+    resampled = RECORDINGS_DIR / f"{base_name}_11025.wav"
+    resample_wav(wav_path, resampled)
+
+    sstv_detected = detect_sstv_tone(resampled)
+    image_path = save_placeholder_image(base_name) if sstv_detected else None
+    meta_path = write_metadata(base_name, wav_path, sstv_detected, image_path)
+
+    print(f"✅ Processed {wav_path.name} — SSTV: {sstv_detected}")
+    print(f"📄 Metadata: {meta_path.name}")
+    if image_path:
+        print(f"🖼️ Image saved: {image_path.name}")
+      
