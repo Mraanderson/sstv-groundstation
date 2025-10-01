@@ -80,6 +80,30 @@ The launcher automatically sets up a Python virtual environment and installs dep
 
 ---
 
+## 🌐 Web Interface & Remote Management
+
+Once launched, SSTV Groundstation starts a temporary Flask web server on your headless Debian device. This allows full remote management from any browser on the same local network.
+
+For example, if your Raspberry Pi's IP address is `192.168.1.42`, open:
+
+```
+http://192.168.1.42:5000
+```
+
+in your browser to access the SSTV Groundstation console.
+
+### 🧭 First Steps via Web Console
+
+After launch, use the web interface to:
+
+1. **Set your location** — Required for accurate satellite pass predictions  
+2. **Refresh TLE data** — Updates orbital elements for current satellite tracking  
+3. **Enable recording** — Starts capturing IQ streams for later decoding  
+
+Captured IQ streams are automatically converted to `.wav` format and added to the **Recordings** library for playback and analysis.
+
+---
+
 ## 🛠 Features
 
 - **Gallery** — Displays decoded SSTV images with live refresh  
