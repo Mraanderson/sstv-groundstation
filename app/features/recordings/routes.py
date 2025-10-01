@@ -64,17 +64,15 @@ def recordings_list():
             meta = json.loads(meta_file.read_text())
             base = meta_file.stem
 
-            # Find any sibling files with the same prefix
+            # Find any sibling files with the same prefix (excluding log files)
             wav_file = next(RECORDINGS_DIR.glob(f"{base}*.wav"), None)
             png_file = next(RECORDINGS_DIR.glob(f"{base}*.png"), None)
-            log_file = next(RECORDINGS_DIR.glob(f"{base}*.log"), None)
 
             recordings.append({
                 "base": base,
                 "meta": meta,
                 "wav_file": wav_file,
                 "png_file": png_file,
-                "log_file": log_file,
                 "json_file": meta_file
             })
         except Exception:
@@ -168,6 +166,13 @@ def recordings_status():
                 break
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
+
+    # If no scheduler PID is found, force recording_enabled to False for UI
+    if scheduler_pid is None:
+        enabled = False
+        # Optionally, update the settings file to reflect this
+        settings["recording_enabled"] = False
+        save_settings(settings)
 
     return jsonify({
         "recording_enabled": enabled,
