@@ -42,7 +42,7 @@ def write_metadata(base_name: str, wav_path: Path, sstv_detected: bool, image_pa
     """Write metadata JSON for uploaded audio."""
     meta = {
         "filename": wav_path.name,
-        "sstv_detected": sstv_detected,
+        "sstv_detected": bool(sstv_detected),   # ✅ force to Python bool
         "callsigns": [],
         "decoded_image": image_path.name if image_path else None,
         "timestamp": datetime.now().isoformat(),
