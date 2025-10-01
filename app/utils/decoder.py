@@ -1,13 +1,10 @@
-import subprocess, json, shutil
+import subprocess, json
 from pathlib import Path
 import numpy as np
 from scipy.io import wavfile
 from datetime import datetime
 from pydub import AudioSegment
 from PIL import Image, ImageDraw
-
-# Import the Python SSTV decoder library
-from sstv import decoder as sstv_decoder
 
 # --- Folder paths ---
 RECORDINGS_DIR = Path("recordings")
@@ -48,13 +45,17 @@ def save_placeholder_image(base_name: str):
     return img_path
 
 def decode_sstv_image(wav_path: Path, output_path: Path):
-    """Decode SSTV image from WAV using the Python sstv library."""
+    """Decode SSTV image from WAV using the CLI `sstv` tool."""
     try:
-        img = sstv_decoder.decode(str(wav_path))  # returns a PIL Image
-        img.save(output_path)
+        subprocess.run([
+            "sstv", "-d", str(wav_path), "-o", str(output_path)
+        ], check=True)
         return output_path
-    except Exception as e:
+    except subprocess.CalledProcessError as e:
         print(f"❌ SSTV decode failed: {e}")
+        return None
+    except FileNotFoundError:
+        print("❌ `sstv` CLI tool not found. Make sure it’s installed in your venv or system PATH.")
         return None
 
 def write_metadata(base_name: str, wav_path: Path, sstv_detected: bool, image_path: Path | None):
