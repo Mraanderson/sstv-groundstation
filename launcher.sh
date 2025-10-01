@@ -1,5 +1,5 @@
 #!/bin/bash
-# SSTV Groundstation Launcher (simplified backup/restore)
+# SSTV Groundstation Launcher (with venv + SSTV decoder integration)
 
 set -euo pipefail
 APP_DIR="$HOME/sstv-groundstation"
@@ -84,7 +84,10 @@ ensure_venv(){
   cd "$APP_DIR"
   [ -d venv ] || python3 -m venv venv
   source venv/bin/activate
-  [ -f requirements.txt ] && pip install -q --upgrade pip -r requirements.txt
+  pip install -q --upgrade pip
+  [ -f requirements.txt ] && pip install -q -r requirements.txt
+  # Install local SSTV decoder if present
+  [ -d sstv ] && pip install -q ./sstv
 }
 
 # --- Run mode ---
