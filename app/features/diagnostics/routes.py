@@ -24,12 +24,14 @@ import subprocess
 from pathlib import Path
 from flask import render_template, jsonify, request
 from app.utils.iq_cleanup import cleanup_orphan_iq
+from app.features.diagnostics import bp
+
+
 @bp.route("/clear_all_iq", methods=["POST"])
 def clear_all_iq():
     """Delete all orphan IQ files (not in use by a current pass)."""
     deleted = cleanup_orphan_iq()
     return jsonify({"success": True, "deleted": deleted, "count": len(deleted)})
-from app.features.diagnostics import bp
 
 # File where the scheduler writes current pass info
 STATE_FILE = os.path.expanduser("~/sstv-groundstation/current_pass.json")
