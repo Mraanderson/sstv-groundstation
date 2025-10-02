@@ -1,3 +1,19 @@
+# --- System requirements check ---
+check_requirements() {
+  echo "Checking system requirements..."
+  local missing=0
+  for bin in sox rtl_sdr sstv rxsstv; do
+    if command -v "$bin" >/dev/null 2>&1; then
+      echo -e "${GREEN}✔ $bin found: $(command -v $bin)${RESET}"
+    else
+      echo -e "${RED}✘ $bin NOT found${RESET}"
+      missing=1
+    fi
+  done
+  if [ $missing -eq 1 ]; then
+    echo -e "${RED}Some required system binaries are missing. Please install them before running the app.${RESET}"
+  fi
+}
 #!/bin/bash
 # SSTV Groundstation Launcher (with venv + SSTV decoder integration)
 
@@ -93,6 +109,7 @@ ensure_venv(){
 # --- Run mode ---
 run_local(){
   have_repo || { msg "$RED" "No install"; return; }
+  check_requirements
   ensure_venv
   status_line
   FLASK_APP=run.py FLASK_ENV=$ENV flask run --host=0.0.0.0 --port=$PORT

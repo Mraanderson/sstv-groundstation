@@ -16,7 +16,9 @@
 <p id="diskInfo">Disk free: …</p>
 <p id="passInfo">Pass status: …</p>
 
+
 <h2>Orphan IQ Files</h2>
+<button id="clearAllIqBtn" class="btn btn-danger btn-sm mb-2">Clear All IQ Files</button>
 <ul id="orphanList"><li>Loading…</li></ul>
 
 <script>
@@ -105,6 +107,28 @@ async function updateStatus() {
     document.getElementById("orphanList").innerHTML = "<li>Error loading orphan files</li>";
   }
 }
+</script>
+<script>
+// Clear All IQ Files button logic
+document.getElementById("clearAllIqBtn").addEventListener("click", async function() {
+  if (!confirm("Are you sure you want to delete ALL orphan IQ files?")) return;
+  this.disabled = true;
+  this.textContent = "Clearing...";
+  try {
+    const res = await fetch("{{ url_for('diagnostics.clear_all_iq') }}", {method: "POST"});
+    const data = await res.json();
+    if (data.success) {
+      alert(`Deleted ${data.count} orphan IQ file(s).`);
+    } else {
+      alert("Failed to clear orphan IQ files.");
+    }
+  } catch (err) {
+    alert("Error clearing orphan IQ files: " + err);
+  }
+  this.disabled = false;
+  this.textContent = "Clear All IQ Files";
+  updateStatus();
+});
 setInterval(updateStatus, 5000);
 updateStatus();
 </script>

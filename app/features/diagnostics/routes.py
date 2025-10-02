@@ -1,9 +1,34 @@
+def check_system_requirements():
+    """Check for required system binaries (not in venv)."""
+    import shutil
+    required = [
+        {"name": "sox", "desc": "Audio conversion (sox)"},
+        {"name": "rtl_sdr", "desc": "RTL-SDR IQ capture (rtl_sdr)"},
+        {"name": "sstv", "desc": "SSTV decoder (sstv)"},
+        {"name": "rxsstv", "desc": "SSTV decoder (rxsstv, for PD120)"},
+    ]
+    results = []
+    for r in required:
+        path = shutil.which(r["name"])
+        results.append({
+            "name": r["name"],
+            "desc": r["desc"],
+            "found": bool(path),
+            "path": path or "Not found"
+        })
+    return results
 import os
 import json
 import shutil
 import subprocess
 from pathlib import Path
 from flask import render_template, jsonify, request
+from app.utils.iq_cleanup import cleanup_orphan_iq
+@bp.route("/clear_all_iq", methods=["POST"])
+def clear_all_iq():
+    """Delete all orphan IQ files (not in use by a current pass)."""
+    deleted = cleanup_orphan_iq()
+    return jsonify({"success": True, "deleted": deleted, "count": len(deleted)})
 from app.features.diagnostics import bp
 
 # File where the scheduler writes current pass info
@@ -73,7 +98,8 @@ def diagnostics_status():
     return jsonify({
         "disk_free_gb": free_gb,
         "pass_info": pass_info,
-        "orphan_iq": orphan_iq
+        "orphan_iq": orphan_iq,
+        "requirements": check_system_requirements()
     })
 
 @bp.route("/delete_iq", methods=["POST"])

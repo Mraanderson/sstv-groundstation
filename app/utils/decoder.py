@@ -1,3 +1,5 @@
+from app.utils.pass_info import get_iss_info_at
+from app import config_paths
 import subprocess, json
 from pathlib import Path
 import numpy as np
@@ -46,37 +48,55 @@ def save_placeholder_image(base_name: str):
 
 def decode_sstv_image(wav_path: Path, output_path: Path):
     """
-    Decode SSTV image:
-    - Try `sstv` CLI first (Martin/Scottie/Robot).
-    - If it fails with unsupported VIS (e.g. PD120), fall back to `rxsstv`.
+    Decode SSTV image using `sstv` CLI. If unsupported VIS (e.g. PD120), use placeholder image.
     """
     try:
-        subprocess.run(
+        result = subprocess.run(
             ["sstv", "-d", str(wav_path), "-o", str(output_path)],
             check=True, capture_output=True, text=True
         )
         return output_path
     except subprocess.CalledProcessError as e:
         stderr = e.stderr or ""
+        # Check for PD120 (VIS 95) unsupported error
         if "unsupported (VIS: 95)" in stderr or "unsupported (VIS: 95)" in str(e):
-            print("⚠️ Detected PD120 (VIS 95) — retrying with rxsstv")
+            print("⚠️ Detected PD120 (VIS 95) — attempting pd120_decoder")
+            # Try pd120_decoder if available
             try:
-                subprocess.run(
-                    ["rxsstv", "-o", str(output_path), str(wav_path)],
-                    check=True
-                )
+                pd120_out = subprocess.run([
+                    "python", "-m", "pd120_decoder.demod",
+                    str(wav_path), str(output_path)
+                ], check=True, capture_output=True, text=True)
+                print("✅ PD120 decode complete")
                 return output_path
-            except Exception as e2:
-                print(f"❌ rxsstv decode failed: {e2}")
+            except Exception as pd120_exc:
+                print(f"❌ PD120 decode failed: {pd120_exc}")
                 return None
         print(f"❌ SSTV decode failed: {e}")
         return None
     except FileNotFoundError:
-        print("❌ Neither `sstv` nor `rxsstv` found in PATH. Install them in your venv.")
+        print("❌ `sstv` not found in PATH. Install it in your venv.")
         return None
 
 def write_metadata(base_name: str, wav_path: Path, sstv_detected: bool, image_path: Path | None):
     """Write metadata JSON for uploaded audio."""
+    # Try to get config for observer location
+    try:
+        with open(config_paths.CONFIG_FILE) as f:
+            cfg = json.load(f)
+        lat = cfg.get("latitude")
+        lon = cfg.get("longitude")
+        alt = cfg.get("altitude_m", 0)
+        tz = cfg.get("timezone", "UTC")
+    except Exception:
+        lat = lon = alt = tz = None
+
+    # Estimate pass midpoint as image time
+    now = datetime.now()
+    iss_info = None
+    if lat is not None and lon is not None and alt is not None:
+        iss_info = get_iss_info_at(now, lat, lon, alt, tz)
+
     meta = {
         "filename": wav_path.name,
         "size_kb": round(wav_path.stat().st_size / 1024, 1),
@@ -84,9 +104,14 @@ def write_metadata(base_name: str, wav_path: Path, sstv_detected: bool, image_pa
         "sstv_detected": bool(sstv_detected),
         "callsigns": [],
         "decoded_image": image_path.name if image_path else None,
-        "timestamp": datetime.now().isoformat(),
-        "source": "user_upload"
+        "timestamp": now.isoformat(),
+        "source": "user_upload",
     }
+    if iss_info:
+        meta["iss_lat"] = iss_info["iss_lat"]
+        meta["iss_lon"] = iss_info["iss_lon"]
+        meta["iss_alt_km"] = iss_info["iss_alt_km"]
+        meta["iss_elev_deg"] = iss_info["iss_elev_deg"]
     meta_path = RECORDINGS_DIR / f"{base_name}.json"
     meta_path.write_text(json.dumps(meta, indent=2))
     return meta_path

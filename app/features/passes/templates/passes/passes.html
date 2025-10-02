@@ -50,7 +50,7 @@
       <h5>Next 24 Hours of Passes</h5>
 
       <!-- Pass Timeline Bar -->
-      <div id="pass-timeline-container" class="mb-4">
+      <div id="pass-timeline-container" class="mb-4" style="display: none;">
         <h6>Current Pass Timeline</h6>
         <div style="position: relative; width: 100%; max-width: 600px; height: 32px; background: #e9ecef; border-radius: 16px; overflow: hidden;">
           <div id="pass-timeline-bar" style="height: 100%; background: linear-gradient(90deg, #007bff, #00c6ff); width: 0%; transition: width 0.5s;"></div>
@@ -148,7 +148,9 @@
       const current = timeline.find(p => p.status === 'in_progress');
       const bar = document.getElementById('pass-timeline-bar');
       const label = document.getElementById('pass-timeline-label');
+      const container = document.getElementById('pass-timeline-container');
       if (current) {
+        container.style.display = '';
         const start = new Date(current.start);
         const end = new Date(current.end);
         const total = end - start;
@@ -157,6 +159,7 @@
         bar.style.width = percent + '%';
         label.textContent = `${current.satellite}: ${start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
       } else {
+        container.style.display = 'none';
         bar.style.width = '0%';
         label.textContent = 'No pass in progress';
       }

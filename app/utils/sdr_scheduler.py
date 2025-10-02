@@ -3,6 +3,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 from logging.handlers import RotatingFileHandler
 from app.utils import sdr, tle as tle_utils, passes as passes_utils
+from app.utils.iq_cleanup import periodic_cleanup
 from app import config_paths
 
 # --- CONFIG ---
@@ -137,7 +138,7 @@ def record_pass(sat, aos, los):
 
         subprocess.run([
             "sox", "-t", "raw", "-r", "2048000", "-e", "unsigned", "-b", "8", "-c", "2",
-            str(iqfile), "-r", "48000", str(wav), "rate"
+            str(iqfile), "-r", "48000", "-c", "1", str(wav), "rate"
         ], check=True)
 
         subprocess.run([
@@ -228,6 +229,8 @@ def listen_for_keypress():
         return
 
 if __name__ == "__main__":
+    # Start periodic orphan IQ cleanup in background
+    threading.Thread(target=periodic_cleanup, kwargs={"interval_minutes":30}, daemon=True).start()
     logger.info("Scheduler starting up — running prechecks...")
     if not recordings_enabled():
         sys.exit(0)

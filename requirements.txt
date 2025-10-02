@@ -26,6 +26,10 @@ pydub
 # SSTV decoder from GitHub
 
 git+https://github.com/colaclanth/sstv.git
+
+# PD120 decoder (for ARISS PD120 SSTV)
+git+https://github.com/reynico/pd120_decoder.git#egg=pd120_decoder
+# Credit: https://github.com/reynico/pd120_decoder (MIT License)
 #No PD120
 
 #git+https://github.com/colaclanth/rxsstv.git

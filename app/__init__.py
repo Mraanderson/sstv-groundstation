@@ -86,6 +86,7 @@ def create_app():
     from app.features.settings import bp as settings_bp
     from app.features.recordings import bp as recordings_bp
     from app.features.diagnostics import bp as diagnostics_bp
+    from app.features.info.routes import bp as info_bp
 
     app.register_blueprint(gallery_bp, url_prefix="/gallery")
     app.register_blueprint(config_bp, url_prefix="/config")
@@ -93,6 +94,7 @@ def create_app():
     app.register_blueprint(settings_bp, url_prefix="/settings")
     app.register_blueprint(recordings_bp, url_prefix="/recordings")
     app.register_blueprint(diagnostics_bp, url_prefix="/diagnostics")
+    app.register_blueprint(info_bp, url_prefix="/info")
 
     # Home route
     @app.route("/")

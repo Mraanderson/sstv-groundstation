@@ -1,0 +1,5 @@
+# For pd120_decoder integration
+numpy
+scipy
+matplotlib
+pillow
