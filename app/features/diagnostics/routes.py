@@ -5,7 +5,7 @@ def check_system_requirements():
         {"name": "sox", "desc": "Audio conversion (sox)"},
         {"name": "rtl_sdr", "desc": "RTL-SDR IQ capture (rtl_sdr)"},
         {"name": "sstv", "desc": "SSTV decoder (sstv)"},
-        {"name": "rxsstv", "desc": "SSTV decoder (rxsstv, for PD120)"},
+        #{"name": "rxsstv", "desc": "SSTV decoder (rxsstv)"},
     ]
     results = []
     for r in required:

@@ -48,7 +48,7 @@ def save_placeholder_image(base_name: str):
 
 def decode_sstv_image(wav_path: Path, output_path: Path):
     """
-    Decode SSTV image using `sstv` CLI. If unsupported VIS (e.g. PD120), use placeholder image.
+    Decode SSTV image using `sstv` CLI. If unsupported VIS, use placeholder image.
     """
     try:
         result = subprocess.run(
@@ -57,22 +57,9 @@ def decode_sstv_image(wav_path: Path, output_path: Path):
         )
         return output_path
     except subprocess.CalledProcessError as e:
+        # SSTV decoder returned a non-zero exit code. Log and fall back to placeholder.
         stderr = e.stderr or ""
-        # Check for PD120 (VIS 95) unsupported error
-        if "unsupported (VIS: 95)" in stderr or "unsupported (VIS: 95)" in str(e):
-            print("⚠️ Detected PD120 (VIS 95) — attempting pd120_decoder")
-            # Try pd120_decoder if available
-            try:
-                pd120_out = subprocess.run([
-                    "python", "-m", "pd120_decoder.demod",
-                    str(wav_path), str(output_path)
-                ], check=True, capture_output=True, text=True)
-                print("✅ PD120 decode complete")
-                return output_path
-            except Exception as pd120_exc:
-                print(f"❌ PD120 decode failed: {pd120_exc}")
-                return None
-        print(f"❌ SSTV decode failed: {e}")
+        print(f"❌ SSTV decode failed: {e}. stderr: {stderr}")
         return None
     except FileNotFoundError:
         print("❌ `sstv` not found in PATH. Install it in your venv.")

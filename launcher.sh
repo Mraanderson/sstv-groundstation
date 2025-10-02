@@ -2,7 +2,7 @@
 check_requirements() {
   echo "Checking system requirements..."
   local missing=0
-  for bin in sox rtl_sdr sstv rxsstv; do
+  for bin in sox rtl_sdr sstv; do
     if command -v "$bin" >/dev/null 2>&1; then
       echo -e "${GREEN}✔ $bin found: $(command -v $bin)${RESET}"
     else
