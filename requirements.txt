@@ -25,7 +25,8 @@ pydub
 
 # SSTV decoder from GitHub
 
-#git+https://github.com/colaclanth/sstv.git
+git+https://github.com/colaclanth/sstv.git
 #No PD120
 
-git+https://github.com/colaclanth/rxsstv.git
+#git+https://github.com/colaclanth/rxsstv.git
+#requires sign in
