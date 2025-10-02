@@ -49,6 +49,15 @@
     <div class="card-body">
       <h5>Next 24 Hours of Passes</h5>
 
+      <!-- Pass Timeline Bar -->
+      <div id="pass-timeline-container" class="mb-4">
+        <h6>Current Pass Timeline</h6>
+        <div style="position: relative; width: 100%; max-width: 600px; height: 32px; background: #e9ecef; border-radius: 16px; overflow: hidden;">
+          <div id="pass-timeline-bar" style="height: 100%; background: linear-gradient(90deg, #007bff, #00c6ff); width: 0%; transition: width 0.5s;"></div>
+          <div id="pass-timeline-label" style="position: absolute; left: 50%; top: 0; width: 100%; text-align: center; line-height: 32px; font-weight: bold; color: #222; pointer-events: none;">No pass in progress</div>
+        </div>
+      </div>
+
       <!-- Desktop table -->
       <div class="table-responsive d-none d-md-block">
         <table class="table table-striped align-middle">
@@ -71,8 +80,10 @@
                 </tr>
                 {% set ns.current_day = p.start.strftime("%Y-%m-%d") %}
               {% endif %}
+              {% set now = now or none %}
+              {% set in_progress = (now and p.start <= now <= p.end) %}
               <tr>
-                <td>{{ p.satellite }}</td>
+                <td>{% if in_progress %}<span title="Pass in progress" style="color:#007bff;">⏳</span> {% endif %}{{ p.satellite }}</td>
                 <td class="{% if p.max_elevation > 50 %}text-success fw-bold{% elif p.max_elevation > 20 %}text-warning{% else %}text-muted{% endif %}">
                   {{ "%.1f"|format(p.max_elevation) }}°
                 </td>
@@ -100,10 +111,12 @@
             <h6 class="mt-3 text-muted">{{ p.start | datetimeformat("%A %d %B") }}</h6>
             {% set ns.current_day = p.start.strftime("%Y-%m-%d") %}
           {% endif %}
+          {% set now = now or none %}
+          {% set in_progress = (now and p.start <= now <= p.end) %}
           <div class="card mb-2 shadow-sm">
             <div class="card-body">
               <h5 class="card-title">
-                {{ p.satellite }} —
+                {% if in_progress %}<span title="Pass in progress" style="color:#007bff;">⏳</span> {% endif %}{{ p.satellite }} —
                 <span class="{% if p.max_elevation > 50 %}text-success{% elif p.max_elevation > 20 %}text-warning{% else %}text-muted{% endif %}">
                   ⏫ {{ "%.1f"|format(p.max_elevation) }}°
                 </span>
@@ -123,6 +136,40 @@
 {% endif %}
 
 <script>
+  // --- Pass Timeline Logic ---
+  async function updatePassTimeline() {
+    try {
+      const res = await fetch('/timeline');
+      if (!res.ok) throw new Error('timeline not ok');
+      const data = await res.json();
+      const timeline = data.timeline || [];
+      const now = new Date();
+      // Find the in-progress pass
+      const current = timeline.find(p => p.status === 'in_progress');
+      const bar = document.getElementById('pass-timeline-bar');
+      const label = document.getElementById('pass-timeline-label');
+      if (current) {
+        const start = new Date(current.start);
+        const end = new Date(current.end);
+        const total = end - start;
+        const elapsed = now - start;
+        let percent = Math.max(0, Math.min(100, (elapsed / total) * 100));
+        bar.style.width = percent + '%';
+        label.textContent = `${current.satellite}: ${start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+      } else {
+        bar.style.width = '0%';
+        label.textContent = 'No pass in progress';
+      }
+    } catch (err) {
+      // fallback
+      const bar = document.getElementById('pass-timeline-bar');
+      const label = document.getElementById('pass-timeline-label');
+      bar.style.width = '0%';
+      label.textContent = 'Timeline unavailable';
+    }
+  }
+  setInterval(updatePassTimeline, 5000);
+  updatePassTimeline();
   // Update TLE button logic
   document.getElementById('update-tle-btn').addEventListener('click', function () {
     const btn = this;

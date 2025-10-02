@@ -207,10 +207,18 @@ def upload_wav():
         # Run your decoder
         result = process_uploaded_wav(save_path)
 
+        # Calculate file size in MB
+        file_mb = None
+        try:
+            file_mb = round(os.path.getsize(save_path) / (1024 * 1024), 2)
+        except Exception:
+            file_mb = None
+
         # Expecting process_uploaded_wav to return dict with file paths
         status = {
             "success": True,
             "wav_name": filename,
+            "file_mb": file_mb,
             "png_name": result.get("png_file") if isinstance(result, dict) else None,
             "json_name": result.get("json_file") if isinstance(result, dict) else None,
             "log_name": result.get("log_file") if isinstance(result, dict) else None

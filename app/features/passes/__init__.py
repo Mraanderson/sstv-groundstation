@@ -10,4 +10,5 @@ bp = Blueprint(
 
 # Import routes so they are registered with the blueprint
 from . import routes
+from . import timeline_api  # Register timeline API endpoints
 

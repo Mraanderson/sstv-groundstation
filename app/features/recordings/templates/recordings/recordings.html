@@ -67,7 +67,7 @@
           <thead>
             <tr>
               <th><input type="checkbox" onclick="toggleAll(this)"></th>
-              <th>🕒 Time</th>
+              <th>🕒 Uploaded time</th>
               <th>⏳ Duration</th>
               <th>💾 Size</th>
               <th>📂 Files</th>
@@ -84,7 +84,13 @@
               {% endif %}
               <tr>
                 <td><input type="checkbox" name="bases" value="{{ r.base }}"></td>
-                <td>{{ r.meta.aos | datetimeformat("%H:%M") }}–{{ r.meta.los | datetimeformat("%H:%M") }}</td>
+                <td>
+                  {% if r.meta.timestamp %}
+                    {{ r.meta.timestamp | datetimeformat('%Y-%m-%d %H:%M') }}
+                  {% else %}
+                    ?
+                  {% endif %}
+                </td>
                 <td>{{ r.meta.duration_s or "?" }} s</td>
                 <td>{{ r.meta.file_mb or "?" }} MB</td>
                 <td>
@@ -113,7 +119,13 @@
             <div class="me-3 fs-3">🎙️</div>
             <div class="flex-grow-1">
               <div class="d-flex justify-content-between align-items-center">
-                <strong>{{ r.meta.aos | datetimeformat("%H:%M") }}–{{ r.meta.los | datetimeformat("%H:%M") }}</strong>
+                <strong>
+                  {% if r.meta.timestamp %}
+                    Uploaded {{ r.meta.timestamp | datetimeformat('%Y-%m-%d %H:%M') }}
+                  {% else %}
+                    Uploaded ?
+                  {% endif %}
+                </strong>
                 <input type="checkbox" name="bases" value="{{ r.base }}">
               </div>
               <small class="text-muted d-block mt-1">⏳ {{ r.meta.duration_s or "?" }} s · 💾 {{ r.meta.file_mb or "?" }} MB</small>
