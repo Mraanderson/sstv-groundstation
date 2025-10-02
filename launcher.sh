@@ -109,8 +109,10 @@ ensure_venv(){
 # --- Run mode ---
 run_local(){
   have_repo || { msg "$RED" "No install"; return; }
-  check_requirements
+  # Ensure virtualenv is installed and activated first so tools installed into the venv
+  # (like the Python-based `sstv` CLI) are available in PATH for checks below.
   ensure_venv
+  check_requirements
   status_line
   FLASK_APP=run.py FLASK_ENV=$ENV flask run --host=0.0.0.0 --port=$PORT
 }
@@ -144,12 +146,9 @@ main_menu(){
   while :; do
     clear
     cat <<'EOF'
-     ____  _____ _____
-    / __ \/ ___// ___/
-   / / / /\__ \\__ \ 
-  / /_/ /___/ /__/ / 
- /_____/____/____/  
-     ISS SSTV Launcher
+  +---------------------------+
+  |        SSTV Launcher      |
+  +---------------------------+
 EOF
     status_line
     echo
