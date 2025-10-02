@@ -117,6 +117,7 @@ run_local(){
 
 # --- Menus ---
 admin_menu(){
+  # Kept for backward compatibility but primary menu is simplified below.
   while :; do
     echo "---- Admin ----"
     status_line
@@ -139,12 +140,22 @@ admin_menu(){
 }
 
 main_menu(){
+  # Simple, flat numeric menu with a small ASCII ISS banner
   while :; do
-    echo "=== SSTV Launcher ==="
+    clear
+    cat <<'EOF'
+     ____  _____ _____
+    / __ \/ ___// ___/
+   / / / /\__ \\__ \ 
+  / /_/ /___/ /__/ / 
+ /_____/____/____/  
+     ISS SSTV Launcher
+EOF
     status_line
+    echo
     if ! have_repo; then
       echo "1) Install main branch"
-      echo "2) Advanced install (choose branch)"
+      echo "2) Reclone / choose branch"
       echo "3) Exit"
       read -rp "> " c
       case $c in
@@ -153,14 +164,22 @@ main_menu(){
         3) exit 0 ;;
       esac
     else
-      echo "1) Run"
-      echo "2) Admin"
-      echo "3) Exit"
+      echo "1) Run web app"
+      echo "2) Pull latest"
+      echo "3) Switch branch"
+      echo "4) Backup (images + recordings)"
+      echo "5) Restore (from backup)"
+      echo "6) Clear & Reclone"
+      echo "7) Exit"
       read -rp "> " c
       case $c in
         1) run_local ;;
-        2) admin_menu ;;
-        3) exit 0 ;;
+        2) pull_update ;;
+        3) switch_branch ;;
+        4) do_backup ;;
+        5) do_restore ;;
+        6) do_reclone ;;
+        7) exit 0 ;;
       esac
     fi
   done
