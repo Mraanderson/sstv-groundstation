@@ -4,13 +4,54 @@
 <h1 class="mb-4">🎙️ Recorded Passes</h1>
 
 <!-- 📤 WAV Upload Form -->
-<h5>Upload SSTV Audio (WAV)</h5>
+<h5>Upload Non‑ISS SSTV Audio (PD120)</h5>
+<p class="text-muted">
+  This uploader is for <strong>non‑ISS PD120</strong> WAV files.  
+  For ISS Robot36 images, you can decode them with the
+  <a href="https://play.google.com/store/apps/details?id=xdsopl.robot36" target="_blank">📱 Robot36 app</a>.
+</p>
 <form method="post" action="{{ url_for('recordings.upload_wav') }}" enctype="multipart/form-data" class="mb-4">
   <div class="input-group">
     <input type="file" name="wav_file" accept=".wav" class="form-control" required>
     <button type="submit" class="btn btn-success">📤 Upload & Decode</button>
   </div>
 </form>
+
+<!-- ✅ Upload/Decode Status -->
+{% if status %}
+  {% if status.success %}
+    <div class="alert alert-success shadow-sm">
+      <h5 class="alert-heading">✅ Upload & Decode Successful</h5>
+      <p>Processed <code>{{ status.wav_name }}</code></p>
+      {% if status.png_name %}
+        <div class="mb-2">
+          <a href="{{ url_for('recordings.recordings_file', filename=status.png_name) }}" target="_blank">
+            <img src="{{ url_for('recordings.recordings_file', filename=status.png_name) }}"
+                 alt="Decoded SSTV image"
+                 class="img-fluid rounded border"
+                 style="max-height:200px;">
+          </a>
+        </div>
+      {% endif %}
+      <p>
+        {% if status.png_name %}
+          🖼️ <a href="{{ url_for('recordings.recordings_file', filename=status.png_name) }}" target="_blank">Full Image</a>
+        {% endif %}
+        {% if status.json_name %}
+          · 🧾 <a href="{{ url_for('recordings.recordings_file', filename=status.json_name) }}" target="_blank">Metadata</a>
+        {% endif %}
+        {% if status.log_name %}
+          · 📄 <a href="{{ url_for('recordings.recordings_file', filename=status.log_name) }}" target="_blank">Log</a>
+        {% endif %}
+      </p>
+    </div>
+  {% else %}
+    <div class="alert alert-danger shadow-sm">
+      <h5 class="alert-heading">⚠️ Upload Failed</h5>
+      <p>{{ status.error }}</p>
+    </div>
+  {% endif %}
+{% endif %}
 
 <h5>Recordings directory: {{ rec_dir }}</h5>
 <button class="btn btn-primary mb-3" onclick="location.reload()">🔄 Refresh</button>
