@@ -4,7 +4,7 @@ import requests
 # Map satellite names to their NORAD catalog numbers
 TLE_SOURCES = {
     "ISS": 25544,
-    "UMKA 1": 57172,
+    #"UMKA 1": 57172,
     # Add more satellites here if you want to track them
 }
 
