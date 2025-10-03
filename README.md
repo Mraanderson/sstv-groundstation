@@ -12,12 +12,10 @@ The new `launcher.sh` script replaces the legacy `SSTV.sh` and provides a full-f
 
 #### 🔧 Features
 
-- Install or reclone any branch from GitHub  
 - Switch branches interactively  
 - Pull latest updates  
 - Backup and restore `images` and `recordings`  
-- Run the Flask server locally  
-- Python virtual environment setup  
+- Run the Flask server locally   
 
 #### 🛠 Setup
 
