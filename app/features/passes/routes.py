@@ -6,7 +6,6 @@ import requests
 
 from . import bp
 from app.utils.sdr import rtl_sdr_present
-from app.utils import passes
 from app.utils.sdr_scheduler import load_pass_predictions, PASS_FILE, manual_refresh
 
 SSTV_SATELLITES = [
@@ -23,13 +22,14 @@ def tle_file_path():
     return os.path.join(current_app.config["TLE_DIR"], "active.txt")
 
 def get_tle_age_days(tle_path):
+    """Return age of TLE file in days, or None if it can't be determined."""
     try:
         with open(tle_path) as f:
             lines = [line.strip() for line in f if line.strip()]
         if len(lines) < 2:
             return None
         line1 = lines[1]
-        epoch_str = line1[18:32]
+        epoch_str = line1[18:32]  # YYDDD.DDDDDDDD
         year = int(epoch_str[:2])
         year += 2000 if year < 57 else 1900
         day_of_year = float(epoch_str[2:])
@@ -56,8 +56,19 @@ def passes_page():
             "age_days": get_tle_age_days(tle_path)
         }
 
-    # Load existing predictions from CSV instead of regenerating
-    passes_list = load_pass_predictions(PASS_FILE)
+    # Load tuples and normalize into dicts for template
+    raw_passes = load_pass_predictions(PASS_FILE)
+    passes_list = [
+        {
+            "satellite": sat,
+            "start": aos,
+            "end": los,
+            "peak": aos + (los - aos) / 2,  # crude midpoint if peak not stored
+            "max_elevation": max_el
+        }
+        for sat, aos, los, max_el in raw_passes
+    ]
+
     now_for_template = datetime.now(ZoneInfo(tz)) if tz else datetime.now()
 
     return render_template(
@@ -98,16 +109,17 @@ def update_tle():
 @bp.route("/timeline")
 def timeline():
     """Return current predicted passes as JSON for the frontend."""
-    passes_list = load_pass_predictions(PASS_FILE)
-    return jsonify([
+    raw_passes = load_pass_predictions(PASS_FILE)
+    passes_list = [
         {
             "satellite": sat,
             "aos": aos.isoformat(),
             "los": los.isoformat(),
             "max_elevation": max_el
         }
-        for sat, aos, los, max_el in passes_list
-    ])
+        for sat, aos, los, max_el in raw_passes
+    ]
+    return jsonify(passes_list)
 
 @bp.route("/update-passes", methods=["POST"])
 def update_passes():
