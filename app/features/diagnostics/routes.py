@@ -3,7 +3,8 @@ from pathlib import Path
 from flask import render_template, jsonify, request, current_app
 from app.utils.iq_cleanup import cleanup_orphan_iq
 from app.features.diagnostics import bp
-from app.utils import passes_utils  # make sure this exists
+from app.utils import passes
+
 
 STATE_FILE = os.path.expanduser("~/sstv-groundstation/current_pass.json")
 RECORDINGS_DIR, LOW_SPACE_GB = Path("recordings"), 2
