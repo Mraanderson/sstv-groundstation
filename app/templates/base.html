@@ -34,15 +34,19 @@
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
-    <ul class="navbar-nav ms-auto">
-    <li class="nav-item"><a class="nav-link" href="{{ url_for('gallery.gallery') }}">Gallery</a></li>
-    <li class="nav-item"><a class="nav-link" href="{{ url_for('recordings.recordings_list') }}">Recordings</a></li>
-    <li class="nav-item"><a class="nav-link" href="{{ url_for('passes.passes_page') }}">Passes</a></li>
-    <li class="nav-item"><a class="nav-link" href="{{ url_for('config.config_page') }}">Config</a></li>
-    <li class="nav-item"><a class="nav-link" href="{{ url_for('diagnostics.diagnostics_page') }}">Diagnostics</a></li>
-    <li class="nav-item"><a class="nav-link" href="{{ url_for('info.info') }}">Info</a></li>
-    </ul>
-</div>
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('gallery.gallery') }}">Gallery</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('recordings.recordings_list') }}">Recordings</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('passes.passes_page') }}">Passes</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('config.config_page') }}">Config</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('diagnostics.diagnostics_page') }}">Diagnostics</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('info.info') }}">Info</a></li>
+                    <!-- SDR status badge -->
+                    <li class="nav-item d-flex align-items-center ms-3">
+                        <span id="sdrNavLight" class="badge bg-secondary">SDR…</span>
+                    </li>
+                </ul>
+            </div>
         </div>
     </nav>
 
@@ -53,5 +57,31 @@
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+    async function updateSdrNavLight() {
+      try {
+        const res = await fetch("{{ url_for('diagnostics.sdr_status') }}");
+        const data = await res.json();
+        const el = document.getElementById("sdrNavLight");
+        const map = {
+          green: {cls: "badge bg-success", text: "🟢 SDR Ready"},
+          red:   {cls: "badge bg-danger",  text: "🔴 SDR In Use"},
+          amber: {cls: "badge bg-warning text-dark", text: "🟠 SDR Scheduled"},
+          grey:  {cls: "badge bg-secondary", text: "⚪ SDR Missing"}
+        };
+        const st = map[data.status] || map.grey;
+        el.className = st.cls;
+        el.textContent = st.text;
+      } catch (err) {
+        const el = document.getElementById("sdrNavLight");
+        el.className = "badge bg-warning text-dark";
+        el.textContent = "SDR Error";
+      }
+    }
+    // poll every 10s
+    setInterval(updateSdrNavLight, 10000);
+    updateSdrNavLight();
+    </script>
 </body>
 </html>
