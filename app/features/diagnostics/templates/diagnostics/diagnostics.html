@@ -171,20 +171,18 @@ document.getElementById("calibrateBtn").addEventListener("click", async function
     if (data.success) {
       resultBox.innerHTML = `
         <div class="alert alert-success">
-          <strong>PPM:</strong> ${data.ppm}<br>
+          <strong>PPM correction:</strong> ${data.ppm}<br>
           <strong>Measured:</strong> ${data.measured_hz} Hz<br>
           <strong>Expected:</strong> ${data.expected_hz} Hz
         </div>
         <div class="row">
           <div class="col-md-6">
             <h6>Before</h6>
-            <img src="/recordings/${data.png_before}" class="img-fluid border rounded">
-            <p><a href="/recordings/${data.wav_before}">🎵 WAV (before)</a></p>
+            <img src="/images/${data.png_before}" class="img-fluid border rounded">
           </div>
           <div class="col-md-6">
             <h6>After</h6>
-            <img src="/recordings/${data.png_after}" class="img-fluid border rounded">
-            <p><a href="/recordings/${data.wav_after}">🎵 WAV (after)</a></p>
+            <img src="/images/${data.png_after}" class="img-fluid border rounded">
           </div>
         </div>`;
     } else {
