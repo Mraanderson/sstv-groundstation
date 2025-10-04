@@ -11,54 +11,82 @@ IMAGES_DIR = Path("images")  # root-level images folder (already exists)
 
 def load_settings():
     return json.loads(SETTINGS_FILE.read_text()) if SETTINGS_FILE.exists() else {}
-def save_settings(s): SETTINGS_FILE.write_text(json.dumps(s, indent=2))
+
+def save_settings(s):
+    SETTINGS_FILE.write_text(json.dumps(s, indent=2))
+
+def get_ppm():
+    """Return the current rtl_ppm value, defaulting to 0 if not set/invalid."""
+    settings = load_settings()
+    try:
+        ppm = int(settings.get("rtl_ppm", 0))
+    except (ValueError, TypeError):
+        ppm = 0
+    return ppm
 
 def check_system_requirements():
-    bins=[("sox","Audio conversion"),("rtl_sdr","RTL-SDR capture")]
+    bins = [("sox","Audio conversion"),("rtl_sdr","RTL-SDR capture")]
     return [{"name":n,"desc":d,"found":bool(shutil.which(n)),"path":shutil.which(n) or "Not found"} for n,d in bins]
 
 @bp.route("/")
-def diagnostics_page(): return render_template("diagnostics/diagnostics.html")
+def diagnostics_page():
+    return render_template("diagnostics/diagnostics.html")
 
 @bp.route("/check")
 def diagnostics_check():
     try:
-        r=subprocess.run(["rtl_test","-t"],capture_output=True,text=True,timeout=5)
-        out=r.stdout+r.stderr
-        return jsonify({"success":any(x in out for x in("Reading samples","Found Rafael")),"output":out})
-    except Exception as e: return jsonify({"success":False,"output":str(e)})
+        r = subprocess.run(["rtl_test","-t"],capture_output=True,text=True,timeout=5)
+        out = r.stdout + r.stderr
+        return jsonify({"success": any(x in out for x in ("Reading samples","Found Rafael")), "output": out})
+    except Exception as e:
+        return jsonify({"success": False, "output": str(e)})
 
 @bp.route("/status")
 def diagnostics_status():
-    free_gb=shutil.disk_usage("/").free//(2**30)
-    pass_info=None
+    free_gb = shutil.disk_usage("/").free // (2**30)
+    pass_info = None
     if os.path.exists(STATE_FILE):
         try:
-            with open(STATE_FILE) as f: pass_info=json.load(f)
-            iq=pass_info.get("iq_file")
-            if iq and os.path.exists(iq): pass_info["iq_size_mb"]=round(os.path.getsize(iq)/(1024*1024),2)
-        except Exception as e: pass_info={"error":f"Could not read pass state: {e}"}
-    orphan=[]
+            with open(STATE_FILE) as f:
+                pass_info = json.load(f)
+            iq = pass_info.get("iq_file")
+            if iq and os.path.exists(iq):
+                pass_info["iq_size_mb"] = round(os.path.getsize(iq)/(1024*1024), 2)
+        except Exception as e:
+            pass_info = {"error": f"Could not read pass state: {e}"}
+    orphan = []
     for f in RECORDINGS_DIR.glob("*.iq"):
-        if not pass_info or str(f)!=pass_info.get("iq_file"):
-            entry={"path":str(f),"size_mb":round(f.stat().st_size/(1024*1024),2)}
-            if free_gb<LOW_SPACE_GB:
-                try: os.remove(f); entry["deleted"]=True
-                except Exception as e: entry["delete_error"]=str(e)
+        if not pass_info or str(f) != pass_info.get("iq_file"):
+            entry = {"path": str(f), "size_mb": round(f.stat().st_size/(1024*1024), 2)}
+            if free_gb < LOW_SPACE_GB:
+                try:
+                    os.remove(f)
+                    entry["deleted"] = True
+                except Exception as e:
+                    entry["delete_error"] = str(e)
             orphan.append(entry)
-    return jsonify({"disk_free_gb":free_gb,"pass_info":pass_info,"orphan_iq":orphan,"requirements":check_system_requirements()})
+    return jsonify({
+        "disk_free_gb": free_gb,
+        "pass_info": pass_info,
+        "orphan_iq": orphan,
+        "requirements": check_system_requirements(),
+        "rtl_ppm": get_ppm()   # always present, defaults to 0
+    })
 
-@bp.route("/clear_all_iq",methods=["POST"])
-def clear_all_iq(): return jsonify({"success":True,"deleted":cleanup_orphan_iq()})
+@bp.route("/clear_all_iq", methods=["POST"])
+def clear_all_iq():
+    return jsonify({"success": True, "deleted": cleanup_orphan_iq()})
 
-@bp.route("/delete_iq",methods=["POST"])
+@bp.route("/delete_iq", methods=["POST"])
 def delete_iq():
     try:
-        path=request.get_json().get("path")
+        path = request.get_json().get("path")
         if path and os.path.exists(path) and path.endswith(".iq"):
-            os.remove(path); return jsonify({"success":True,"message":f"Deleted {path}"})
-        return jsonify({"success":False,"message":"File not found"})
-    except Exception as e: return jsonify({"success":False,"message":str(e)})
+            os.remove(path)
+            return jsonify({"success": True, "message": f"Deleted {path}"})
+        return jsonify({"success": False, "message": "File not found"})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)})
 
 # --- Calibration route ---
 @bp.route("/calibrate", methods=["POST"])
@@ -69,7 +97,7 @@ def calibrate():
         fm_csv = CAL_DIR / "scan_fm.csv"
 
         # Run rtl_power scan
-        subprocess.run(["rtl_power","-f","88M:108M:100k","-g","20","-e","6",str(fm_csv)],check=True)
+        subprocess.run(["rtl_power","-f","88M:108M:100k","-g","20","-e","6",str(fm_csv)], check=True)
 
         # Parse CSV for strongest peak
         best_freq, best_power = None, -1e9
@@ -78,7 +106,6 @@ def calibrate():
                 parts = [p.strip() for p in line.split(",")]
                 if len(parts) < 7:
                     continue
-                # Correct columns: parts[2]=f_start, parts[3]=f_end
                 f_start, f_end = float(parts[2]), float(parts[3])
                 bins = [float(x) for x in parts[6:] if x]
                 if not bins:
