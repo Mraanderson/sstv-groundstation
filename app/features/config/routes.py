@@ -4,7 +4,19 @@ from app.config_paths import CONFIG_FILE
 import json
 import os
 from datetime import datetime
+from pathlib import Path
 from . import bp
+
+SETTINGS_FILE = Path("settings.json")  # diagnostics calibration file
+
+def load_diag_settings():
+    """Load diagnostics settings (rtl_ppm), defaulting to {} if missing."""
+    if SETTINGS_FILE.exists():
+        try:
+            return json.loads(SETTINGS_FILE.read_text())
+        except Exception:
+            return {}
+    return {}
 
 @bp.route("/", methods=["GET", "POST"], endpoint="config_page")
 def config_page():
@@ -73,7 +85,14 @@ def config_page():
         except Exception:
             settings = {}
 
-    calibrated = "rtl_ppm" in settings
+    # Merge in rtl_ppm from diagnostics settings.json
+    diag_settings = load_diag_settings()
+    try:
+        ppm = int(diag_settings.get("rtl_ppm", 0))
+    except (ValueError, TypeError):
+        ppm = 0
+    settings["rtl_ppm"] = ppm
+    calibrated = ppm != 0
 
     return render_template(
         "config/config.html",
