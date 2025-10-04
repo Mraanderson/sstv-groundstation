@@ -1,4 +1,4 @@
-from flask import render_template, request, redirect, url_for, current_app, flash, jsonify
+from flask import render_template, request, current_app, jsonify
 from timezonefinder import TimezoneFinder
 from app.config_paths import CONFIG_FILE
 import json
@@ -52,30 +52,37 @@ def config_page():
 
         # Save to config file
         os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
-        with open(CONFIG_FILE, "w") as f:
-            json.dump({
-                "latitude": current_app.config.get("LATITUDE"),
-                "longitude": current_app.config.get("LONGITUDE"),
-                "altitude_m": current_app.config.get("ALTITUDE_M"),
-                "timezone": current_app.config.get("TIMEZONE"),
-                "theme": theme
-            }, f, indent=2)
-
-        return jsonify({
+        saved = {
             "latitude": current_app.config.get("LATITUDE"),
             "longitude": current_app.config.get("LONGITUDE"),
             "altitude_m": current_app.config.get("ALTITUDE_M"),
             "timezone": current_app.config.get("TIMEZONE"),
-            "theme": theme,
-            "saved_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        })
+            "theme": theme
+        }
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(saved, f, indent=2)
+
+        return jsonify({**saved, "saved_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
+
+    # GET: load current settings from file if present
+    settings = {}
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE) as f:
+                settings = json.load(f)
+        except Exception:
+            settings = {}
+
+    calibrated = "rtl_ppm" in settings
 
     return render_template(
         "config/config.html",
-        latitude=current_app.config.get("LATITUDE"),
-        longitude=current_app.config.get("LONGITUDE"),
-        altitude=current_app.config.get("ALTITUDE_M"),
-        timezone=current_app.config.get("TIMEZONE")
+        latitude=settings.get("latitude"),
+        longitude=settings.get("longitude"),
+        altitude=settings.get("altitude_m"),
+        timezone=settings.get("timezone"),
+        settings=settings,
+        calibrated=calibrated
     )
 
 @bp.route("/altitude", methods=["GET"])
