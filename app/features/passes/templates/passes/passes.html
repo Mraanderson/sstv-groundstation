@@ -90,7 +90,7 @@
 <script>
 async function updatePassTimeline(){
   try{
-    const res=await fetch('/timeline'); if(!res.ok) throw new Error();
+    const res=await fetch('/passes/timeline'); if(!res.ok) throw new Error();
     const passes=await res.json(); const now=new Date();
     const current=passes.find(p=>{const s=new Date(p.aos),e=new Date(p.los);return s<=now&&now<=e;});
     const bar=document.getElementById('pass-timeline-bar'),label=document.getElementById('pass-timeline-label'),cont=document.getElementById('pass-timeline-container');
