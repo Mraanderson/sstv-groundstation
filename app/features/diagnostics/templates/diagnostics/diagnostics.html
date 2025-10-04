@@ -11,34 +11,12 @@ Each section below runs a different test or maintenance task and explains why it
 <hr>
 
 <h2>Dongle Presence Check</h2>
-<p>
-This test runs <code>rtl_test</code> briefly to confirm that the SDR hardware is detected by the system 
-and can stream samples. If successful, you’ll see “Dongle Present” and details about the tuner. 
-If it fails, the dongle may not be plugged in, drivers may be missing, or another process may be using it.
-</p>
-<button id="checkBtn" class="btn btn-primary">Run Check</button>
-<span id="statusBadge" class="badge bg-secondary ms-2">Not checked</span>
-<pre id="outputBox" class="mt-3"></pre>
+<!-- ... your existing dongle check markup ... -->
 
 <hr>
 
 <h2>System Status</h2>
-<p>
-This section shows free disk space, whether a satellite pass is currently being recorded, 
-and the size of any ongoing IQ capture file. It also lists “orphan” IQ files — raw recordings 
-left behind after a pass. These can be deleted to free up space.
-</p>
-<p id="diskInfo">Disk free: …</p>
-<p id="passInfo">Pass status: …</p>
-
-<h2>Orphan IQ Files</h2>
-<p>
-Orphan IQ files are recordings not linked to an active pass. They can take up a lot of space. 
-You can delete them individually or clear them all at once. If disk space drops below a safe threshold, 
-the system will auto‑delete them to protect ongoing captures.
-</p>
-<button id="clearAllIqBtn" class="btn btn-danger btn-sm mb-2">Clear All IQ Files</button>
-<ul id="orphanList"><li>Loading…</li></ul>
+<!-- ... your existing system status markup ... -->
 
 <hr>
 
@@ -55,145 +33,53 @@ The page shows “before” and “after” spectrograms so you can see the corr
 If the “before” image looks slanted or offset and the “after” image looks centred and stable, 
 your calibration is working correctly.
 </p>
+
+<!-- New info box -->
+<div class="alert alert-info">
+  Why calibrate? SDR dongles use inexpensive crystal oscillators that can drift by tens of kHz. 
+  Calibration measures this error and applies a correction (PPM). Without it, narrowband signals 
+  like satellites may be missed or distorted. 
+  <a href="https://osmocom.org/projects/rtl-sdr/wiki/Rtl-sdr" target="_blank">Learn more about SDR calibration</a>.
+</div>
+
+<!-- Current PPM display -->
+<div id="ppmBox" class="alert alert-secondary">
+  Current PPM correction: <span id="ppmValue">loading…</span>
+</div>
+
 <button id="calibrateBtn" class="btn btn-warning">🛠️ Calibrate SDR</button>
 <div id="calibrationResult" class="mt-3"></div>
 
 <script>
 document.getElementById("checkBtn").addEventListener("click", () => {
-  fetch("{{ url_for('diagnostics.diagnostics_check') }}")
-    .then(r => r.json())
-    .then(data => {
-      const badge = document.getElementById("statusBadge");
-      const output = document.getElementById("outputBox");
-      if (data.success) {
-        badge.textContent = "Dongle Present";
-        badge.className = "badge bg-success ms-2";
-      } else {
-        badge.textContent = "Not Detected";
-        badge.className = "badge bg-danger ms-2";
-      }
-      output.textContent = data.output;
-    })
-    .catch(err => {
-      document.getElementById("statusBadge").textContent = "Error";
-      document.getElementById("statusBadge").className = "badge bg-warning ms-2";
-      document.getElementById("outputBox").textContent = err;
-    });
+  // ... existing dongle check JS ...
 });
 
-// Poll /status every 5 seconds
 async function updateStatus() {
   try {
     const res = await fetch("{{ url_for('diagnostics.diagnostics_status') }}");
     const data = await res.json();
 
-    document.getElementById("diskInfo").innerText =
-      "Disk free: " + data.disk_free_gb + " GB";
+    // ... your existing disk/pass/orphan logic ...
 
-    if (data.pass_info) {
-      let msg = "Pass in progress: " + data.pass_info.satellite +
-                " (IQ: " + data.pass_info.iq_file + ")";
-      if (data.pass_info.iq_size_mb !== undefined) {
-        msg += " — size: " + data.pass_info.iq_size_mb + " MB";
+    // Update PPM box
+    const ppmBox = document.getElementById("ppmBox");
+    const ppmValue = document.getElementById("ppmValue");
+    if (data.rtl_ppm !== undefined) {
+      ppmValue.textContent = data.rtl_ppm + " ppm";
+      if (data.rtl_ppm === 0) {
+        ppmBox.className = "alert alert-warning";
+        ppmBox.innerHTML = "⚠️ No calibration value found (using 0 ppm). Please run calibration.";
       }
-      document.getElementById("passInfo").innerText = msg;
     } else {
-      document.getElementById("passInfo").innerText = "No pass in progress";
+      ppmValue.textContent = "not available";
     }
-
-    const list = document.getElementById("orphanList");
-    list.innerHTML = "";
-    if (data.orphan_iq && data.orphan_iq.length > 0) {
-      data.orphan_iq.forEach(file => {
-        const li = document.createElement("li");
-        let text = file.path + " (" + file.size_mb + " MB)";
-        if (file.deleted) text += " — auto‑deleted (low disk space)";
-        if (file.delete_error) text += " — error: " + file.delete_error;
-        li.textContent = text;
-
-        if (!file.deleted) {
-          const btn = document.createElement("button");
-          btn.textContent = "Delete";
-          btn.className = "btn btn-sm btn-danger ms-2";
-          btn.onclick = async () => {
-            await fetch("{{ url_for('diagnostics.delete_iq') }}", {
-              method: "POST",
-              headers: {"Content-Type": "application/json"},
-              body: JSON.stringify({path: file.path})
-            });
-            updateStatus();
-          };
-          li.appendChild(btn);
-        }
-        list.appendChild(li);
-      });
-    } else {
-      list.innerHTML = "<li>No orphan IQ files</li>";
-    }
-
   } catch (err) {
-    document.getElementById("diskInfo").innerText = "Disk free: error";
-    document.getElementById("passInfo").innerText = "Pass status: error";
-    document.getElementById("orphanList").innerHTML = "<li>Error loading orphan files</li>";
+    // ... existing error handling ...
   }
 }
 
-// Clear All IQ Files button logic
-document.getElementById("clearAllIqBtn").addEventListener("click", async function() {
-  if (!confirm("Are you sure you want to delete ALL orphan IQ files?")) return;
-  this.disabled = true;
-  this.textContent = "Clearing...";
-  try {
-    const res = await fetch("{{ url_for('diagnostics.clear_all_iq') }}", {method: "POST"});
-    const data = await res.json();
-    if (data.success) {
-      alert(`Deleted ${data.count} orphan IQ file(s).`);
-    } else {
-      alert("Failed to clear orphan IQ files.");
-    }
-  } catch (err) {
-    alert("Error clearing orphan IQ files: " + err);
-  }
-  this.disabled = false;
-  this.textContent = "Clear All IQ Files";
-  updateStatus();
-});
-
-// Calibration button logic
-document.getElementById("calibrateBtn").addEventListener("click", async function() {
-  this.disabled = true;
-  this.textContent = "Calibrating...";
-  const resultBox = document.getElementById("calibrationResult");
-  resultBox.innerHTML = "";
-  try {
-    const res = await fetch("{{ url_for('diagnostics.calibrate') }}", {method: "POST"});
-    const data = await res.json();
-    if (data.success) {
-      resultBox.innerHTML = `
-        <div class="alert alert-success">
-          <strong>PPM correction:</strong> ${data.ppm}<br>
-          <strong>Measured:</strong> ${data.measured_hz} Hz<br>
-          <strong>Expected:</strong> ${data.expected_hz} Hz
-        </div>
-        <div class="row">
-          <div class="col-md-6">
-            <h6>Before</h6>
-            <img src="/images/${data.png_before}" class="img-fluid border rounded">
-          </div>
-          <div class="col-md-6">
-            <h6>After</h6>
-            <img src="/images/${data.png_after}" class="img-fluid border rounded">
-          </div>
-        </div>`;
-    } else {
-      resultBox.innerHTML = `<div class="alert alert-danger">Calibration failed: ${data.error}</div>`;
-    }
-  } catch (err) {
-    resultBox.innerHTML = `<div class="alert alert-warning">Error: ${err}</div>`;
-  }
-  this.disabled = false;
-  this.textContent = "🛠️ Calibrate SDR";
-});
+// ... your existing clear/delete/calibrate JS ...
 
 setInterval(updateStatus, 5000);
 updateStatus();
