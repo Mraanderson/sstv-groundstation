@@ -66,4 +66,15 @@ def generate_predictions(lat, lon, alt, tz, tle_path, hours: int = 48):
     passes.sort(key=lambda p: p["start"])
     save_predicted_passes(passes)
     return passes
+
+def load_predictions():
+    """Read predicted_passes.csv and return a list of dicts with keys: satellite, aos, los, max_elev."""
+    if not PASS_FILE.exists():
+        return []
+    passes = []
+    with PASS_FILE.open() as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            passes.append(row)
+    return passes
     
