@@ -6,7 +6,8 @@ import requests
 
 from . import bp
 from app.utils.sdr import rtl_sdr_present
-from app.utils import passes  # <-- import the shared utility
+from app.utils import passes
+from app.utils.sdr_scheduler import load_pass_predictions, PASS_FILE, manual_refresh
 
 SSTV_SATELLITES = [
     {
@@ -22,14 +23,13 @@ def tle_file_path():
     return os.path.join(current_app.config["TLE_DIR"], "active.txt")
 
 def get_tle_age_days(tle_path):
-    """Return age of TLE file in days, or None if it can't be determined."""
     try:
         with open(tle_path) as f:
             lines = [line.strip() for line in f if line.strip()]
         if len(lines) < 2:
             return None
         line1 = lines[1]
-        epoch_str = line1[18:32]  # YYDDD.DDDDDDDD
+        epoch_str = line1[18:32]
         year = int(epoch_str[:2])
         year += 2000 if year < 57 else 1900
         day_of_year = float(epoch_str[2:])
@@ -56,7 +56,8 @@ def passes_page():
             "age_days": get_tle_age_days(tle_path)
         }
 
-    passes_list = passes.generate_predictions(lat, lon, alt, tz, tle_path)
+    # Load existing predictions from CSV instead of regenerating
+    passes_list = load_pass_predictions(PASS_FILE)
     now_for_template = datetime.now(ZoneInfo(tz)) if tz else datetime.now()
 
     return render_template(
@@ -88,14 +89,30 @@ def update_tle():
             with open(path, "w") as f:
                 f.write("\n".join(tle_lines[:3]) + "\n")
 
-        # Generate passes immediately after updating TLE
-        lat = current_app.config.get("LATITUDE")
-        lon = current_app.config.get("LONGITUDE")
-        alt = current_app.config.get("ALTITUDE_M")
-        tz = current_app.config.get("TIMEZONE")
-        passes.generate_predictions(lat, lon, alt, tz, path)
-
+        # Trigger a refresh of predictions after updating TLE
+        manual_refresh()
         return jsonify({"status": "success", "updated": True})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
-        
+
+@bp.route("/timeline")
+def timeline():
+    """Return current predicted passes as JSON for the frontend."""
+    passes_list = load_pass_predictions(PASS_FILE)
+    return jsonify([
+        {
+            "satellite": sat,
+            "aos": aos.isoformat(),
+            "los": los.isoformat(),
+            "max_elevation": max_el
+        }
+        for sat, aos, los, max_el in passes_list
+    ])
+
+@bp.route("/update-passes", methods=["POST"])
+def update_passes():
+    """Manual refresh of predictions (used by button)."""
+    manual_refresh()
+    refreshed = len(load_pass_predictions(PASS_FILE))
+    return jsonify({"success": True, "count": refreshed})
+    
