@@ -137,4 +137,22 @@
     </div>
   </div>
 </div>
+
+<!-- Current Config Box -->
+<div class="card shadow-sm mt-4">
+  <div class="card-body">
+    <h5>Current Saved Configuration</h5>
+    {% if settings %}
+      <pre class="small bg-light p-2 border rounded">{{ settings | tojson(indent=2) }}</pre>
+      {% if not calibrated %}
+        <div class="alert alert-warning mt-3">
+          ⚠️ SDR calibration has not been performed yet.
+          Please go to the <a href="{{ url_for('diagnostics.diagnostics_page') }}">Diagnostics page</a> and run calibration.
+        </div>
+      {% endif %}
+    {% else %}
+      <p class="text-muted">No configuration saved yet.</p>
+    {% endif %}
+  </div>
+</div>
 {% endblock %}
