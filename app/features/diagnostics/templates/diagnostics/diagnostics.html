@@ -27,6 +27,15 @@ and can stream samples.
 
 <hr>
 
+<h2>SDR Traffic‑Light Status</h2>
+<p>
+This indicator shows whether the SDR is present and available, busy with another process, 
+reserved for a scheduled pass, or missing entirely.
+</p>
+<span id="sdrLight" class="badge bg-secondary">Checking…</span>
+
+<hr>
+
 <h2>Calibration</h2>
 <p>
 Calibration measures how far your dongle’s internal clock drifts from true frequency. 
@@ -124,6 +133,27 @@ async function updateStatus() {
   }
 }
 
+async function updateSdrLight() {
+  try {
+    const res = await fetch("{{ url_for('diagnostics.sdr_status') }}");
+    const data = await res.json();
+    const el = document.getElementById("sdrLight");
+    const map = {
+      green: {cls: "badge bg-success", text: "🟢 Ready"},
+      red:   {cls: "badge bg-danger",  text: "🔴 In Use"},
+      amber: {cls: "badge bg-warning text-dark", text: "🟠 Scheduled Soon"},
+      grey:  {cls: "badge bg-secondary", text: "⚪ Not Present"}
+    };
+    const st = map[data.status] || map.grey;
+    el.className = st.cls;
+    el.textContent = st.text;
+  } catch (err) {
+    const el = document.getElementById("sdrLight");
+    el.className = "badge bg-warning text-dark";
+    el.textContent = "Error";
+  }
+}
+
 document.getElementById("calibrateBtn").addEventListener("click", async function() {
   this.disabled = true;
   this.textContent = "Calibrating...";
@@ -163,5 +193,7 @@ document.getElementById("calibrateBtn").addEventListener("click", async function
 runDongleCheck();
 setInterval(updateStatus, 5000);
 updateStatus();
+setInterval(updateSdrLight, 5000);
+updateSdrLight();
 </script>
 {% endblock %}
