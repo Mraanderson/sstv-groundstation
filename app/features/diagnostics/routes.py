@@ -1,6 +1,6 @@
 import os, json, shutil, subprocess
 from pathlib import Path
-from flask import render_template, jsonify, request
+from flask import render_template, jsonify, request, current_app
 from app.utils.iq_cleanup import cleanup_orphan_iq
 from app.features.diagnostics import bp
 
@@ -62,44 +62,44 @@ def delete_iq():
 # --- Calibration route ---
 @bp.route("/calibrate", methods=["POST"])
 def calibrate():
-    CAL_DIR=(RECORDINGS_DIR/"calibration"); CAL_DIR.mkdir(parents=True,exist_ok=True)
-    fm_csv,fm_png=CAL_DIR/"scan_fm.csv",CAL_DIR/"scan_fm.png"
+    try:
+        CAL_DIR=(RECORDINGS_DIR/"calibration"); CAL_DIR.mkdir(parents=True,exist_ok=True)
+        fm_csv=CAL_DIR/"scan_fm.csv"
 
-    # Scan FM band
-    subprocess.run(["rtl_power","-f","88M:108M:100k","-g","20","-e","6",str(fm_csv)],check=True)
+        # Run rtl_power scan
+        subprocess.run(["rtl_power","-f","88M:108M:100k","-g","20","-e","6",str(fm_csv)],check=True)
 
-    # Parse CSV for strongest peak
-    best_freq,best_power=None,-1e9
-    with open(fm_csv) as f:
-        for line in f:
-            parts=line.strip().split(",")
-            if len(parts)<7: continue
-            f_start,f_end=float(parts[0]),float(parts[1]); bins=[float(x) for x in parts[6:]]
-            if not bins: continue
-            idx=max(range(len(bins)),key=lambda i:bins[i]); power=bins[idx]
-            if power>best_power:
-                best_power=power; bin_size=(f_end-f_start)/len(bins)
-                best_freq=f_start+(idx+0.5)*bin_size
-    if not best_freq: return jsonify({"success":False,"error":"No strong FM peak found"})
+        # Parse CSV for strongest peak
+        best_freq,best_power=None,-1e9
+        with open(fm_csv) as f:
+            for line in f:
+                parts=[p.strip() for p in line.split(",")]
+                if len(parts)<7: continue
+                # Correct columns: parts[2]=f_start, parts[3]=f_end
+                f_start,f_end=float(parts[2]),float(parts[3])
+                bins=[float(x) for x in parts[6:] if x]
+                if not bins: continue
+                idx=max(range(len(bins)),key=lambda i:bins[i]); power=bins[idx]
+                if power>best_power:
+                    best_power=power
+                    bin_size=(f_end-f_start)/len(bins)
+                    best_freq=f_start+(idx+0.5)*bin_size
 
-    expected=round(best_freq/100_000)*100_000
-    ppm=int(round(((best_freq-expected)/expected)*1e6)); ppm=max(min(ppm,3000),-3000)
+        if not best_freq:
+            return jsonify({"success":False,"error":"No strong FM peak found"})
 
-    def nf_capture(label,ppm_arg=None):
-        rate=48000; wav,png=CAL_DIR/f"{label}.wav",CAL_DIR/f"{label}.png"
-        ppm_opts=["-p",str(ppm_arg)] if ppm_arg is not None else []
-        cmd=f"timeout 8 rtl_fm -f {expected} -M fm -s {rate} -g 29.7 -l 0 {' '.join(ppm_opts)} " \
-            f"| tee >(sox -t raw -r {rate} -e signed -b 16 -c 1 - -n spectrogram -o {png}) " \
-            f"| sox -t raw -r {rate} -e signed -b 16 -c 1 - {wav}"
-        subprocess.run(cmd,shell=True,check=True); return wav.name,png.name
+        expected=round(best_freq/100_000)*100_000
+        ppm=int(round(((best_freq-expected)/expected)*1e6)); ppm=max(min(ppm,3000),-3000)
 
-    wav_before,png_before=nf_capture("before")
-    wav_after,png_after=nf_capture("after",ppm)
+        # Save ppm
+        settings=load_settings(); settings["rtl_ppm"]=ppm; save_settings(settings)
 
-    settings=load_settings(); settings["rtl_ppm"]=ppm; save_settings(settings)
-
-    return jsonify({"success":True,"measured_hz":int(best_freq),"expected_hz":int(expected),
-                    "ppm":ppm,"scan_csv":fm_csv.name,
-                    "wav_before":wav_before,"png_before":png_before,
-                    "wav_after":wav_after,"png_after":png_after})
-    
+        return jsonify({"success":True,
+                        "measured_hz":int(best_freq),
+                        "expected_hz":int(expected),
+                        "ppm":ppm,
+                        "scan_csv":fm_csv.name})
+    except Exception as e:
+        current_app.logger.exception("Calibration failed")
+        return jsonify({"success":False,"error":str(e)}),500
+        
