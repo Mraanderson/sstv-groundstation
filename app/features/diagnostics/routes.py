@@ -1,8 +1,9 @@
-import os, json, shutil, subprocess
+import os, json, shutil, subprocess, psutil, datetime
 from pathlib import Path
 from flask import render_template, jsonify, request, current_app
 from app.utils.iq_cleanup import cleanup_orphan_iq
 from app.features.diagnostics import bp
+from app.utils import passes_utils  # make sure this exists
 
 STATE_FILE = os.path.expanduser("~/sstv-groundstation/current_pass.json")
 RECORDINGS_DIR, LOW_SPACE_GB = Path("recordings"), 2
@@ -153,4 +154,43 @@ def calibrate():
     except Exception as e:
         current_app.logger.exception("Calibration failed")
         return jsonify({"success": False, "error": str(e)}), 500
-        
+
+# --- SDR traffic-light status ---
+def sdr_present():
+    return shutil.which("rtl_sdr") is not None
+
+def sdr_in_use():
+    for proc in psutil.process_iter(['name','cmdline']):
+        try:
+            if proc.info['name'] and 'rtl_fm' in proc.info['name']:
+                return True
+            if proc.info['cmdline'] and any('rtl_fm' in c for c in proc.info['cmdline']):
+                return True
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+    return False
+
+def scheduled_pass_soon(minutes=5):
+    try:
+        now = datetime.datetime.now(datetime.timezone.utc)
+        passes = passes_utils.load_predictions()
+        for p in passes:
+            aos = datetime.datetime.fromisoformat(p['aos'])
+            if now <= aos <= now + datetime.timedelta(minutes=minutes):
+                return True
+    except Exception:
+        pass
+    return False
+
+@bp.route("/sdr/status")
+def sdr_status():
+    if not sdr_present():
+        status = "grey"
+    elif sdr_in_use():
+        status = "red"
+    elif scheduled_pass_soon():
+        status = "amber"
+    else:
+        status = "green"
+    return jsonify({"status": status})
+    
