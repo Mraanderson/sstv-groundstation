@@ -108,44 +108,52 @@ def record_pass(sat, aos, los):
     freq_mhz = f"{freq/1e6:.3f}MHz"
     base_name = f"{start_str}_{safe_sat}_{freq_mhz}"
     wav = RECORDINGS_DIR / f"{base_name}.wav"
-    iqfile = RECORDINGS_DIR / f"{base_name}.iq"
 
-    plog = logging.getLogger(start_str); plog.setLevel(logging.INFO)
+    plog = logging.getLogger(start_str)
+    plog.setLevel(logging.INFO)
     plog.addHandler(RotatingFileHandler(RECORDINGS_DIR/f"{base_name}.log",
                                         maxBytes=200_000, backupCount=1))
 
     if not sdr.sdr_exists():
         return log_and_print("warning", f"[{sat}] SDR not detected — skipping.", plog)
 
-    # Disk space check (≥ 3 GB free)
+    # Disk space check
     statvfs = os.statvfs(str(RECORDINGS_DIR))
     free_gb = (statvfs.f_frsize * statvfs.f_bavail) / (1024**3)
     if free_gb < 3:
         return log_and_print("warning", f"[{sat}] Not enough disk space ({free_gb:.2f} GB free) — skipping.", plog)
 
     dur = int((los - aos).total_seconds()) + STOP_LATE
-    log_and_print("info", f"[{sat}] ▶ IQ capture for {dur}s at {freq/1e6:.3f} MHz", plog)
+    log_and_print("info", f"[{sat}] ▶ WAV capture for {dur}s at {freq/1e6:.3f} MHz", plog)
+
+    # Load ppm correction
+    ppm = 0
+    try:
+        if SETTINGS_FILE.exists():
+            ppm = json.loads(SETTINGS_FILE.read_text()).get("rtl_ppm", 0)
+    except Exception as e:
+        logger.warning(f"Could not load ppm: {e}")
 
     # Mark pass start for diagnostics
-    mark_pass_start(sat, iqfile, los)
+    mark_pass_start(sat, wav, los)
 
     error = None; size = 0.0
     try:
+        # Direct FM demod to WAV (resampled to 11025 Hz mono)
+        cmd = (
+            f"timeout {dur} rtl_fm -f {int(freq)} -M fm -s {SAMPLE_RATE} "
+            f"-g {GAIN} -l 0 -p {ppm} "
+            f"| sox -t raw -r {SAMPLE_RATE} -e signed -b 16 -c 1 - "
+            f"-r 11025 -c 1 {wav}"
+        )
+        subprocess.run(cmd, shell=True, check=True)
+
+        # Spectrogram
         subprocess.run([
-            "rtl_sdr", "-f", str(int(freq)), "-s", "2048000",
-            "-n", str(2048000 * dur), str(iqfile)
+            "sox", str(wav), "-n", "spectrogram",
+            "-o", str(RECORDINGS_DIR / f"{base_name}.png")
         ], check=True)
 
-        subprocess.run([
-            "sox", "-t", "raw", "-r", "2048000", "-e", "unsigned", "-b", "8", "-c", "2",
-            str(iqfile), "-r", "48000", "-c", "1", str(wav), "rate"
-        ], check=True)
-
-        subprocess.run([
-            "sox", str(wav), "-n", "spectrogram", "-o", str(RECORDINGS_DIR / f"{base_name}.png")
-        ], check=True)
-
-        iqfile.unlink(missing_ok=True)
         size = wav.stat().st_size / (1024*1024) if wav.exists() else 0.0
 
     except Exception as e:
@@ -154,27 +162,6 @@ def record_pass(sat, aos, los):
     verdict = "PASS" if not error and size > 0 else "FAIL"
     print(f"{GREEN if verdict=='PASS' else RED}[{sat}] PASS COMPLETE — {verdict} — {size:.2f} MB{RESET}")
     write_metadata(start_str, sat, aos, los, freq, dur, size, verdict, error, base_name)
-
-def load_pass_predictions(path):
-    if not Path(path).exists():
-        return []
-    results = []
-    try:
-        with open(path, newline="") as f:
-            for r in csv.DictReader(f):
-                try:
-                    sat = r["satellite"]
-                    aos = datetime.datetime.fromisoformat(r["aos"]).astimezone()
-                    los = datetime.datetime.fromisoformat(r["los"]).astimezone()
-                    max_elev = float(r["max_elev"])
-                    if max_elev >= ELEVATION_THRESHOLD:
-                        results.append((sat, aos, los, max_elev))
-                except (KeyError, ValueError) as e:
-                    logger.warning(f"Skipping invalid pass prediction row: {e}")
-                    continue
-    except (OSError, IOError, csv.Error) as e:
-        logger.warning(f"Could not load pass predictions: {e}")
-    return results
 
 def schedule_passes(passes):
     cfg = load_config_data()
