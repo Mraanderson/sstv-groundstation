@@ -57,6 +57,20 @@ This number is then applied automatically to all future recordings.
 <button id="calibrateBtn" class="btn btn-warning">🛠️ Calibrate SDR</button>
 <div id="calibrationResult" class="mt-3"></div>
 
+<hr>
+
+<h2>Manual Recorder</h2>
+<form method="post" action="{{ url_for('diagnostics.manual_recorder') }}">
+  ...
+</form>
+
+<ul>
+  {% for f in files %}
+    ...
+  {% endfor %}
+</ul>
+
+
 <script>
 async function runDongleCheck() {
   try {
