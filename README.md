@@ -34,18 +34,7 @@ Run the launcher interactively:
 ./launcher.sh
 ```
 
-Or use command-line flags:
-
-```bash
-./launcher.sh -r            # Run the Flask server
-./launcher.sh -u            # Pull latest updates
-./launcher.sh -b            # Switch branch
-./launcher.sh --backup      # Backup images and recordings
-./launcher.sh --restore     # Restore from backup
-./launcher.sh --reclone     # Reclone and choose branch
-./launcher.sh -p 8080       # Set custom port
-./launcher.sh -e production # Set Flask environment
-```
+See also: **Wiki** [Quick Start](https://github.com/Mraanderson/sstv-groundstation/wiki/Quick-start-overview)
 
 The launcher automatically sets up a Python virtual environment and installs dependencies from `requirements.txt`.
 
