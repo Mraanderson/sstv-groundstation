@@ -79,7 +79,7 @@ remove_repo(){
   echo "WARNING: This will delete $APP_DIR and all its contents."
   echo "Images and recordings will be lost unless you back them up."
   read -p "Are you sure? (yes/no): " ans
-  [ "$ans" = "yes" ] && rm -rf "$APP_DIR" && echo "Repository removed." || echo "Cancelled."
+  [ "$ans" = "yes" ] && rm -rf "$APP_DIR" && echo "Repository removed. If sstv-groundstation still exists run rm -rf sstv-groundstation." || echo "Cancelled."
 }
 
 # --- Python env ---
