@@ -112,4 +112,56 @@
     setTimeout(() => confirmBox.remove(), 3000);
   });
 </script>
+
+<div class="card shadow-sm mt-4">
+  <div class="card-body">
+    <h5>Import/Export Config Settings</h5>
+    <p class="text-muted">Import or export <strong>configuration settings only</strong>. This does <strong>not</strong> include images or recordings.</p>
+    <div class="row">
+      <div class="col-md-6">
+        <form action="{{ url_for('settings.import_settings') }}" method="post" enctype="multipart/form-data">
+          <div class="mb-3">
+            <label for="settings_file" class="form-label">Import Config (.json)</label>
+            <input type="file" id="settings_file" name="settings_file" accept=".json" class="form-control">
+          </div>
+          <button type="submit" class="btn btn-primary">Import</button>
+        </form>
+      </div>
+      <div class="col-md-6">
+        <form action="{{ url_for('settings.export_settings') }}" method="get">
+          <label class="form-label">Export Config (.json)</label>
+          <div class="mb-3"></div>
+          <button type="submit" class="btn btn-success">Export</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Current Config Box -->
+<div class="card shadow-sm mt-4">
+  <div class="card-body">
+    <h5>Current Saved Configuration</h5>
+    {% if settings %}
+      <pre class="small bg-light p-2 border rounded">{{ settings | tojson(indent=2) }}</pre>
+    {% else %}
+      <p class="text-muted">No configuration saved yet.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Calibration Box -->
+<div class="card shadow-sm mt-4">
+  <div class="card-body">
+    <h5>SDR Calibration</h5>
+    {% if settings.rtl_ppm and settings.rtl_ppm != 0 %}
+      <p>Current correction: <strong>{{ settings.rtl_ppm }} ppm</strong></p>
+    {% else %}
+      <div class="alert alert-warning">
+        ⚠️ No calibration value found (using 0 ppm). Please run calibration on the
+        <a href="{{ url_for('diagnostics.diagnostics_page') }}">Diagnostics page</a>.
+      </div>
+    {% endif %}
+  </div>
+</div>
 {% endblock %}

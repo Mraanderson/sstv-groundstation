@@ -20,8 +20,11 @@ def save_predicted_passes(passes):
                 p["max_elevation"]
             ])
 
-def generate_predictions(lat, lon, alt, tz, tle_path):
-    """Generate passes for next 24h and save to predicted_passes.csv."""
+def generate_predictions(lat, lon, alt, tz, tle_path, hours: int = 48):
+    """
+    Generate passes for the next `hours` and save to predicted_passes.csv.
+    Default horizon is 48 hours.
+    """
     passes = []
     if None in (lat, lon, alt, tz) or not tle_path or not os.path.exists(tle_path):
         return passes
@@ -34,7 +37,7 @@ def generate_predictions(lat, lon, alt, tz, tle_path):
         lines = [line.strip() for line in f if line.strip()]
 
     now_utc = datetime.now(timezone.utc)
-    end_utc = now_utc + timedelta(hours=24)
+    end_utc = now_utc + timedelta(hours=hours)
     t0, t1 = ts.from_datetime(now_utc), ts.from_datetime(end_utc)
 
     for i in range(0, len(lines), 3):
@@ -46,7 +49,6 @@ def generate_predictions(lat, lon, alt, tz, tle_path):
             continue
 
         for j in range(0, len(events) - 2, 3):
-            # FIX: convert NumPy slice to list before comparing
             if list(events[j:j+3]) == [0, 1, 2]:
                 start = times[j].utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
                 peak  = times[j+1].utc_datetime().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(tz))
@@ -63,5 +65,16 @@ def generate_predictions(lat, lon, alt, tz, tle_path):
 
     passes.sort(key=lambda p: p["start"])
     save_predicted_passes(passes)
+    return passes
+
+def load_predictions():
+    """Read predicted_passes.csv and return a list of dicts with keys: satellite, aos, los, max_elev."""
+    if not PASS_FILE.exists():
+        return []
+    passes = []
+    with PASS_FILE.open() as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            passes.append(row)
     return passes
     

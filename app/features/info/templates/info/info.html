@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+  <h1>Info</h1>
+
+  <h3>Credits</h3>
+  <ul>
+    <li>SSTV decoder: <a href="https://github.com/colaclanth/sstv" target="_blank">colaclanth/sstv</a></li>
+  </ul>
+
+  <h3>ARISS SSTV</h3>
+  <p>
+    ARISS (Amateur Radio on the International Space Station) hosts SSTV events and maintains a gallery of submitted images. If you want to view or submit images from ARISS SSTV events, see the ARISS‑USA user submissions page linked below.
+  </p>
+  <p>
+    ARISS user-submitted SSTV images & upload guidance: <a href="https://ariss-usa.org/ARISS_SSTV/" target="_blank">https://ariss-usa.org/ARISS_SSTV/</a>
+  </p>
+  <p>
+    AMSAT.org status: <a href="https://amsat.org/status/" target="_blank">https://amsat.org/status/</a>
+  </p>
+
+  <h3>About SSTV</h3>
+  <p>
+    Slow Scan Television (SSTV) is a method of transmitting static images via radio, commonly used by amateur radio operators and on the International Space Station (ISS). SSTV encodes images as audio tones, which can be received and decoded using software or hardware decoders. Common modes include Martin M1 and Robot36, each with different transmission speeds and image formats.
+  </p>
+
+  <h3>Groundstation pipeline</h3>
+  <ol class="mt-2">
+    <li><strong>📡 TLE fetch:</strong> Download latest orbital elements for ISS and other satellites.</li>
+    <li><strong>📅 Pass prediction:</strong> Calculate upcoming AOS/LOS times for your location.</li>
+    <li><strong>⏰ Scheduler:</strong> Queue jobs to start SDR capture at each AOS.</li>
+    <li><strong>🎙️ SDR capture:</strong> Use <code>rtl_fm</code> + <code>sox</code> to record audio to WAV.</li>
+    <li><strong>🖼️ SSTV decode:</strong> Resample to 11.025&nbsp;kHz mono, detect sync tone, and decode image (or placeholder).</li>
+    <li><strong>📄 Metadata:</strong> Save JSON with pass info (frequency, duration, ISS position, verdict) and file sizes.</li>
+    <li><strong>🌐 Web UI:</strong> Display recordings, images, and status in the dashboard and info page.</li>
+  </ol>
+</div>
+{% endblock %}
