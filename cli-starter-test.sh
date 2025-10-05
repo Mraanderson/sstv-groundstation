@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # SSTV Groundstation Unified Launcher
 
 set -u   # safer than -euo pipefail (won’t silently kill script)
@@ -10,6 +10,17 @@ GREEN="\033[92m"; RED="\033[91m"; RESET="\033[0m"
 
 msg(){ echo -e "$1$2${RESET}"; }
 have_repo(){ [ -d "$APP_DIR/.git" ]; }
+
+# --- Status line (branch awareness) ---
+status_line(){
+  if ! have_repo; then
+    echo -e "${RED}Installed: no${RESET}"
+  else
+    cd "$APP_DIR"
+    local branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+    echo -e "${GREEN}Installed: yes | Branch: $branch${RESET}"
+  fi
+}
 
 # --- System requirements check ---
 check_requirements() {
@@ -87,7 +98,8 @@ run_local(){
   have_repo || { msg "$RED" "No repo installed"; return; }
   ensure_venv
   check_requirements
-  echo "Launching Flask app on port $PORT..."
+  local branch=$(cd "$APP_DIR" && git rev-parse --abbrev-ref HEAD)
+  echo "Launching Flask app on branch '$branch' at port $PORT..."
   trap "deactivate 2>/dev/null; echo 'Exited cleanly.'" EXIT
   FLASK_APP=run.py FLASK_ENV=$ENV flask run --host=0.0.0.0 --port=$PORT
 }
@@ -101,6 +113,8 @@ main_menu(){
   |   SSTV Groundstation App  |
   +---------------------------+
 EOF
+    status_line
+    echo
     if ! have_repo; then
       echo "1) Clone main branch"
       echo "2) Exit"
@@ -110,8 +124,9 @@ EOF
         2) exit 0;;
       esac
     else
-      echo "1) Run web app"
-      echo "2) Pull latest"
+      local branch=$(cd "$APP_DIR" && git rev-parse --abbrev-ref HEAD)
+      echo "1) Run web app (current: $branch)"
+      echo "2) Pull latest (stay on $branch)"
       echo "3) Switch branch"
       echo "4) Backup (images + recordings)"
       echo "5) Restore (from backup)"
