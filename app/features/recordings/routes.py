@@ -1,30 +1,29 @@
-# recordings/routes.py
-
 import json
 import subprocess
 import psutil
 import os
 from pathlib import Path
-from flask import Blueprint, render_template, jsonify, send_from_directory, request
+from flask import render_template, jsonify, send_from_directory, request
 from werkzeug.utils import secure_filename
+
+from . import bp  # import the blueprint defined in __init__.py
 
 from app.utils.decoder import process_uploaded_wav
 import app.utils.tle as tle_utils
 import app.utils.passes as passes_utils
 from app import config_paths
 
-# IMPORTANT: blueprint name must be 'recordings'
-bp = Blueprint("recordings", __name__)
-
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 RECORDINGS_DIR = (BASE_DIR / "recordings").resolve()
 SETTINGS_FILE = Path("settings.json")
 SCHEDULER_SCRIPT = Path("app/utils/sdr_scheduler.py")
 
+# ---------------- Helpers ----------------
 def build_recordings_lists():
     iss_recordings = []
     other_files = []
 
+    # ISS recordings (with JSON metadata)
     for meta_file in RECORDINGS_DIR.glob("*.json"):
         try:
             meta = json.loads(meta_file.read_text())
@@ -44,6 +43,7 @@ def build_recordings_lists():
         except Exception:
             continue
 
+    # Collect all files in recordings dir
     all_files = set(RECORDINGS_DIR.glob("*"))
     used_files = {r["wav_file"] for r in iss_recordings if r["wav_file"]} \
                | {r["png_file"] for r in iss_recordings if r["png_file"]} \
@@ -85,8 +85,7 @@ def recordings_list_with_status(status=None):
         status=status
     )
 
-# Routes
-
+# ---------------- Routes ----------------
 @bp.route("/", methods=["GET"])
 def recordings_list():
     return recordings_list_with_status()
@@ -140,8 +139,7 @@ def rename_file():
             old_path.rename(new_path)
     return recordings_list()
 
-# Scheduler control
-
+# ---------------- Scheduler control ----------------
 @bp.route("/enable", methods=["POST"])
 def enable_recordings():
     settings = load_settings()
