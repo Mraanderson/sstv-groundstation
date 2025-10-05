@@ -1,13 +1,15 @@
-import os, requests, tempfile, shutil
+
+import os
+import requests
 
 # Map satellite names to their NORAD catalog numbers
 TLE_SOURCES = {
     "ISS": 25544,
-    # "UMKA 1": 57172,
+    #"UMKA 1": 57172,
+    # Add more satellites here if you want to track them
 }
 
 TLE_DIR = os.path.join(os.path.dirname(__file__), "..", "static", "tle")
-ACTIVE_PATH = os.path.join(TLE_DIR, "active.txt")
 
 def fetch_tle(sat_name):
     """Fetch a TLE for the given satellite name from Celestrak GP API."""
@@ -30,35 +32,15 @@ def fetch_tle(sat_name):
         print(f"❌ Failed to fetch TLE for {sat_name}: {e}")
         return None
 
-def save_tles(tle_list, append=False):
-    """Save TLEs to active.txt. Only writes if we have valid data."""
-    if not tle_list:
-        print("⚠ No new TLEs fetched, keeping existing file")
-        return
-
+def save_tle(tle_data):
+    """Save a list of TLE dicts to active.txt in the TLE_DIR."""
     os.makedirs(TLE_DIR, exist_ok=True)
-    mode = "a" if append else "w"
-
-    # Write to a temp file first if overwriting
-    if not append:
-        fd, tmp = tempfile.mkstemp(dir=TLE_DIR)
-        with os.fdopen(fd, "w") as f:
-            for tle in tle_list:
+    path = os.path.join(TLE_DIR, "active.txt")
+    try:
+        with open(path, "w") as f:
+            for tle in tle_data:
                 f.write(f"{tle['name']}\n{tle['line1']}\n{tle['line2']}\n")
-        shutil.move(tmp, ACTIVE_PATH)
-    else:
-        with open(ACTIVE_PATH, mode) as f:
-            for tle in tle_list:
-                f.write(f"{tle['name']}\n{tle['line1']}\n{tle['line2']}\n")
-
-    print(f"✅ TLEs saved to {ACTIVE_PATH}")
-
-def update_tles():
-    """Fetch all satellites and update active.txt only if successful."""
-    new_tles = []
-    for name in TLE_SOURCES:
-        tle = fetch_tle(name)
-        if tle:
-            new_tles.append(tle)
-
-    save_tles(new_tles, append=False)  # set append=True if you want to add to existing
+        print(f"✅ TLEs saved to {path}")
+    except Exception as e:
+        print(f"❌ Failed to save TLEs: {e}")
+        
