@@ -1,0 +1,1 @@
+ finish wiring waterfall snapshot into manual recorder
