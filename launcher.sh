@@ -14,13 +14,38 @@ status_panel(){
   echo "╔════════════════════════════════════════╗"
   echo "║        Groundstation Status            ║"
   echo "╚════════════════════════════════════════╝"
-  if have_repo; then branch=$(cd "$APP_DIR"&&git rev-parse --abbrev-ref HEAD 2>/dev/null); msg "$GREEN" "Repo: ✔ Installed ($branch)"; else msg "$RED" "Repo: ✘ Not installed"; fi
+  if have_repo; then
+    branch=$(cd "$APP_DIR" && git rev-parse --abbrev-ref HEAD 2>/dev/null)
+    msg "$GREEN" "Repo: ✔ Installed ($branch)"
+  else
+    msg "$RED" "Repo: ✘ Not installed"
+  fi
+
   [ -d "$APP_DIR/venv" ] && msg "$GREEN" "Venv: ✔ Present" || msg "$RED" "Venv: ✘ Missing"
-  local essentials_ok=1 missing=(); for b in git python3 pip3 sox rtl_sdr ffmpeg; do command -v $b >/dev/null||{ essentials_ok=0; missing+=($b); }; done
+
+  local essentials_ok=1 missing=()
+  for b in git python3 pip3 sox rtl_sdr ffmpeg; do
+    command -v "$b" >/dev/null || { essentials_ok=0; missing+=("$b"); }
+  done
   [ $essentials_ok -eq 1 ] && msg "$GREEN" "Essentials: ✔ All found" || msg "$RED" "Essentials: ✘ Missing (${missing[*]})"
+
   systemctl --user is-enabled sstv-groundstation >/dev/null 2>&1 && msg "$GREEN" "Systemd: ✔ Enabled" || msg "$RED" "Systemd: ✘ Not enabled"
-  crontab -l 2>/dev/null|grep -q "$APP_DIR/launcher.sh -r" && msg "$GREEN" "Cron: ✔ Present" || msg "$RED" "Cron: ✘ None"
-  if command -v rtl_test >/dev/null 2>&1; then rtl_test -t 2>&1|grep -q "Found" && msg "$GREEN" "USB SDR: ✔ Detected" || msg "$RED" "USB SDR: ✘ Not detected"; else msg "$RED" "USB SDR: ✘ rtl_test missing"; fi
+  crontab -l 2>/dev/null | grep -q "$APP_DIR/launcher.sh -r" && msg "$GREEN" "Cron: ✔ Present" || msg "$RED" "Cron: ✘ None"
+
+  if command -v rtl_test >/dev/null 2>&1; then
+    rtl_test -t 2>&1 | grep -q "Found" && msg "$GREEN" "USB SDR: ✔ Detected" || msg "$RED" "USB SDR: ✘ Not detected"
+  else
+    msg "$RED" "USB SDR: ✘ rtl_test missing"
+  fi
+
+  if [ -x "$APP_DIR/launcher.sh" ]; then
+    msg "$GREEN" "Launcher: ✔ Executable"
+  elif [ -f "$APP_DIR/launcher.sh" ]; then
+    msg "$RED" "Launcher: ✘ Not executable (chmod +x needed)"
+  else
+    msg "$RED" "Launcher: ✘ Missing"
+  fi
+
   echo
 }
 
