@@ -22,28 +22,23 @@ status_line(){
   fi
 }
 
-# --- Minimal requirements check (venv bootstrap only) ---
-check_requirements() {
-  echo "Checking minimal system requirements..."
-  local missing=0
-  for bin in git python3 pip3; do
-    if command -v "$bin" >/dev/null 2>&1; then
-      msg "$GREEN" "✔ $bin found: $(command -v $bin)"
-    else
-      msg "$RED" "✘ $bin NOT found"
-      missing=1
-    fi
-  done
-  [ $missing -eq 1 ] && msg "$RED" "Some required system binaries are missing."
-}
-
-# --- Verify essentials (runtime tools) ---
+# --- Verify essentials (bootstrap + runtime) ---
 verify_essentials() {
-  echo "Verifying essential runtime tools..."
+  echo "Verifying required software..."
   local missing=0
-  for bin in sox rtl_sdr ffmpeg; do
+  for bin in git python3 pip3 sox rtl_sdr ffmpeg; do
     if command -v "$bin" >/dev/null 2>&1; then
-      msg "$GREEN" "✔ $bin found: $(command -v $bin)"
+      # Show version if available
+      case $bin in
+        python3) ver=$($bin --version 2>&1) ;;
+        git) ver=$($bin --version 2>&1) ;;
+        sox) ver=$($bin --version 2>&1 | head -n1) ;;
+        ffmpeg) ver=$($bin -version 2>&1 | head -n1) ;;
+        rtl_sdr) ver=$($bin -V 2>&1 | head -n1) ;;
+        pip3) ver=$($bin --version 2>&1) ;;
+        *) ver="" ;;
+      esac
+      msg "$GREEN" "✔ $bin found: $(command -v $bin) $ver"
     else
       msg "$RED" "✘ $bin NOT found"
       missing=1
@@ -51,9 +46,9 @@ verify_essentials() {
   done
   echo
   if [ $missing -eq 0 ]; then
-    msg "$GREEN" "All essential tools are installed."
+    msg "$GREEN" "All required tools are installed."
   else
-    msg "$RED" "Some essential tools are missing."
+    msg "$RED" "Some required tools are missing."
   fi
   echo
   read -rp "Press Enter to return to the menu..."
@@ -164,7 +159,7 @@ ensure_venv(){
 run_local(){
   have_repo || { msg "$RED" "No repo installed"; return; }
   ensure_venv
-  check_requirements
+  verify_essentials
   local branch=$(cd "$APP_DIR" && git rev-parse --abbrev-ref HEAD)
   echo "Launching Flask app on branch '$branch' at port $PORT..."
   trap "deactivate 2>/dev/null; echo 'Exited cleanly.'" EXIT
