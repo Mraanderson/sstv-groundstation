@@ -37,16 +37,50 @@ check_requirements() {
   [ $missing -eq 1 ] && msg "$RED" "Some required system binaries are missing."
 }
 
+# --- Verify essentials (runtime tools) ---
+verify_essentials() {
+  echo "Verifying essential runtime tools..."
+  for bin in sox rtl_sdr ffmpeg; do
+    if command -v "$bin" >/dev/null 2>&1; then
+      msg "$GREEN" "✔ $bin found: $(command -v $bin)"
+    else
+      msg "$RED" "✘ $bin NOT found"
+    fi
+  done
+}
+
 # --- Install essential runtime software ---
 install_essentials() {
-  echo "Installing essential runtime packages (sox, rtl-sdr, ffmpeg)..."
+  echo "The following packages are considered essential for SSTV Groundstation:"
+  echo "  • sox"
+  echo "  • rtl-sdr"
+  echo "  • ffmpeg"
+  echo
+  echo "Dry run (no changes made):"
   if command -v apt >/dev/null 2>&1; then
-    sudo apt update
-    sudo apt install -y sox rtl-sdr ffmpeg
+    echo "  sudo apt update && sudo apt install -y sox rtl-sdr ffmpeg"
+    pkgmgr="apt"
   elif command -v dnf >/dev/null 2>&1; then
-    sudo dnf install -y sox rtl-sdr ffmpeg
+    echo "  sudo dnf install -y sox rtl-sdr ffmpeg"
+    pkgmgr="dnf"
   else
     msg "$RED" "Unsupported package manager. Please install sox, rtl-sdr, and ffmpeg manually."
+    return
+  fi
+
+  echo
+  read -p "Proceed with installation? (y/n): " ans
+  if [[ "$ans" =~ ^[Yy]$ ]]; then
+    if [ "$pkgmgr" = "apt" ]; then
+      sudo apt update && sudo apt install -y sox rtl-sdr ffmpeg
+    else
+      sudo dnf install -y sox rtl-sdr ffmpeg
+    fi
+
+    echo
+    verify_essentials
+  else
+    msg "$RED" "Installation cancelled by user."
   fi
 
   echo
@@ -155,7 +189,8 @@ EOF
       echo "5) Restore (from backup)"
       echo "6) Remove repo (with warnings)"
       echo "7) Install essential software"
-      echo "8) Exit"
+      echo "8) Verify essential software"
+      echo "9) Exit"
       read -rp "> " c
       case $c in
         1) run_local;;
@@ -165,7 +200,8 @@ EOF
         5) do_restore;;
         6) remove_repo;;
         7) install_essentials;;
-        8) exit 0;;
+        8) verify_essentials;;
+        9) exit 0;;
       esac
     fi
   done
