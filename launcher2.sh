@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SSTV Groundstation Unified Launcher (compact)
+# SSTV Groundstation Unified Launcher (compact with boot mgmt)
 
 set -u
 APP_DIR="$HOME/sstv-groundstation"
@@ -51,15 +51,61 @@ remove_repo(){ echo "WARNING: delete $APP_DIR"; read -p "Are you sure? (yes/no):
 ensure_venv(){ cd "$APP_DIR"; [ -d venv ]||python3 -m venv venv; source venv/bin/activate; pip install --upgrade pip; [ -f requirements.txt ]&&pip install -r requirements.txt; [ -d sstv ]&&pip install ./sstv; }
 run_local(){ have_repo||{ msg "$RED" "No repo"; return; }; ensure_venv; verify_essentials; local branch=$(cd "$APP_DIR"&&git rev-parse --abbrev-ref HEAD); echo "Launching Flask ($branch) on port $PORT..."; trap "deactivate 2>/dev/null; echo 'Exited cleanly.'" EXIT; FLASK_APP=run.py FLASK_ENV=$ENV flask run --host=0.0.0.0 --port=$PORT; }
 
+# --- Boot management ---
+install_systemd_service(){
+  local dir="$HOME/.config/systemd/user"; mkdir -p "$dir"
+  local svc="$dir/sstv-groundstation.service"
+  if systemctl --user status sstv-groundstation >/dev/null 2>&1; then
+    msg "$RED" "Systemd service already exists."; read -p "Reinstall? (y/n): " ans
+    [[ "$ans" =~ ^[Yy]$ ]] && systemctl --user disable sstv-groundstation && rm -f "$svc"
+  fi
+  cat > "$svc" <<EOF
+[Unit]
+Description=SSTV Groundstation Web App
+After=network.target
+[Service]
+Type=simple
+WorkingDirectory=$APP_DIR
+ExecStart=$APP_DIR/launcher.sh -r
+Restart=on-failure
+Environment=FLASK_APP=run.py
+Environment=FLASK_ENV=$ENV
+[Install]
+WantedBy=default.target
+EOF
+  systemctl --user daemon-reload; systemctl --user enable sstv-groundstation
+  msg "$GREEN" "Systemd service installed and enabled."
+}
+remove_systemd_service(){ systemctl --user disable sstv-groundstation 2>/dev/null; rm -f "$HOME/.config/systemd/user/sstv-groundstation.service"; msg "$RED" "Systemd service removed."; }
+install_cron_job(){ local line="@reboot $APP_DIR/launcher.sh -r >> $APP_DIR/cron.log 2>&1"; echo "Dry run: $line"; read -p "Proceed? (y/n): " ans; [[ "$ans" =~ ^[Yy]$ ]]&&(crontab -l 2>/dev/null; echo "$line")|crontab - && msg "$GREEN" "Cron job installed."; }
+remove_cron_job(){ crontab -l 2>/dev/null|grep -v "$APP_DIR/launcher.sh -r"|crontab -; msg "$RED" "Cron job removed."; }
+manage_boot(){ while :; do clear; echo "╔════════════════════════════════╗"; echo "║   Run at Boot Options          ║"; echo "╚════════════════════════════════╝"; echo "1) Install systemd service"; echo "2) Remove systemd service"; echo "3) Install cron @reboot job"; echo "4) Remove cron job"; echo "5) Back"; read -rp "> " c; case $c in 1) install_systemd_service;; 2) remove_systemd_service;; 3) install_cron_job;; 4) remove_cron_job;; 5) break;; esac; read -rp "Press Enter to continue..."; done; }
+
 main_menu(){
   while :; do clear; echo -e "\n  +---------------------------+\n  |   SSTV Groundstation App  |\n  +---------------------------+"; status_line; echo
     if ! have_repo; then echo "1) Clone main branch"; echo "2) Exit"; read -rp "> " c; case $c in 1) git clone -b main "$REPO_URL" "$APP_DIR";; 2) exit 0;; esac
     else local branch=$(cd "$APP_DIR"&&git rev-parse --abbrev-ref HEAD)
-      echo "1) Run web app (current: $branch)"; echo "2) Pull latest"; echo "3) Switch branch"; echo "4) Backup"; echo "5) Restore"; echo "6) Remove repo"; echo "7) Install essentials"; echo "8) Verify essentials"; echo "9) Exit"
+      echo "1) Run web app (current: $branch)"; echo "2) Pull latest"; echo "3) Switch branch"; echo "4) Backup"; echo "5) Restore"; echo "6) Remove repo"; echo "7) Install essentials"; echo "8) Verify essentials"; echo "9) Run at boot (systemd/cron)"; echo "0) Exit"
       read -rp "> " c
-      case $c in 1) run_local;; 2) pull_update;; 3) switch_branch;; 4) do_backup;; 5) do_restore;; 6) remove_repo;; 7) install_essentials;; 8) verify_essentials;; 9) exit 0;; esac
+       case $c in
+        1) run_local;;
+        2) pull_update;;
+        3) switch_branch;;
+        4) do_backup;;
+        5) do_restore;;
+        6) remove_repo;;
+        7) install_essentials;;
+        8) verify_essentials;;
+        9) manage_boot;;
+        0) exit 0;;
+      esac
     fi
   done
 }
 
-main_menu
+# --- Entry point ---
+if [[ "${1:-}" == "-r" ]]; then
+  run_local
+else
+  main_menu
+fi     
