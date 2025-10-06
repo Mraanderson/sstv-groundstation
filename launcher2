@@ -252,3 +252,4 @@ if [[ "${1:-}" == "-r" ]]; then
   run_non_interactive
 else
   main_menu
+}
