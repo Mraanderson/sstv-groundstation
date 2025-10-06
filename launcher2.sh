@@ -40,13 +40,23 @@ check_requirements() {
 # --- Verify essentials (runtime tools) ---
 verify_essentials() {
   echo "Verifying essential runtime tools..."
+  local missing=0
   for bin in sox rtl_sdr ffmpeg; do
     if command -v "$bin" >/dev/null 2>&1; then
       msg "$GREEN" "✔ $bin found: $(command -v $bin)"
     else
       msg "$RED" "✘ $bin NOT found"
+      missing=1
     fi
   done
+  echo
+  if [ $missing -eq 0 ]; then
+    msg "$GREEN" "All essential tools are installed."
+  else
+    msg "$RED" "Some essential tools are missing."
+  fi
+  echo
+  read -rp "Press Enter to return to the menu..."
 }
 
 # --- Install essential runtime software ---
