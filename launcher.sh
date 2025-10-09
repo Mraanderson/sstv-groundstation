@@ -60,23 +60,40 @@ install_essentials(){
 }
 
 pull_update(){
-  if ! have_repo; then msg "$RED" "No repo found."; return; fi
+  if ! have_repo; then
+    msg "$RED" "No repo found."
+    return
+  fi
+
   branch=$(cd "$APP_DIR" && git rev-parse --abbrev-ref HEAD)
   msg "$GREEN" "Updating branch: $branch"
 
-  if systemctl --user is-active --quiet sstv-groundstation; then
-    msg "$RED" "Stopping service..."
-    systemctl --user stop sstv-groundstation
-    msg "$GREEN" "Service stopped."
+  # Check if the systemd service is installed
+  if systemctl --user list-unit-files | grep -q '^sstv-groundstation.service'; then
+    if systemctl --user is-active --quiet sstv-groundstation; then
+      msg "$RED" "Stopping systemd service..."
+      systemctl --user stop sstv-groundstation
+      msg "$GREEN" "Service stopped."
+    else
+      msg "$GREEN" "Service already stopped."
+    fi
+  else
+    msg "$RED" "Systemd service not installed. Skipping stop/restart."
   fi
 
   cd "$APP_DIR"
-  git fetch origin && git pull --ff-only origin "$branch"
-  msg "$GREEN" "Pulled latest changes."
+  msg "$GREEN" "Fetching latest changes..."
+  git fetch origin
 
-  msg "$GREEN" "Restarting service..."
-  systemctl --user start sstv-groundstation
-  msg "$GREEN" "Service restarted."
+  msg "$GREEN" "Pulling updates..."
+  git pull --ff-only origin "$branch"
+
+  # Restart only if the service is installed
+  if systemctl --user list-unit-files | grep -q '^sstv-groundstation.service'; then
+    msg "$GREEN" "Restarting systemd service..."
+    systemctl --user start sstv-groundstation
+    msg "$GREEN" "Service restarted."
+  fi
 }
 
 switch_branch(){
