@@ -170,8 +170,8 @@ def load_pass_predictions(path):
             for row in reader:
                 try:
                     sat = row["satellite"]
-                    aos = datetime.datetime.fromisoformat(row["aos"])
-                    los = datetime.datetime.fromisoformat(row["los"])
+                    aos = datetime.datetime.fromisoformat(row["aos"]).replace(tzinfo=ZoneInfo("UTC"))
+                    los = datetime.datetime.fromisoformat(row["los"]).replace(tzinfo=ZoneInfo("UTC"))
                     max_el = float(row.get("max_elev", 0))
                     results.append((sat, aos, los, max_el))
                 except Exception as e:
