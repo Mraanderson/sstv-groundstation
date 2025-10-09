@@ -1,3 +1,4 @@
+
 {% extends "base.html" %}
 {% block title %}Diagnostics{% endblock %}
 {% block content %}
@@ -60,42 +61,16 @@ This number is then applied automatically to all future recordings.
 <hr>
 
 <h2>Manual Recorder</h2>
-<p>
-Use this form to manually record IQ data from the SDR at a specific frequency.
-</p>
 <form method="post" action="{{ url_for('diagnostics.manual_recorder') }}">
-  <div class="mb-3">
-    <label for="frequency" class="form-label">Center Frequency (MHz)</label>
-    <input type="number" step="0.001" class="form-control" id="frequency" name="frequency" required>
-  </div>
-  <div class="mb-3">
-    <label for="sample_rate" class="form-label">Sample Rate (Hz)</label>
-    <input type="number" class="form-control" id="sample_rate" name="sample_rate" value="2048000" required>
-  </div>
-  <div class="mb-3">
-    <label for="gain" class="form-label">Gain (dB)</label>
-    <input type="number" step="0.1" class="form-control" id="gain" name="gain" value="49.6">
-  </div>
-  <div class="mb-3">
-    <label for="duration" class="form-label">Duration (seconds)</label>
-    <input type="number" class="form-control" id="duration" name="duration" value="10" required>
-  </div>
-  <div class="mb-3">
-    <label for="filename" class="form-label">Output Filename</label>
-    <input type="text" class="form-control" id="filename" name="filename" placeholder="manual_recording.iq" required>
-  </div>
-  <button type="submit" class="btn btn-primary">Start Recording</button>
+  ...
 </form>
 
-<h3>Recorded Files</h3>
 <ul>
   {% for f in files %}
-    <li>
-      <a href="{{ url_for('diagnostics.download_file', filename=f.name) }}">{{ f.name }}</a>
-      ({{ f.size_mb }} MB)
-    </li>
+    ...
   {% endfor %}
 </ul>
+
 
 <script>
 async function runDongleCheck() {
