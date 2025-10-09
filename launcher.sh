@@ -195,6 +195,37 @@ manage_boot(){
   done
 }
 
+ensure_update_script(){
+  local script="$APP_DIR/update-service.sh"
+  if [ ! -f "$script" ]; then
+    cat >"$script"<<EOF
+#!/usr/bin/env bash
+APP_DIR="\$HOME/sstv-groundstation"
+GREEN="\\033[92m"; RED="\\033[91m"; RESET="\\033[0m"
+msg(){ echo -e "\$1\$2\${RESET}"; }
+
+branch=\$(cd "\$APP_DIR" && git rev-parse --abbrev-ref HEAD)
+msg "\$GREEN" "Updating branch: \$branch"
+
+if systemctl --user is-active --quiet sstv-groundstation; then
+  msg "\$RED" "Stopping service..."
+  systemctl --user stop sstv-groundstation
+  msg "\$GREEN" "Service stopped."
+fi
+
+cd "\$APP_DIR"
+git fetch origin && git pull --ff-only origin "\$branch"
+msg "\$GREEN" "Pulled latest changes."
+
+msg "\$GREEN" "Restarting service..."
+systemctl --user start sstv-groundstation
+msg "\$GREEN" "Service restarted."
+EOF
+    chmod +x "$script"
+    msg "$GREEN" "Created and made update-service.sh executable."
+  fi
+}
+
 main_menu(){
   while :; do
     clear
