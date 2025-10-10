@@ -3,6 +3,28 @@
 {% block content %}
 <h1 class="mb-4">Image Gallery</h1>
 
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        <div class="alert-area mb-3">
+        {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">{{ message | safe }}</div>
+        {% endfor %}
+        </div>
+    {% endif %}
+{% endwith %}
+
+<div class="upload-area card p-3 mb-4">
+    <h2 class="card-title h5">Upload New Image</h2>
+    <form method="POST" action="{{ url_for('gallery.upload_image') }}" enctype="multipart/form-data" class="form-inline">
+        <div class="form-group mr-2">
+            <input type="file" name="file" accept="image/*" class="form-control-file" required>
+        </div>
+        <button type="submit" class="btn btn-success">Upload</button>
+    </form>
+</div>
+<hr>
+
+
 <div id="gallery-container">
   {% include "gallery/_gallery_items.html" %}
 </div>
@@ -11,10 +33,15 @@
   // Example: refresh gallery every 60 seconds
   async function refreshGallery() {
     try {
+      // Fetching the partial content
       const response = await fetch("{{ url_for('gallery.gallery_partial') }}");
       if (response.ok) {
         const html = await response.text();
+        // Update the gallery content
         document.getElementById("gallery-container").innerHTML = html;
+        
+        // Optional: After a successful upload, you might want to stop the flash messages 
+        // from disappearing on refresh, but for now, we just update the list.
       }
     } catch (err) {
       console.error("Error refreshing gallery:", err);
