@@ -134,7 +134,7 @@ def record_pass(sat, aos, los):
             f"timeout {dur} rtl_fm -f {int(freq)} -M fm -s {SAMPLE_RATE} "
             f"-g {GAIN} -l 0 -p {ppm} "
             f"| sox -t raw -r {SAMPLE_RATE} -e signed -b 16 -c 1 - "
-            f"-r 11025 -c 1 {wav}"
+            f" -c 1 {wav}"
         )
         subprocess.run(cmd, shell=True, check=True)
         subprocess.run([
