@@ -1,7 +1,18 @@
-
 {% extends "base.html" %}
 {% block title %}Diagnostics{% endblock %}
 {% block content %}
+
+{# --- 1. ADD FLASH MESSAGE DISPLAY (Crucial for showing POST results) --- #}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="flashes">
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }}" role="alert">{{ message }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
 <h1>RTL‑SDR Diagnostics</h1>
 
 <p>
@@ -61,13 +72,59 @@ This number is then applied automatically to all future recordings.
 <hr>
 
 <h2>Manual Recorder</h2>
-<form method="post" action="{{ url_for('diagnostics.manual_recorder') }}">
-  ...
+<p>
+Manually trigger a recording to test the SDR, audio pipeline, and decoder outside of the scheduler. 
+Files are saved in the <code>recordings/manual</code> directory.
+</p>
+
+{# --- 2. ADD COMPLETE MANUAL RECORDER FORM --- #}
+<form method="post" action="{{ url_for('diagnostics.manual_recorder') }}" class="row g-3 align-items-end mb-4">
+    <div class="col-md-3">
+        <label for="frequency" class="form-label">Frequency (e.g., 145.800M)</label>
+        <input type="text" class="form-control" id="frequency" name="frequency" value="145.800M" required>
+    </div>
+    <div class="col-md-3">
+        <label for="duration" class="form-label">Duration (seconds)</label>
+        <input type="number" class="form-control" id="duration" name="duration" value="30" required>
+    </div>
+    <div class="col-md-3">
+        <label for="ppm" class="form-label">PPM Correction</label>
+        <input type="number" class="form-control" id="ppm" name="ppm" value="{{ ppm }}" required>
+        <div class="form-text">Current calibrated value is suggested.</div>
+    </div>
+    <div class="col-md-3">
+        <button type="submit" class="btn btn-primary w-100">Start Manual Record</button>
+    </div>
 </form>
 
-<ul>
+{# --- 3. ADD HISTORY AND LINKS FOR MANUAL RUNS --- #}
+<h4 class="mt-4">Manual Recordings History</h4>
+<ul class="list-group">
   {% for f in files %}
-    ...
+    {# Derive file names for log and PNG from the WAV name #}
+    {% set base_name = f.stem.split('_manual')[0] %}
+    {% set log_file = base_name + '_manual.txt' %}
+    {% set png_file = base_name + '_manual.png' %}
+    
+    <li class="list-group-item {% if loop.first %}list-group-item-info{% endif %}">
+      <strong>{{ f.name }} 
+      {% if loop.first %}(LATEST RUN){% endif %}
+      </strong>
+      <div class="btn-group float-end" role="group">
+        {# Link to WAV file #}
+        <a href="{{ url_for('recordings.recordings_file', filename='manual/' + f.name) }}" class="btn btn-sm btn-outline-secondary" target="_blank">WAV</a>
+        
+        {# Link to Log file #}
+        <a href="{{ url_for('recordings.recordings_file', filename='manual/' + log_file) }}" class="btn btn-sm btn-outline-secondary" target="_blank">Log</a>
+        
+        {# Link to SSTV PNG (check if it exists) #}
+        {% if f.parent.joinpath(png_file).exists() %}
+          <a href="{{ url_for('recordings.recordings_file', filename='manual/' + png_file) }}" class="btn btn-sm btn-outline-success" target="_blank">SSTV Image</a>
+        {% endif %}
+      </div>
+    </li>
+  {% else %}
+    <li class="list-group-item">No manual recordings found.</li>
   {% endfor %}
 </ul>
 
@@ -202,6 +259,8 @@ document.getElementById("calibrateBtn").addEventListener("click", async function
   }
   this.disabled = false;
   this.textContent = "🛠️ Calibrate SDR";
+  // Refresh status and PPM after successful calibration
+  updateStatus(); 
 });
 
 // Run checks on load and poll status
