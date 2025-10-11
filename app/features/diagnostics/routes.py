@@ -171,12 +171,19 @@ def manual_recorder():
         duration = int(request.form.get("duration", 30))
         ppm      = request.form.get("ppm", str(get_ppm()))
 
+        # --- FIX: Use a standard, high-quality sample rate (48000 Hz) ---
+        SAMPLE_RATE = "48000"
+        # ----------------------------------------------------------------
+
         ts = time.strftime("%Y%m%d_%H%M%S")
         wav_file = MANUAL_DIR / f"{ts}_manual.wav"
         log_file = MANUAL_DIR / f"{ts}_manual.txt"
 
-        cmd = ["rtl_fm","-M","fm","-f",freq,"-p",ppm,"-s","11025","-g","40"]
-        sox_cmd = ["sox","-t","raw","-r","11025","-e","s16","-b","16","-c","1","-",
+        # AMENDED: Replaced "11025" with SAMPLE_RATE for rtl_fm -s
+        cmd = ["rtl_fm","-M","fm","-f",freq,"-p",ppm,"-s",SAMPLE_RATE,"-g","40"]
+        
+        # AMENDED: Replaced "11025" with SAMPLE_RATE for sox -r
+        sox_cmd = ["sox","-t","raw","-r",SAMPLE_RATE,"-e","s16","-b","16","-c","1","-",
                    str(wav_file)]
 
         with open(log_file,"w") as lf:
@@ -216,5 +223,3 @@ def manual_recorder():
     # GET request → show form and list of past manual recordings
     files = sorted(MANUAL_DIR.glob("*_manual.wav"), reverse=True)
     return render_template("diagnostics/manual_recorder.html", files=files, ppm=get_ppm())
-
-       
