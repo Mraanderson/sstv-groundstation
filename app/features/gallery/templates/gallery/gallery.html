@@ -34,6 +34,27 @@ required>
 {% include "gallery/_gallery_items.html" %}
 </div>
 <script>
+// Function to handle automatic fade-out of alerts
+function fadeAlerts() {
+const alertArea = document.querySelector('.alert-area');
+if (alertArea) {
+// Apply transition style to all alerts for a smooth fade effect
+alertArea.style.transition = 'opacity 0.5s ease-in-out';
+      // Start fade-out after 5 seconds
+  setTimeout(() =&gt; {
+    // Set opacity to 0 to trigger the fade
+    alertArea.style.opacity = &#39;0&#39;;
+
+    // Remove the element completely from the DOM after the fade transition ends (600ms buffer)
+    setTimeout(() =&gt; {
+      alertArea.remove();
+    }, 600); 
+
+  }, 5000); // 5000ms = 5 seconds wait time
+}
+    }
+// Call the fade function when the page loads
+window.addEventListener('load', fadeAlerts);
 // Example: refresh gallery every 60 seconds
 async function refreshGallery() {
 try {
@@ -43,12 +64,6 @@ if (response.ok) {
 const html = await response.text();
 // Update the gallery content
 document.getElementById("gallery-container").innerHTML = html;
-    // Optional: After a successful upload, you might want to stop the flash messages 
-    // from disappearing on refresh, but for now, we just update the list.
-  }
-} catch (err) {
-  console.error(&quot;Error refreshing gallery:&quot;, err);
-}
     }
 // Refresh every 60 seconds
 setInterval(refreshGallery, 60000);
