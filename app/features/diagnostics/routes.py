@@ -164,62 +164,89 @@ def sdr_status():
     return jsonify({"status": "green"})
 
 # --- Manual Recorder ---
-@bp.route("/recorder", methods=["GET","POST"])
+@bp.route("/recorder", methods=["GET", "POST"])
 def manual_recorder():
+    # Load existing .wav files & current PPM
     try:
         files = sorted(MANUAL_DIR.glob("*.wav"), key=os.path.getmtime, reverse=True)
         ppm = get_ppm()
     except Exception as e:
         current_app.logger.exception("Failed to load manual recordings or PPM")
         flash(f"Error loading manual recordings: {e}", "danger")
-        files = []
-        ppm = 0
-        
+        files, ppm = [], 0
+
     if request.method == "POST":
-        freq     = request.form.get("frequency", "145.800M")
-        duration = int(request.form.get("duration", 30))
-        ppm      = request.form.get("ppm", str(get_ppm()))
+        duration  = int(request.form.get("duration", 30))
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
-        # --- FIX: Use a standard, high-quality sample rate (48000 Hz) ---
-        SAMPLE_RATE = "48000"
-        # ----------------------------------------------------------------
-
-        ts = time.strftime("%Y%m%d_%H%M%S")
-        wav_file = MANUAL_DIR / f"{ts}_manual.wav"
-        log_file = MANUAL_DIR / f"{ts}_manual.txt"
-
-        # AMENDED: Replaced "11025" with SAMPLE_RATE for rtl_fm -s
-        cmd = ["rtl_fm","-M","fm","-f",freq,"-p",ppm,"-s",SAMPLE_RATE,"-g","40"]
-        
-        # AMENDED: Replaced "11025" with SAMPLE_RATE for sox -r
-        sox_cmd = ["sox","-t","raw","-r",SAMPLE_RATE,"-e","s16","-b","16","-c","1","-",
-                   str(wav_file)]
-
-        with open(log_file,"w") as lf:
+        # If no SDR dongle, generate a tone-demo
+        if not sdr_present():
+            demo_file = MANUAL_DIR / f"{timestamp}_demo_manual.wav"
             try:
+                # Build 0.5 s sine-tone segments at 440 Hz/880 Hz
+                segments = []
+                for i in range(int(duration * 2)):
+                    freq = 440 if (i % 2 == 0) else 880
+                    seg = MANUAL_DIR / f"{timestamp}_seg{i}.wav"
+                    subprocess.run(
+                        ["sox", "-n", str(seg), "synth", "0.5", "sin", str(freq)],
+                        check=True
+                    )
+                    segments.append(str(seg))
+
+                # Concatenate segments into final demo file
+                subprocess.run(["sox"] + segments + [str(demo_file)], check=True)
+
+                # Cleanup temporary segments
+                for seg in segments:
+                    os.remove(seg)
+
+                flash(f"Demo recording created: {demo_file.name}", "success")
+            except Exception as e:
+                current_app.logger.exception("Demo recording failed")
+                flash(f"Demo recording error: {e}", "danger")
+
+            return redirect(url_for("diagnostics.manual_recorder"))
+
+        # SDR dongle present → real capture
+        freq     = request.form.get("frequency", "145.800M")
+        ppm_arg  = request.form.get("ppm", str(ppm))
+        SAMPLE_RATE = "48000"
+        wav_file = MANUAL_DIR / f"{timestamp}_manual.wav"
+        log_file = MANUAL_DIR / f"{timestamp}_manual.txt"
+
+        with open(log_file, "w") as lf:
+            try:
+                # rtl_fm → sox pipeline
+                cmd = [
+                    "rtl_fm", "-M", "fm", "-f", freq,
+                    "-p", ppm_arg, "-s", SAMPLE_RATE, "-g", "40"
+                ]
                 p1 = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=lf)
+                sox_cmd = [
+                    "sox", "-t", "raw", "-r", SAMPLE_RATE, "-e", "s16",
+                    "-b", "16", "-c", "1", "-", str(wav_file)
+                ]
                 p2 = subprocess.Popen(sox_cmd, stdin=p1.stdout, stderr=lf)
                 p1.stdout.close()
-                p2.wait(timeout=duration+5)
+                p2.wait(timeout=duration + 5)
             except subprocess.TimeoutExpired:
                 p1.terminate(); p2.terminate()
-                flash("Recording timed out","error")
+                flash("Recording timed out", "danger")
             finally:
-                # Ensure processes are cleaned up
                 if p1.poll() is None: p1.terminate()
                 if p2.poll() is None: p2.terminate()
 
-        # Analyse with soxi
+        # Append soxi analysis to log
         try:
             soxi_out = subprocess.check_output(["soxi", str(wav_file)], text=True)
             with open(log_file, "a") as lf:
-                lf.write("\n--- soxi analysis ---\n")
-                lf.write(soxi_out)
+                lf.write("\n--- soxi analysis ---\n" + soxi_out)
         except Exception as e:
             with open(log_file, "a") as lf:
                 lf.write(f"\nsoxi failed: {e}\n")
 
-        # Decode SSTV
+        # Trigger SSTV decode
         try:
             process_uploaded_wav(str(wav_file))
         except Exception as e:
@@ -229,6 +256,9 @@ def manual_recorder():
         flash(f"Recording complete: {wav_file.name}", "success")
         return redirect(url_for("diagnostics.manual_recorder"))
 
-    # GET request → show form and list of past manual recordings
-    files = sorted(MANUAL_DIR.glob("*_manual.wav"), reverse=True)
-    return render_template("diagnostics/manual_recorder.html", files=files, ppm=get_ppm())
+    # GET → render form + recordings list
+    return render_template(
+        "diagnostics/manual_recorder.html",
+        files=files,
+        ppm=ppm
+    )
