@@ -62,28 +62,80 @@ def refresh_tle_and_predictions():
     print("📅 Pass predictions updated for next 24h.")
 
 
-def build_recordings_list():
-    """Helper to collect recordings with metadata."""
-    recordings = []
-    for meta_file in RECORDINGS_DIR.glob("*.json"):
-        try:
-            meta = json.loads(meta_file.read_text())
-            base = meta_file.stem
-            wav_file = next(RECORDINGS_DIR.glob(f"{base}*.wav"), None)
-            png_file = next(RECORDINGS_DIR.glob(f"{base}*.png"), None)
+import json
+import wave
+from pathlib import Path
+from collections import defaultdict
+from datetime import datetime
 
-            recordings.append({
-                "base": base,
-                "meta": meta,
-                "wav_file": wav_file,
-                "png_file": png_file,
-                "json_file": meta_file
-            })
-        except Exception:
+# … your existing constants …
+# RECORDINGS_DIR already set to the top-level recordings folder
+
+def build_recordings_list():
+    """Recursively scan RECORDINGS_DIR for all relevant files,
+       group by stem, and extract metadata."""
+    grouped = defaultdict(lambda: {
+        "base":       None,
+        "wav_file":   None,
+        "png_file":   None,
+        "json_file":  None,
+        "log_file":   None,
+        "meta": {
+            "timestamp": None,
+            "file_mb":   None,
+            "duration_s": None,
+            # keep any .json fields too
+        }
+    })
+
+    # Walk every file in recordings/
+    for f in RECORDINGS_DIR.rglob("*"):
+        if not f.is_file():
             continue
 
-    recordings.sort(key=lambda r: r["meta"].get("timestamp", ""), reverse=True)
+        stem = f.stem
+        rec  = grouped[stem]
+        rec["base"] = stem
+
+        ext = f.suffix.lower()
+        # WAV
+        if ext == ".wav":
+            rec["wav_file"] = f
+            stat = f.stat()
+            rec["meta"]["timestamp"] = datetime.fromtimestamp(stat.st_mtime)
+            rec["meta"]["file_mb"]   = round(stat.st_size / (1024*1024), 2)
+            # try to read duration
+            try:
+                with wave.open(str(f), "rb") as w:
+                    rec["meta"]["duration_s"] = round(w.getnframes() / w.getframerate(), 2)
+            except Exception:
+                pass
+
+        # PNG
+        elif ext == ".png":
+            rec["png_file"] = f
+
+        # JSON metadata (e.g. from uploads)
+        elif ext == ".json":
+            rec["json_file"] = f
+            try:
+                data = json.loads(f.read_text())
+                rec["meta"].update(data)
+            except Exception:
+                pass
+
+        # TXT or LOG
+        elif ext in (".txt", ".log"):
+            rec["log_file"] = f
+
+    # Convert to list and sort by timestamp desc
+    recordings = sorted(
+        grouped.values(),
+        key=lambda r: r["meta"].get("timestamp") or datetime.min,
+        reverse=True
+    )
     return recordings
+
 
 
 def recordings_list_with_status(status=None):
