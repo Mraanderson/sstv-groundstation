@@ -71,24 +71,32 @@ from datetime import datetime
 # … your existing constants …
 # RECORDINGS_DIR already set to the top-level recordings folder
 
+import json
+import wave
+from pathlib import Path
+from collections import defaultdict
+from datetime import datetime
+
+# RECORDINGS_DIR already set to top‐level recordings/
+
 def build_recordings_list():
-    """Recursively scan RECORDINGS_DIR for all relevant files,
-       group by stem, and extract metadata."""
     grouped = defaultdict(lambda: {
-        "base":       None,
-        "wav_file":   None,
-        "png_file":   None,
-        "json_file":  None,
-        "log_file":   None,
+        "base":        None,
+        "wav_file":    None,
+        "wav_size_mb": None,
+        "png_file":    None,
+        "png_size_mb": None,
+        "json_file":   None,
+        "json_size_mb":None,
+        "log_file":    None,
+        "log_size_mb": None,
         "meta": {
-            "timestamp": None,
-            "file_mb":   None,
+            "timestamp":  None,
+            "file_mb":    None,
             "duration_s": None,
-            # keep any .json fields too
         }
     })
 
-    # Walk every file in recordings/
     for f in RECORDINGS_DIR.rglob("*"):
         if not f.is_file():
             continue
@@ -96,46 +104,47 @@ def build_recordings_list():
         stem = f.stem
         rec  = grouped[stem]
         rec["base"] = stem
-
+        size_mb     = round(f.stat().st_size / (1024*1024), 2)
         ext = f.suffix.lower()
-        # WAV
+
         if ext == ".wav":
-            rec["wav_file"] = f
-            stat = f.stat()
-            rec["meta"]["timestamp"] = datetime.fromtimestamp(stat.st_mtime)
-            rec["meta"]["file_mb"]   = round(stat.st_size / (1024*1024), 2)
-            # try to read duration
+            rec["wav_file"]    = f
+            rec["wav_size_mb"] = size_mb
+            # also for the main columns
+            rec["meta"]["timestamp"] = datetime.fromtimestamp(f.stat().st_mtime)
+            rec["meta"]["file_mb"]   = size_mb
             try:
                 with wave.open(str(f), "rb") as w:
-                    rec["meta"]["duration_s"] = round(w.getnframes() / w.getframerate(), 2)
+                    rec["meta"]["duration_s"] = round(
+                        w.getnframes() / w.getframerate(), 2
+                    )
             except Exception:
                 pass
 
-        # PNG
         elif ext == ".png":
-            rec["png_file"] = f
+            rec["png_file"]    = f
+            rec["png_size_mb"] = size_mb
 
-        # JSON metadata (e.g. from uploads)
         elif ext == ".json":
-            rec["json_file"] = f
+            rec["json_file"]    = f
+            rec["json_size_mb"] = size_mb
             try:
                 data = json.loads(f.read_text())
                 rec["meta"].update(data)
             except Exception:
                 pass
 
-        # TXT or LOG
         elif ext in (".txt", ".log"):
-            rec["log_file"] = f
+            rec["log_file"]    = f
+            rec["log_size_mb"] = size_mb
 
-    # Convert to list and sort by timestamp desc
+    # Sort by the WAV timestamp (newest first)
     recordings = sorted(
         grouped.values(),
         key=lambda r: r["meta"].get("timestamp") or datetime.min,
         reverse=True
     )
     return recordings
-
 
 
 def recordings_list_with_status(status=None):
