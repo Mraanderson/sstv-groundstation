@@ -73,16 +73,16 @@ from pathlib import Path
 from collections import defaultdict
 from datetime import datetime
 
-# RECORDINGS_DIR → your top-level recordings folder
+# RECORDINGS_DIR → Path to your top-level recordings/ folder
 
 def build_recordings_list():
-    # collect by base-stem
+    # temporary dict keyed by filename-stem
     temp = defaultdict(lambda: {
-        "base":      None,
-        "wav_file":  None,
-        "png_file":  None,
-        "json_file": None,
-        "log_file":  None,
+        "base":       None,
+        "wav_file":   None, "wav_path":   None,
+        "png_file":   None, "png_path":   None,
+        "json_file":  None, "json_path":  None,
+        "log_file":   None, "log_path":   None,
         "meta": {
             "timestamp":    None,
             "timestamp_ts":  0.0,
@@ -92,6 +92,7 @@ def build_recordings_list():
         }
     })
 
+    # 1) Scan all files
     for f in RECORDINGS_DIR.rglob("*"):
         if not f.is_file():
             continue
@@ -100,72 +101,77 @@ def build_recordings_list():
         rec  = temp[stem]
         rec["base"] = stem
 
-        ext  = f.suffix.lower()
-        stat = f.stat()
-        size = round(stat.st_size / (1024*1024), 2)
+        ext     = f.suffix.lower()
+        stat    = f.stat()
+        size_mb = round(stat.st_size / (1024 * 1024), 2)
+        relpath = str(f.relative_to(RECORDINGS_DIR))
 
         if ext == ".wav":
             ts = stat.st_mtime
             rec["wav_file"]             = f
+            rec["wav_path"]             = relpath
             rec["meta"]["timestamp"]    = datetime.fromtimestamp(ts)
             rec["meta"]["timestamp_ts"] = ts
-            rec["meta"]["file_mb"]      = size
+            rec["meta"]["file_mb"]      = size_mb
             try:
                 with wave.open(str(f), "rb") as w:
                     rec["meta"]["duration_s"] = round(
                         w.getnframes() / w.getframerate(), 2
                     )
-            except:
+            except Exception:
                 pass
 
         elif ext == ".png":
             rec["png_file"] = f
+            rec["png_path"] = relpath
 
         elif ext == ".json":
             rec["json_file"] = f
+            rec["json_path"] = relpath
             try:
                 data = json.loads(f.read_text())
-                # override satellite if present
-                if data.get("satellite"):
+                if "satellite" in data:
                     rec["meta"]["satellite"] = data["satellite"]
-                # override timestamp if present
                 raw_ts = data.get("timestamp")
                 if isinstance(raw_ts, str):
                     dt = datetime.fromisoformat(raw_ts)
                     rec["meta"]["timestamp"]    = dt.replace(tzinfo=None)
                     rec["meta"]["timestamp_ts"] = dt.timestamp()
-                # merge other JSON fields
                 for k, v in data.items():
-                    if k not in ("timestamp","satellite"):
+                    if k not in ("timestamp", "satellite"):
                         rec["meta"][k] = v
-            except:
+            except Exception:
                 pass
 
         elif ext in (".txt", ".log"):
             rec["log_file"] = f
+            rec["log_path"] = relpath
 
-    # group by satellite (fallback to 'Unknown Satellite')
+    # 2) Group by satellite, defaulting to "Unknown Satellite"
     sat_groups = defaultdict(list)
     for rec in temp.values():
         sat = rec["meta"].get("satellite") or "Unknown Satellite"
         sat_groups[sat].append(rec)
 
-    # sort each group newest-first
+    # 3) Sort each satellite group newest→oldest
     for recs in sat_groups.values():
-        recs.sort(key=lambda r: r["meta"].get("timestamp_ts", 0.0),
-                  reverse=True)
+        recs.sort(
+            key=lambda r: r["meta"].get("timestamp_ts", 0.0),
+            reverse=True
+        )
 
-    # decide satellite order: alpha, with Unknown last
-    sats = sorted([s for s in sat_groups if s != "Unknown Satellite"])
+    # 4) Determine satellite order (alpha, with Unknown last)
+    sats = sorted(s for s in sat_groups if s != "Unknown Satellite")
     if "Unknown Satellite" in sat_groups:
         sats.append("Unknown Satellite")
 
-    # flatten
+    # 5) Flatten groups back into one list
     recordings = []
     for sat in sats:
         recordings.extend(sat_groups[sat])
 
     return recordings
+
 
 
 
