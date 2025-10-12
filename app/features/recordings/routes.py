@@ -64,29 +64,30 @@ def refresh_tle_and_predictions():
     print("📅 Pass predictions updated for next 24h.")
 
 
+# ┌────────────────────────────────────────────────────────────────────────────┐
+# │ 1) routes.py – build_recordings_list with relative paths for every file  │
+# └────────────────────────────────────────────────────────────────────────────┘
 import json
 import wave
 from pathlib import Path
 from collections import defaultdict
 from datetime import datetime
 
-# RECORDINGS_DIR must already point at your top-level recordings/
-# e.g. /home/pi/sstv-groundstation/recordings
+# RECORDINGS_DIR → your top‐level recordings folder
 
 def build_recordings_list():
-    # 1) First pass: collect every file under recordings/
     grouped = defaultdict(lambda: {
         "base":       None,
-        "wav_file":   None,
-        "png_file":   None,
-        "json_file":  None,
-        "log_file":   None,
+        "wav_file":   None, "wav_path":   None,
+        "png_file":   None, "png_path":   None,
+        "json_file":  None, "json_path":  None,
+        "log_file":   None, "log_path":   None,
         "meta": {
-            "timestamp":    None,    # datetime for display
-            "timestamp_ts":  0.0,    # float epoch for sorting
+            "timestamp":    None,
+            "timestamp_ts":  0.0,
             "file_mb":      None,
             "duration_s":   None,
-            "satellite":    None,    # will fill from JSON if present
+            "satellite":    None,
         }
     })
 
@@ -102,14 +103,14 @@ def build_recordings_list():
         stat    = f.stat()
         size_mb = round(stat.st_size / (1024 * 1024), 2)
 
-        # WAV files: use file-modify time as our default timestamp
+        # WAV: set timestamp, size, duration + relative path
         if ext == ".wav":
             ts = stat.st_mtime
-            rec["wav_file"]               = f
-            rec["meta"]["timestamp"]      = datetime.fromtimestamp(ts)
-            rec["meta"]["timestamp_ts"]   = ts
-            rec["meta"]["file_mb"]        = size_mb
-
+            rec["wav_file"]             = f
+            rec["wav_path"]             = str(f.relative_to(RECORDINGS_DIR))
+            rec["meta"]["timestamp"]    = datetime.fromtimestamp(ts)
+            rec["meta"]["timestamp_ts"] = ts
+            rec["meta"]["file_mb"]      = size_mb
             try:
                 with wave.open(str(f), "rb") as w:
                     rec["meta"]["duration_s"] = round(
@@ -118,62 +119,43 @@ def build_recordings_list():
             except Exception:
                 pass
 
-        # PNG: just slot in
+        # PNG: just attach relative path
         elif ext == ".png":
             rec["png_file"] = f
+            rec["png_path"] = str(f.relative_to(RECORDINGS_DIR))
 
-        # JSON: may include its own timestamp AND a satellite field
+        # JSON: parse metadata, override timestamp if present
         elif ext == ".json":
             rec["json_file"] = f
+            rec["json_path"] = str(f.relative_to(RECORDINGS_DIR))
             try:
                 data = json.loads(f.read_text())
-                # Pull out satellite if present
-                if "satellite" in data:
-                    rec["meta"]["satellite"] = data["satellite"]
-                # If JSON gives you its own timestamp, override
                 raw_ts = data.get("timestamp")
                 if isinstance(raw_ts, str):
                     dt = datetime.fromisoformat(raw_ts)
                     ts = dt.timestamp()
                     rec["meta"]["timestamp"]    = dt.replace(tzinfo=None)
                     rec["meta"]["timestamp_ts"] = ts
-                # Merge any other JSON metadata you care about
+                if "satellite" in data:
+                    rec["meta"]["satellite"] = data["satellite"]
                 for k, v in data.items():
-                    if k not in ("timestamp","satellite"):
+                    if k not in ("timestamp", "satellite"):
                         rec["meta"][k] = v
             except Exception:
                 pass
 
-        # TXT or LOG: just slot it in
+        # LOG/TXT: just attach relative path
         elif ext in (".txt", ".log"):
             rec["log_file"] = f
+            rec["log_path"] = str(f.relative_to(RECORDINGS_DIR))
 
-    # 2) Group records by satellite name
-    sat_groups = defaultdict(list)
-    for rec in grouped.values():
-        sat = rec["meta"].get("satellite") or "Unknown Satellite"
-        sat_groups[sat].append(rec)
-
-    # 3) Sort each satellite’s list newest-first
-    for sat, recs in sat_groups.items():
-        recs.sort(
-            key=lambda r: r["meta"].get("timestamp_ts", 0.0),
-            reverse=True
-        )
-
-    # 4) Decide your satellite ordering
-    #    Here we do alphabetical, but force "Unknown Satellite" to the end.
-    sats = sorted(s for s in sat_groups if s != "Unknown Satellite")
-    if "Unknown Satellite" in sat_groups:
-        sats.append("Unknown Satellite")
-
-    # 5) Flatten back into one list, in satellite order
-    recordings = []
-    for sat in sats:
-        recordings.extend(sat_groups[sat])
-
+    # Flatten & sort by numeric timestamp
+    recordings = sorted(
+        grouped.values(),
+        key=lambda r: r["meta"].get("timestamp_ts", 0.0),
+        reverse=True
+    )
     return recordings
-
 
 
 def recordings_list_with_status(status=None):
