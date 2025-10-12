@@ -94,42 +94,39 @@
                 <td>{{ r.meta.duration_s or "?" }} s</td>
                 <td>{{ r.meta.file_mb or "?" }} MB</td>
                 <td>
-
-
-{% if r.wav_file %}
-    🎵
-    <a href="{{ url_for('recordings.recordings_file', filename=r.wav_file.relative_to(rec_dir)) }}"
-       title="{{ r.wav_file.name }}">
+  {% if r.wav_file %}
+    🎵 
+    <a href="{{ url_for('recordings.recordings_file', filename=r.wav_path) }}"
+       title="{{ r.wav_file.name }}"
+       target="_blank">
       {{ r.wav_file.name }}
     </a>
-    ({{ r.wav_size_mb }} MB)
   {% endif %}
   {% if r.png_file %}
-    | 🖼️
-    <a href="{{ url_for('recordings.recordings_file', filename=r.png_file.relative_to(rec_dir)) }}"
-       title="{{ r.png_file.name }}">
+    | 🖼️ 
+    <a href="{{ url_for('recordings.recordings_file', filename=r.png_path) }}"
+       title="{{ r.png_file.name }}"
+       target="_blank">
       {{ r.png_file.name }}
     </a>
-    ({{ r.png_size_mb }} MB)
   {% endif %}
   {% if r.log_file %}
-    | 📄
-    <a href="{{ url_for('recordings.recordings_file', filename=r.log_file.relative_to(rec_dir)) }}"
-       title="{{ r.log_file.name }}">
+    | 📄 
+    <a href="{{ url_for('recordings.recordings_file', filename=r.log_path) }}"
+       title="{{ r.log_file.name }}"
+       target="_blank">
       {{ r.log_file.name }}
     </a>
-    ({{ r.log_size_mb }} MB)
   {% endif %}
   {% if r.json_file %}
-    | 🧾
-    <a href="{{ url_for('recordings.recordings_file', filename=r.json_file.relative_to(rec_dir)) }}"
-       title="{{ r.json_file.name }}">
+    | 🧾 
+    <a href="{{ url_for('recordings.recordings_file', filename=r.json_path) }}"
+       title="{{ r.json_file.name }}"
+       target="_blank">
       {{ r.json_file.name }}
     </a>
-    ({{ r.json_size_mb }} MB)
   {% endif %}
-                
-                </td>
+</td>
               </tr>
             {% endfor %}
           </tbody>
@@ -160,42 +157,37 @@
                 <input type="checkbox" name="bases" value="{{ r.base }}">
               </div>
               <small class="text-muted d-block mt-1">⏳ {{ r.meta.duration_s or "?" }} s · 💾 {{ r.meta.file_mb or "?" }} MB</small>
-              <div class="mt-2 d-flex gap-2">
-
+              <div class="mt-2 d-flex gap-2 align-items-center">
   {% if r.wav_file %}
-    🎵
-    <a href="{{ url_for('recordings.recordings_file', filename=r.wav_file.relative_to(rec_dir)) }}"
-       title="{{ r.wav_file.name }}">
+    🎵 
+    <a href="{{ url_for('recordings.recordings_file', filename=r.wav_path) }}"
+       title="{{ r.wav_file.name }}" target="_blank">
       {{ r.wav_file.name }}
     </a>
-    ({{ r.wav_size_mb }} MB)
   {% endif %}
   {% if r.png_file %}
-    | 🖼️
-    <a href="{{ url_for('recordings.recordings_file', filename=r.png_file.relative_to(rec_dir)) }}"
-       title="{{ r.png_file.name }}">
+    | 🖼️ 
+    <a href="{{ url_for('recordings.recordings_file', filename=r.png_path) }}"
+       title="{{ r.png_file.name }}" target="_blank">
       {{ r.png_file.name }}
     </a>
-    ({{ r.png_size_mb }} MB)
   {% endif %}
   {% if r.log_file %}
-    | 📄
-    <a href="{{ url_for('recordings.recordings_file', filename=r.log_file.relative_to(rec_dir)) }}"
-       title="{{ r.log_file.name }}">
+    | 📄 
+    <a href="{{ url_for('recordings.recordings_file', filename=r.log_path) }}"
+       title="{{ r.log_file.name }}" target="_blank">
       {{ r.log_file.name }}
     </a>
-    ({{ r.log_size_mb }} MB)
   {% endif %}
   {% if r.json_file %}
-    | 🧾
-    <a href="{{ url_for('recordings.recordings_file', filename=r.json_file.relative_to(rec_dir)) }}"
-       title="{{ r.json_file.name }}">
+    | 🧾 
+    <a href="{{ url_for('recordings.recordings_file', filename=r.json_path) }}"
+       title="{{ r.json_file.name }}" target="_blank">
       {{ r.json_file.name }}
     </a>
-    ({{ r.json_size_mb }} MB)
   {% endif %}
+</div>
 
-              </div>
             </div>
           </div>
         </div>
