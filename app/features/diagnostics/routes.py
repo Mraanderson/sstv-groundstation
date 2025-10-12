@@ -166,6 +166,15 @@ def sdr_status():
 # --- Manual Recorder ---
 @bp.route("/recorder", methods=["GET","POST"])
 def manual_recorder():
+    try:
+        files = sorted(MANUAL_DIR.glob("*.wav"), key=os.path.getmtime, reverse=True)
+        ppm = get_ppm()
+    except Exception as e:
+        current_app.logger.exception("Failed to load manual recordings or PPM")
+        flash(f"Error loading manual recordings: {e}", "danger")
+        files = []
+        ppm = 0
+        
     if request.method == "POST":
         freq     = request.form.get("frequency", "145.800M")
         duration = int(request.form.get("duration", 30))
