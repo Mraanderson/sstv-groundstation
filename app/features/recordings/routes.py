@@ -62,34 +62,23 @@ def refresh_tle_and_predictions():
     print("📅 Pass predictions updated for next 24h.")
 
 
-import json
-import wave
-from pathlib import Path
-from collections import defaultdict
-from datetime import datetime
-
 # … your existing constants …
 # RECORDINGS_DIR already set to the top-level recordings folder
-
-import json
-import wave
-from pathlib import Path
-from collections import defaultdict
-from datetime import datetime
 
 # RECORDINGS_DIR already set to top‐level recordings/
 
 def build_recordings_list():
     grouped = defaultdict(lambda: {
-        "base":       None,
-        "wav_file":   None,
-        "png_file":   None,
-        "json_file":  None,
-        "log_file":   None,
+        "base":         None,
+        "wav_file":     None,
+        "png_file":     None,
+        "json_file":    None,
+        "log_file":     None,
         "meta": {
-            "timestamp":  None,
-            "file_mb":    None,
-            "duration_s": None,
+            "timestamp":    None,   # datetime for display
+            "timestamp_ts": 0.0,    # float seconds since epoch for sorting
+            "file_mb":      None,
+            "duration_s":   None,
         }
     })
 
@@ -97,20 +86,22 @@ def build_recordings_list():
         if not f.is_file():
             continue
 
-        ext  = f.suffix.lower()
         stem = f.stem
         rec  = grouped[stem]
         rec["base"] = stem
 
-        # pre-compute size (for WAV and any other file)
+        ext     = f.suffix.lower()
         size_mb = round(f.stat().st_size / (1024 * 1024), 2)
 
+        # WAV: mtime → timestamp, duration, size
         if ext == ".wav":
+            stat = f.stat()
+            ts   = stat.st_mtime
             rec["wav_file"] = f
-            rec["meta"]["file_mb"] = size_mb
-            # set timestamp to file‐modify time
-            rec["meta"]["timestamp"] = datetime.fromtimestamp(f.stat().st_mtime)
-            # compute duration
+            rec["meta"]["timestamp"]    = datetime.fromtimestamp(ts)
+            rec["meta"]["timestamp_ts"] = ts
+            rec["meta"]["file_mb"]      = size_mb
+
             try:
                 with wave.open(str(f), "rb") as w:
                     rec["meta"]["duration_s"] = round(
@@ -119,44 +110,37 @@ def build_recordings_list():
             except Exception:
                 pass
 
+        # PNG: just attach
         elif ext == ".png":
             rec["png_file"] = f
 
+        # JSON metadata: parse any timestamp string
         elif ext == ".json":
             rec["json_file"] = f
             try:
                 data = json.loads(f.read_text())
-                # merge in JSON fields—but leave timestamp parsing to the sorter
-                rec["meta"].update(data)
+                # If JSON has a timestamp field, parse it
+                raw_ts = data.get("timestamp")
+                if isinstance(raw_ts, str):
+                    # fromisoformat handles both naive and "+00:00" offsets
+                    dt = datetime.fromisoformat(raw_ts)
+                    rec["meta"]["timestamp"]    = dt.replace(tzinfo=None)
+                    rec["meta"]["timestamp_ts"] = dt.timestamp()
+                # merge the rest of the JSON fields
+                for k, v in data.items():
+                    if k not in ("timestamp",):
+                        rec["meta"][k] = v
             except Exception:
                 pass
 
+        # TXT or LOG: just attach
         elif ext in (".txt", ".log"):
             rec["log_file"] = f
 
-    # helper to coerce timestamps to datetime
-    def _ts_key(r):
-        ts = r["meta"].get("timestamp")
-        # already a datetime?
-        if isinstance(ts, datetime):
-            return ts
-        # if it's a string, try ISO‐format parse
-        if isinstance(ts, str):
-            try:
-                return datetime.fromisoformat(ts)
-            except ValueError:
-                pass
-        # fallback: use WAV file mtime if available
-        wav = r.get("wav_file")
-        if wav:
-            return datetime.fromtimestamp(wav.stat().st_mtime)
-        # ultimate fallback:
-        return datetime.min
-
-    # turn into sorted list
+    # Turn into list & sort by numeric timestamp
     recordings = sorted(
         grouped.values(),
-        key=_ts_key,
+        key=lambda r: r["meta"].get("timestamp_ts", 0.0),
         reverse=True
     )
     return recordings
