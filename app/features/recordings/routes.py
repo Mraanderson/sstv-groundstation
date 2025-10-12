@@ -81,15 +81,11 @@ from datetime import datetime
 
 def build_recordings_list():
     grouped = defaultdict(lambda: {
-        "base":        None,
-        "wav_file":    None,
-        "wav_size_mb": None,
-        "png_file":    None,
-        "png_size_mb": None,
-        "json_file":   None,
-        "json_size_mb":None,
-        "log_file":    None,
-        "log_size_mb": None,
+        "base":       None,
+        "wav_file":   None,
+        "png_file":   None,
+        "json_file":  None,
+        "log_file":   None,
         "meta": {
             "timestamp":  None,
             "file_mb":    None,
@@ -101,18 +97,20 @@ def build_recordings_list():
         if not f.is_file():
             continue
 
+        ext  = f.suffix.lower()
         stem = f.stem
         rec  = grouped[stem]
         rec["base"] = stem
-        size_mb     = round(f.stat().st_size / (1024*1024), 2)
-        ext = f.suffix.lower()
+
+        # pre-compute size (for WAV and any other file)
+        size_mb = round(f.stat().st_size / (1024 * 1024), 2)
 
         if ext == ".wav":
-            rec["wav_file"]    = f
-            rec["wav_size_mb"] = size_mb
-            # also for the main columns
+            rec["wav_file"] = f
+            rec["meta"]["file_mb"] = size_mb
+            # set timestamp to file‐modify time
             rec["meta"]["timestamp"] = datetime.fromtimestamp(f.stat().st_mtime)
-            rec["meta"]["file_mb"]   = size_mb
+            # compute duration
             try:
                 with wave.open(str(f), "rb") as w:
                     rec["meta"]["duration_s"] = round(
@@ -122,26 +120,43 @@ def build_recordings_list():
                 pass
 
         elif ext == ".png":
-            rec["png_file"]    = f
-            rec["png_size_mb"] = size_mb
+            rec["png_file"] = f
 
         elif ext == ".json":
-            rec["json_file"]    = f
-            rec["json_size_mb"] = size_mb
+            rec["json_file"] = f
             try:
                 data = json.loads(f.read_text())
+                # merge in JSON fields—but leave timestamp parsing to the sorter
                 rec["meta"].update(data)
             except Exception:
                 pass
 
         elif ext in (".txt", ".log"):
-            rec["log_file"]    = f
-            rec["log_size_mb"] = size_mb
+            rec["log_file"] = f
 
-    # Sort by the WAV timestamp (newest first)
+    # helper to coerce timestamps to datetime
+    def _ts_key(r):
+        ts = r["meta"].get("timestamp")
+        # already a datetime?
+        if isinstance(ts, datetime):
+            return ts
+        # if it's a string, try ISO‐format parse
+        if isinstance(ts, str):
+            try:
+                return datetime.fromisoformat(ts)
+            except ValueError:
+                pass
+        # fallback: use WAV file mtime if available
+        wav = r.get("wav_file")
+        if wav:
+            return datetime.fromtimestamp(wav.stat().st_mtime)
+        # ultimate fallback:
+        return datetime.min
+
+    # turn into sorted list
     recordings = sorted(
         grouped.values(),
-        key=lambda r: r["meta"].get("timestamp") or datetime.min,
+        key=_ts_key,
         reverse=True
     )
     return recordings
