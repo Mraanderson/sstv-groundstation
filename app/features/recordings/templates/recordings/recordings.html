@@ -159,34 +159,31 @@
               <small class="text-muted d-block mt-1">⏳ {{ r.meta.duration_s or "?" }} s · 💾 {{ r.meta.file_mb or "?" }} MB</small>
               <div class="mt-2 d-flex gap-2 align-items-center">
   {% if r.wav_file %}
-    🎵 
     <a href="{{ url_for('recordings.recordings_file', filename=r.wav_path) }}"
        title="{{ r.wav_file.name }}" target="_blank">
-      {{ r.wav_file.name }}
+      🎵
     </a>
   {% endif %}
   {% if r.png_file %}
-    | 🖼️ 
     <a href="{{ url_for('recordings.recordings_file', filename=r.png_path) }}"
        title="{{ r.png_file.name }}" target="_blank">
-      {{ r.png_file.name }}
+      🖼️
     </a>
   {% endif %}
   {% if r.log_file %}
-    | 📄 
     <a href="{{ url_for('recordings.recordings_file', filename=r.log_path) }}"
        title="{{ r.log_file.name }}" target="_blank">
-      {{ r.log_file.name }}
+      📄
     </a>
   {% endif %}
   {% if r.json_file %}
-    | 🧾 
     <a href="{{ url_for('recordings.recordings_file', filename=r.json_path) }}"
        title="{{ r.json_file.name }}" target="_blank">
-      {{ r.json_file.name }}
+      🧾
     </a>
   {% endif %}
 </div>
+
 
             </div>
           </div>
