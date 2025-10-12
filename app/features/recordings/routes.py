@@ -64,23 +64,29 @@ def refresh_tle_and_predictions():
     print("📅 Pass predictions updated for next 24h.")
 
 
-# … your existing constants …
-# RECORDINGS_DIR already set to the top-level recordings folder
+import json
+import wave
+from pathlib import Path
+from collections import defaultdict
+from datetime import datetime
 
-# RECORDINGS_DIR already set to top‐level recordings/
+# RECORDINGS_DIR must already point at your top-level recordings/
+# e.g. /home/pi/sstv-groundstation/recordings
 
 def build_recordings_list():
+    # 1) First pass: collect every file under recordings/
     grouped = defaultdict(lambda: {
-        "base":         None,
-        "wav_file":     None,
-        "png_file":     None,
-        "json_file":    None,
-        "log_file":     None,
+        "base":       None,
+        "wav_file":   None,
+        "png_file":   None,
+        "json_file":  None,
+        "log_file":   None,
         "meta": {
-            "timestamp":    None,   # datetime for display
-            "timestamp_ts": 0.0,    # float seconds since epoch for sorting
+            "timestamp":    None,    # datetime for display
+            "timestamp_ts":  0.0,    # float epoch for sorting
             "file_mb":      None,
             "duration_s":   None,
+            "satellite":    None,    # will fill from JSON if present
         }
     })
 
@@ -93,16 +99,16 @@ def build_recordings_list():
         rec["base"] = stem
 
         ext     = f.suffix.lower()
-        size_mb = round(f.stat().st_size / (1024 * 1024), 2)
+        stat    = f.stat()
+        size_mb = round(stat.st_size / (1024 * 1024), 2)
 
-        # WAV: mtime → timestamp, duration, size
+        # WAV files: use file-modify time as our default timestamp
         if ext == ".wav":
-            stat = f.stat()
-            ts   = stat.st_mtime
-            rec["wav_file"] = f
-            rec["meta"]["timestamp"]    = datetime.fromtimestamp(ts)
-            rec["meta"]["timestamp_ts"] = ts
-            rec["meta"]["file_mb"]      = size_mb
+            ts = stat.st_mtime
+            rec["wav_file"]               = f
+            rec["meta"]["timestamp"]      = datetime.fromtimestamp(ts)
+            rec["meta"]["timestamp_ts"]   = ts
+            rec["meta"]["file_mb"]        = size_mb
 
             try:
                 with wave.open(str(f), "rb") as w:
@@ -112,40 +118,62 @@ def build_recordings_list():
             except Exception:
                 pass
 
-        # PNG: just attach
+        # PNG: just slot in
         elif ext == ".png":
             rec["png_file"] = f
 
-        # JSON metadata: parse any timestamp string
+        # JSON: may include its own timestamp AND a satellite field
         elif ext == ".json":
             rec["json_file"] = f
             try:
                 data = json.loads(f.read_text())
-                # If JSON has a timestamp field, parse it
+                # Pull out satellite if present
+                if "satellite" in data:
+                    rec["meta"]["satellite"] = data["satellite"]
+                # If JSON gives you its own timestamp, override
                 raw_ts = data.get("timestamp")
                 if isinstance(raw_ts, str):
-                    # fromisoformat handles both naive and "+00:00" offsets
                     dt = datetime.fromisoformat(raw_ts)
+                    ts = dt.timestamp()
                     rec["meta"]["timestamp"]    = dt.replace(tzinfo=None)
-                    rec["meta"]["timestamp_ts"] = dt.timestamp()
-                # merge the rest of the JSON fields
+                    rec["meta"]["timestamp_ts"] = ts
+                # Merge any other JSON metadata you care about
                 for k, v in data.items():
-                    if k not in ("timestamp",):
+                    if k not in ("timestamp","satellite"):
                         rec["meta"][k] = v
             except Exception:
                 pass
 
-        # TXT or LOG: just attach
+        # TXT or LOG: just slot it in
         elif ext in (".txt", ".log"):
             rec["log_file"] = f
 
-    # Turn into list & sort by numeric timestamp
-    recordings = sorted(
-        grouped.values(),
-        key=lambda r: r["meta"].get("timestamp_ts", 0.0),
-        reverse=True
-    )
+    # 2) Group records by satellite name
+    sat_groups = defaultdict(list)
+    for rec in grouped.values():
+        sat = rec["meta"].get("satellite") or "Unknown Satellite"
+        sat_groups[sat].append(rec)
+
+    # 3) Sort each satellite’s list newest-first
+    for sat, recs in sat_groups.items():
+        recs.sort(
+            key=lambda r: r["meta"].get("timestamp_ts", 0.0),
+            reverse=True
+        )
+
+    # 4) Decide your satellite ordering
+    #    Here we do alphabetical, but force "Unknown Satellite" to the end.
+    sats = sorted(s for s in sat_groups if s != "Unknown Satellite")
+    if "Unknown Satellite" in sat_groups:
+        sats.append("Unknown Satellite")
+
+    # 5) Flatten back into one list, in satellite order
+    recordings = []
+    for sat in sats:
+        recordings.extend(sat_groups[sat])
+
     return recordings
+
 
 
 def recordings_list_with_status(status=None):
