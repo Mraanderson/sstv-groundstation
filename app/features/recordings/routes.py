@@ -158,7 +158,7 @@ def recordings_list():
 def delete_recording():
     base = request.form.get("base")
     if base:
-        for f in RECORDINGS_DIR.glob(f"{base}*"):
+        for f in RECORDINGS_DIR.rglob(f"{base}*"):
             if f.is_file():
                 f.unlink()
     return recordings_list()
@@ -168,7 +168,7 @@ def delete_recording():
 def bulk_delete():
     bases = request.form.getlist("bases")
     for base in bases:
-        for f in RECORDINGS_DIR.glob(f"{base}*"):
+        for f in RECORDINGS_DIR.rglob(f"{base}*"):
             if f.is_file():
                 f.unlink()
     return recordings_list()
