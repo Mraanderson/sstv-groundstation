@@ -94,10 +94,41 @@
                 <td>{{ r.meta.duration_s or "?" }} s</td>
                 <td>{{ r.meta.file_mb or "?" }} MB</td>
                 <td>
-                  {% if r.wav_file %}<a href="{{ url_for('recordings.recordings_file', filename=r.wav_file.name) }}" target="_blank">🎵</a>{% endif %}
-                  {% if r.png_file %} | <a href="{{ url_for('recordings.recordings_file', filename=r.png_file.name) }}" target="_blank">🖼️</a>{% endif %}
-                  {% if r.log_file %} | <a href="{{ url_for('recordings.recordings_file', filename=r.log_file.name) }}" target="_blank">📄</a>{% endif %}
-                  {% if r.json_file %} | <a href="{{ url_for('recordings.recordings_file', filename=r.json_file.name) }}" target="_blank">🧾</a>{% endif %}
+
+
+{% if r.wav_file %}
+    🎵
+    <a href="{{ url_for('recordings.recordings_file', filename=r.wav_file.relative_to(rec_dir)) }}"
+       title="{{ r.wav_file.name }}">
+      {{ r.wav_file.name }}
+    </a>
+    ({{ r.wav_size_mb }} MB)
+  {% endif %}
+  {% if r.png_file %}
+    | 🖼️
+    <a href="{{ url_for('recordings.recordings_file', filename=r.png_file.relative_to(rec_dir)) }}"
+       title="{{ r.png_file.name }}">
+      {{ r.png_file.name }}
+    </a>
+    ({{ r.png_size_mb }} MB)
+  {% endif %}
+  {% if r.log_file %}
+    | 📄
+    <a href="{{ url_for('recordings.recordings_file', filename=r.log_file.relative_to(rec_dir)) }}"
+       title="{{ r.log_file.name }}">
+      {{ r.log_file.name }}
+    </a>
+    ({{ r.log_size_mb }} MB)
+  {% endif %}
+  {% if r.json_file %}
+    | 🧾
+    <a href="{{ url_for('recordings.recordings_file', filename=r.json_file.relative_to(rec_dir)) }}"
+       title="{{ r.json_file.name }}">
+      {{ r.json_file.name }}
+    </a>
+    ({{ r.json_size_mb }} MB)
+  {% endif %}
+                
                 </td>
               </tr>
             {% endfor %}
