@@ -28,6 +28,3 @@ pydub
 git+https://github.com/colaclanth/sstv.git
 
 # Note: PD120-specific decoders were removed due to integration issues.
-
-## Optional alternative decoders (commented out)
-# git+https://github.com/colaclanth/rxsstv.git  # requires sign in
