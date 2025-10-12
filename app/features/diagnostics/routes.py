@@ -178,13 +178,24 @@ def sdr_status():
     if scheduled_pass_soon(): return jsonify({"status": "amber"})
     return jsonify({"status": "green"})
 
+# --- System checks (add this above your routes) ---
+def sdr_device_connected():
+    """Returns True only if rtl_test -t actually finds a dongle."""
+    try:
+        res = subprocess.run(
+            ["rtl_test", "-t"], capture_output=True, text=True, timeout=3
+        )
+        out = (res.stdout or "") + (res.stderr or "")
+        return any(x in out for x in ("Reading samples", "Found Rafael"))
+    except Exception:
+        return False
+
 # --- Manual Recorder ---
 @bp.route("/recorder", methods=["GET", "POST"])
 def manual_recorder():
-    # Load existing .wav files & current PPM
     try:
         files = sorted(MANUAL_DIR.glob("*.wav"), key=os.path.getmtime, reverse=True)
-        ppm = get_ppm()
+        ppm   = get_ppm()
     except Exception as e:
         current_app.logger.exception("Failed to load manual recordings or PPM")
         flash(f"Error loading manual recordings: {e}", "danger")
@@ -194,16 +205,16 @@ def manual_recorder():
         duration  = int(request.form.get("duration", 30))
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
-        # If no SDR dongle, generate a tone-demo
-        if not sdr_present():
+        # DEMO branch if no dongle actually connected
+        if not sdr_device_connected():
             demo_file = MANUAL_DIR / f"{timestamp}_demo_manual.wav"
-            full_path = wav_file.resolve()
-            current_app.logger.info(f"Writing WAV to: {full_path}")
-            flash(f"Writing to: {full_path}", "info")
+
+            # debug flash to show where it writes
+            flash(f"Writing DEMO to: {demo_file.resolve()}", "info")
 
             try:
-                # Build 0.5 s sine-tone segments at 440 Hz/880 Hz
-                segments = []
+                # build 0.5s tone segments
+                segs = []
                 for i in range(int(duration * 2)):
                     freq = 440 if (i % 2 == 0) else 880
                     seg = MANUAL_DIR / f"{timestamp}_seg{i}.wav"
@@ -211,42 +222,42 @@ def manual_recorder():
                         ["sox", "-n", str(seg), "synth", "0.5", "sin", str(freq)],
                         check=True
                     )
-                    segments.append(str(seg))
+                    segs.append(str(seg))
 
-                # Concatenate segments into final demo file
-                subprocess.run(["sox"] + segments + [str(demo_file)], check=True)
+                # concatenate them
+                subprocess.run(["sox"] + segs + [str(demo_file)], check=True)
 
-                # Cleanup temporary segments
-                for seg in segments:
-                    os.remove(seg)
+                # cleanup
+                for s in segs: os.remove(s)
 
                 flash(f"Demo recording created: {demo_file.name}", "success")
             except Exception as e:
                 current_app.logger.exception("Demo recording failed")
-                flash(f"Demo recording error: {e}", "danger")
+                flash(f"Demo error: {e}", "danger")
 
             return redirect(url_for("diagnostics.manual_recorder"))
 
-        # SDR dongle present → real capture
-        freq     = request.form.get("frequency", "145.800M")
-        ppm_arg  = request.form.get("ppm", str(ppm))
-        SAMPLE_RATE = "48000"
-        wav_file = MANUAL_DIR / f"{timestamp}_manual.wav"
-        log_file = MANUAL_DIR / f"{timestamp}_manual.txt"
+        # REAL SDR branch
+        freq       = request.form.get("frequency", "145.800M")
+        ppm_arg    = request.form.get("ppm", str(ppm))
+        SAMPLE_RATE= "48000"
+        wav_file   = MANUAL_DIR / f"{timestamp}_manual.wav"
+        log_file   = MANUAL_DIR / f"{timestamp}_manual.txt"
+
+        # debug flash
+        flash(f"Writing REAL to: {wav_file.resolve()}", "info")
 
         with open(log_file, "w") as lf:
             try:
-                # rtl_fm → sox pipeline
-                cmd = [
-                    "rtl_fm", "-M", "fm", "-f", freq,
-                    "-p", ppm_arg, "-s", SAMPLE_RATE, "-g", "40"
-                ]
-                p1 = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=lf)
-                sox_cmd = [
-                    "sox", "-t", "raw", "-r", SAMPLE_RATE, "-e", "s16",
-                    "-b", "16", "-c", "1", "-", str(wav_file)
-                ]
-                p2 = subprocess.Popen(sox_cmd, stdin=p1.stdout, stderr=lf)
+                p1 = subprocess.Popen(
+                    ["rtl_fm","-M","fm","-f",freq,"-p",ppm_arg,"-s",SAMPLE_RATE,"-g","40"],
+                    stdout=subprocess.PIPE, stderr=lf
+                )
+                p2 = subprocess.Popen(
+                    ["sox","-t","raw","-r",SAMPLE_RATE,"-e","s16","-b","16","-c","1","-",
+                     str(wav_file)],
+                    stdin=p1.stdout, stderr=lf
+                )
                 p1.stdout.close()
                 p2.wait(timeout=duration + 5)
             except subprocess.TimeoutExpired:
@@ -256,28 +267,11 @@ def manual_recorder():
                 if p1.poll() is None: p1.terminate()
                 if p2.poll() is None: p2.terminate()
 
-        # Append soxi analysis to log
-        try:
-            soxi_out = subprocess.check_output(["soxi", str(wav_file)], text=True)
-            with open(log_file, "a") as lf:
-                lf.write("\n--- soxi analysis ---\n" + soxi_out)
-        except Exception as e:
-            with open(log_file, "a") as lf:
-                lf.write(f"\nsoxi failed: {e}\n")
-
-        # Trigger SSTV decode
-        try:
-            process_uploaded_wav(str(wav_file))
-        except Exception as e:
-            with open(log_file, "a") as lf:
-                lf.write(f"\nDecoder failed: {e}\n")
+        # soxi analysis & decode...
+        # (keep your existing soxi + process_uploaded_wav here)
 
         flash(f"Recording complete: {wav_file.name}", "success")
         return redirect(url_for("diagnostics.manual_recorder"))
 
-    # GET → render form + recordings list
-    return render_template(
-        "diagnostics/manual_recorder.html",
-        files=files,
-        ppm=ppm
-    )
+    # GET → render form + list
+    return render_template("diagnostics/manual_recorder.html", files=files, ppm=ppm)
