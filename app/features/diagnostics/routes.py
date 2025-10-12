@@ -30,7 +30,22 @@ def check_system_requirements():
     bins = [("sox","Audio conversion"),("rtl_sdr","RTL-SDR capture")]
     return [{"name":n,"desc":d,"found":bool(shutil.which(n)),"path":shutil.which(n) or "Not found"} for n,d in bins]
 
-def sdr_present(): return shutil.which("rtl_sdr") is not None
+#def sdr_present(): return shutil.which("rtl_sdr") is not None
+def sdr_present(): 
+    """Check for rtl_sdr binary on $PATH."""
+    return bool(shutil.which("rtl_sdr"))
+
+def sdr_device_connected():
+    """Probe the dongle via `rtl_test -t`; returns True if hardware responds."""
+    try:
+        res = subprocess.run(
+            ["rtl_test", "-t"], capture_output=True, text=True, timeout=3
+        )
+        out = (res.stdout or "") + (res.stderr or "")
+        return any(k in out for k in ("Reading samples", "Found Rafael"))
+    except Exception:
+        return False
+
 
 def sdr_in_use():
     for proc in psutil.process_iter(['name','cmdline']):
