@@ -197,6 +197,10 @@ def manual_recorder():
         # If no SDR dongle, generate a tone-demo
         if not sdr_present():
             demo_file = MANUAL_DIR / f"{timestamp}_demo_manual.wav"
+            full_path = wav_file.resolve()
+            current_app.logger.info(f"Writing WAV to: {full_path}")
+            flash(f"Writing to: {full_path}", "info")
+
             try:
                 # Build 0.5 s sine-tone segments at 440 Hz/880 Hz
                 segments = []
