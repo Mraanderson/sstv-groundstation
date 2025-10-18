@@ -134,7 +134,7 @@ def record_pass(sat, aos, los):
             f"timeout {dur} rtl_fm -f {int(freq)} -M fm -s {SAMPLE_RATE} "
             f"-g {GAIN} -l 0 -p {ppm} "
             f"| sox -t raw -r {SAMPLE_RATE} -e signed -b 16 -c 1 - "
-            f"-r 11025 -c 1 {wav}"
+            f" -c 1 {wav}"
         )
         subprocess.run(cmd, shell=True, check=True)
         subprocess.run([
@@ -170,8 +170,8 @@ def load_pass_predictions(path):
             for row in reader:
                 try:
                     sat = row["satellite"]
-                    aos = datetime.datetime.fromisoformat(row["aos"])
-                    los = datetime.datetime.fromisoformat(row["los"])
+                    aos = datetime.datetime.fromisoformat(row["aos"]).replace(tzinfo=ZoneInfo("UTC"))
+                    los = datetime.datetime.fromisoformat(row["los"]).replace(tzinfo=ZoneInfo("UTC"))
                     max_el = float(row.get("max_elev", 0))
                     results.append((sat, aos, los, max_el))
                 except Exception as e:

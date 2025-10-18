@@ -7,7 +7,7 @@
 <!-- 📤 WAV Upload Form -->
 <h5>Upload Non‑ISS SSTV Audio</h5>
 <p class="text-muted">
-  This uploader accepts non‑ISS SSTV WAV files. For ISS Robot36 images, you can decode them with the
+  This uploader accepts non‑ISS SSTV WAV files. For ISS SSTV PD120 images, you can decode them with the
   <a href="https://play.google.com/store/apps/details?id=xdsopl.robot36" target="_blank">📱 Robot36 app</a>.
 </p>
 <form method="post" action="{{ url_for('recordings.upload_wav') }}" enctype="multipart/form-data" class="mb-4">
@@ -94,11 +94,44 @@
                 <td>{{ r.meta.duration_s or "?" }} s</td>
                 <td>{{ r.meta.file_mb or "?" }} MB</td>
                 <td>
-                  {% if r.wav_file %}<a href="{{ url_for('recordings.recordings_file', filename=r.wav_file.name) }}" target="_blank">🎵</a>{% endif %}
-                  {% if r.png_file %} | <a href="{{ url_for('recordings.recordings_file', filename=r.png_file.name) }}" target="_blank">🖼️</a>{% endif %}
-                  {% if r.log_file %} | <a href="{{ url_for('recordings.recordings_file', filename=r.log_file.name) }}" target="_blank">📄</a>{% endif %}
-                  {% if r.json_file %} | <a href="{{ url_for('recordings.recordings_file', filename=r.json_file.name) }}" target="_blank">🧾</a>{% endif %}
-                </td>
+  {% if r.wav_file %}
+    <div>
+      🎵
+      <a href="{{ url_for('recordings.recordings_file', filename=r.wav_path) }}"
+         title="{{ r.wav_file.name }}" target="_blank">
+        {{ r.wav_file.name }}
+      </a>
+    </div>
+  {% endif %}
+  {% if r.png_file %}
+    <div>
+      🖼️
+      <a href="{{ url_for('recordings.recordings_file', filename=r.png_path) }}"
+         title="{{ r.png_file.name }}" target="_blank">
+        {{ r.png_file.name }}
+      </a>
+    </div>
+  {% endif %}
+  {% if r.log_file %}
+    <div>
+      📄
+      <a href="{{ url_for('recordings.recordings_file', filename=r.log_path) }}"
+         title="{{ r.log_file.name }}" target="_blank">
+        {{ r.log_file.name }}
+      </a>
+    </div>
+  {% endif %}
+  {% if r.json_file %}
+    <div>
+      🧾
+      <a href="{{ url_for('recordings.recordings_file', filename=r.json_path) }}"
+         title="{{ r.json_file.name }}" target="_blank">
+        {{ r.json_file.name }}
+      </a>
+    </div>
+  {% endif %}
+</td>
+
               </tr>
             {% endfor %}
           </tbody>
@@ -129,12 +162,34 @@
                 <input type="checkbox" name="bases" value="{{ r.base }}">
               </div>
               <small class="text-muted d-block mt-1">⏳ {{ r.meta.duration_s or "?" }} s · 💾 {{ r.meta.file_mb or "?" }} MB</small>
-              <div class="mt-2 d-flex gap-2">
-                {% if r.wav_file %}<a href="{{ url_for('recordings.recordings_file', filename=r.wav_file.name) }}" target="_blank" title="{{ r.wav_file.name }}">🎵</a>{% endif %}
-                {% if r.png_file %}<a href="{{ url_for('recordings.recordings_file', filename=r.png_file.name) }}" target="_blank" title="{{ r.png_file.name }}">🖼️</a>{% endif %}
-                {% if r.log_file %}<a href="{{ url_for('recordings.recordings_file', filename=r.log_file.name) }}" target="_blank" title="{{ r.log_file.name }}">📄</a>{% endif %}
-                {% if r.json_file %}<a href="{{ url_for('recordings.recordings_file', filename=r.json_file.name) }}" target="_blank" title="{{ r.json_file.name }}">🧾</a>{% endif %}
-              </div>
+              <div class="mt-2 d-flex gap-2 align-items-center">
+  {% if r.wav_file %}
+    <a href="{{ url_for('recordings.recordings_file', filename=r.wav_path) }}"
+       title="{{ r.wav_file.name }}" target="_blank">
+      🎵
+    </a>
+  {% endif %}
+  {% if r.png_file %}
+    <a href="{{ url_for('recordings.recordings_file', filename=r.png_path) }}"
+       title="{{ r.png_file.name }}" target="_blank">
+      🖼️
+    </a>
+  {% endif %}
+  {% if r.log_file %}
+    <a href="{{ url_for('recordings.recordings_file', filename=r.log_path) }}"
+       title="{{ r.log_file.name }}" target="_blank">
+      📄
+    </a>
+  {% endif %}
+  {% if r.json_file %}
+    <a href="{{ url_for('recordings.recordings_file', filename=r.json_path) }}"
+       title="{{ r.json_file.name }}" target="_blank">
+      🧾
+    </a>
+  {% endif %}
+</div>
+
+
             </div>
           </div>
         </div>

@@ -1,12 +1,14 @@
 
 import json
+import wave
 import subprocess
 import psutil
 import os
 from pathlib import Path
 from flask import render_template, jsonify, send_from_directory, request
 from werkzeug.utils import secure_filename
-
+from collections import defaultdict
+from datetime import datetime
 from app.features.recordings import bp
 import app.utils.tle as tle_utils
 import app.utils.passes as passes_utils
@@ -62,28 +64,115 @@ def refresh_tle_and_predictions():
     print("📅 Pass predictions updated for next 24h.")
 
 
-def build_recordings_list():
-    """Helper to collect recordings with metadata."""
-    recordings = []
-    for meta_file in RECORDINGS_DIR.glob("*.json"):
-        try:
-            meta = json.loads(meta_file.read_text())
-            base = meta_file.stem
-            wav_file = next(RECORDINGS_DIR.glob(f"{base}*.wav"), None)
-            png_file = next(RECORDINGS_DIR.glob(f"{base}*.png"), None)
+# ┌────────────────────────────────────────────────────────────────────────────┐
+# │ 1) routes.py – build_recordings_list with relative paths for every file  │
+# └────────────────────────────────────────────────────────────────────────────┘
+import json
+import wave
+from pathlib import Path
+from collections import defaultdict
+from datetime import datetime
 
-            recordings.append({
-                "base": base,
-                "meta": meta,
-                "wav_file": wav_file,
-                "png_file": png_file,
-                "json_file": meta_file
-            })
-        except Exception:
+# RECORDINGS_DIR → Path to your top-level recordings/ folder
+
+def build_recordings_list():
+    # temporary dict keyed by filename-stem
+    temp = defaultdict(lambda: {
+        "base":       None,
+        "wav_file":   None, "wav_path":   None,
+        "png_file":   None, "png_path":   None,
+        "json_file":  None, "json_path":  None,
+        "log_file":   None, "log_path":   None,
+        "meta": {
+            "timestamp":    None,
+            "timestamp_ts":  0.0,
+            "file_mb":      None,
+            "duration_s":   None,
+            "satellite":    None,
+        }
+    })
+
+    # 1) Scan all files
+    for f in RECORDINGS_DIR.rglob("*"):
+        if not f.is_file():
             continue
 
-    recordings.sort(key=lambda r: r["meta"].get("timestamp", ""), reverse=True)
+        stem = f.stem
+        rec  = temp[stem]
+        rec["base"] = stem
+
+        ext     = f.suffix.lower()
+        stat    = f.stat()
+        size_mb = round(stat.st_size / (1024 * 1024), 2)
+        relpath = str(f.relative_to(RECORDINGS_DIR))
+
+        if ext == ".wav":
+            ts = stat.st_mtime
+            rec["wav_file"]             = f
+            rec["wav_path"]             = relpath
+            rec["meta"]["timestamp"]    = datetime.fromtimestamp(ts)
+            rec["meta"]["timestamp_ts"] = ts
+            rec["meta"]["file_mb"]      = size_mb
+            try:
+                with wave.open(str(f), "rb") as w:
+                    rec["meta"]["duration_s"] = round(
+                        w.getnframes() / w.getframerate(), 2
+                    )
+            except Exception:
+                pass
+
+        elif ext == ".png":
+            rec["png_file"] = f
+            rec["png_path"] = relpath
+
+        elif ext == ".json":
+            rec["json_file"] = f
+            rec["json_path"] = relpath
+            try:
+                data = json.loads(f.read_text())
+                if "satellite" in data:
+                    rec["meta"]["satellite"] = data["satellite"]
+                raw_ts = data.get("timestamp")
+                if isinstance(raw_ts, str):
+                    dt = datetime.fromisoformat(raw_ts)
+                    rec["meta"]["timestamp"]    = dt.replace(tzinfo=None)
+                    rec["meta"]["timestamp_ts"] = dt.timestamp()
+                for k, v in data.items():
+                    if k not in ("timestamp", "satellite"):
+                        rec["meta"][k] = v
+            except Exception:
+                pass
+
+        elif ext in (".txt", ".log"):
+            rec["log_file"] = f
+            rec["log_path"] = relpath
+
+    # 2) Group by satellite, defaulting to "Unknown Satellite"
+    sat_groups = defaultdict(list)
+    for rec in temp.values():
+        sat = rec["meta"].get("satellite") or "Unknown Satellite"
+        sat_groups[sat].append(rec)
+
+    # 3) Sort each satellite group newest→oldest
+    for recs in sat_groups.values():
+        recs.sort(
+            key=lambda r: r["meta"].get("timestamp_ts", 0.0),
+            reverse=True
+        )
+
+    # 4) Determine satellite order (alpha, with Unknown last)
+    sats = sorted(s for s in sat_groups if s != "Unknown Satellite")
+    if "Unknown Satellite" in sat_groups:
+        sats.append("Unknown Satellite")
+
+    # 5) Flatten groups back into one list
+    recordings = []
+    for sat in sats:
+        recordings.extend(sat_groups[sat])
+
     return recordings
+
+
 
 
 def recordings_list_with_status(status=None):
@@ -106,7 +195,7 @@ def recordings_list():
 def delete_recording():
     base = request.form.get("base")
     if base:
-        for f in RECORDINGS_DIR.glob(f"{base}*"):
+        for f in RECORDINGS_DIR.rglob(f"{base}*"):
             if f.is_file():
                 f.unlink()
     return recordings_list()
@@ -116,7 +205,7 @@ def delete_recording():
 def bulk_delete():
     bases = request.form.getlist("bases")
     for base in bases:
-        for f in RECORDINGS_DIR.glob(f"{base}*"):
+        for f in RECORDINGS_DIR.rglob(f"{base}*"):
             if f.is_file():
                 f.unlink()
     return recordings_list()

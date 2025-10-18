@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Manual Recorder{% endblock %}
+{% block content %}
+  <h2>Manual Recorder</h2>
+  <p>Current PPM correction: {{ ppm }} ppm</p>
+  <ul>
+    {% for f in files %}
+      <li>{{ f }}</li>
+    {% else %}
+      <li>No recordings found.</li>
+    {% endfor %}
+  </ul>
+{% endblock %}

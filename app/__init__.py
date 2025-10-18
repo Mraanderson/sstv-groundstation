@@ -96,6 +96,37 @@ def create_app():
     app.register_blueprint(diagnostics_bp, url_prefix="/diagnostics")
     app.register_blueprint(info_bp, url_prefix="/info")
 
+
+#import atexit
+#from datetime import datetime
+#from apscheduler.schedulers.background import BackgroundScheduler
+
+## TLE Scheduler Job
+#from app.features.passes.routes import fetch_and_save_tle
+#
+#def create_app(config_object=None):
+#    app = Flask(__name__)
+#    if config_object:
+#        app.config.from_object(config_object)
+#
+#    # register blueprints, DB, etc.
+#    # app.register_blueprint(bp)…
+#
+#    # ── START TLE REFRESH SCHEDULER ────────────────────────────────────────
+#    scheduler = BackgroundScheduler()
+#    # run immediately on startup, then every 6h
+#    scheduler.add_job(
+#        func=fetch_and_save_tle,
+#        trigger="interval",
+#        hours=6,
+#        next_run_time=datetime.now()
+#    )
+#    scheduler.start()
+#
+#    # shut down scheduler when the app stops
+#    atexit.register(lambda: scheduler.shutdown(wait=False))
+#    # ── END SCHEDULER SETUP ────────────────────────────────────────────────
+
     # Home route
     @app.route("/")
     def home():

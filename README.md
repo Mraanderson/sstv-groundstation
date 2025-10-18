@@ -34,18 +34,7 @@ Run the launcher interactively:
 ./launcher.sh
 ```
 
-Or use command-line flags:
-
-```bash
-./launcher.sh -r            # Run the Flask server
-./launcher.sh -u            # Pull latest updates
-./launcher.sh -b            # Switch branch
-./launcher.sh --backup      # Backup images and recordings
-./launcher.sh --restore     # Restore from backup
-./launcher.sh --reclone     # Reclone and choose branch
-./launcher.sh -p 8080       # Set custom port
-./launcher.sh -e production # Set Flask environment
-```
+See also: **Wiki** [Quick Start](https://github.com/Mraanderson/sstv-groundstation/wiki/Quick-start-overview)
 
 The launcher automatically sets up a Python virtual environment and installs dependencies from `requirements.txt`.
 
@@ -94,10 +83,12 @@ in your browser to access the SSTV Groundstation console.
 
 After launch, use the web interface to:
 
-1. **Set your location** — Required for accurate satellite pass predictions  
-2. **Refresh TLE data** — Updates orbital elements for current satellite tracking  
-3. **Enable recording** — Starts capturing IQ streams for later decoding  
+1. **Set your location** — Required for accurate satellite pass predictions 
+2. **Run SDR Calibration** - To obtain a PPM value for your speciffic SDR device, to be used when recording.
+3. **Refresh TLE data** — Updates orbital elements for current satellite tracking (Should be automatic now when location is set)
+4. **Enable recording** — Starts capturing IQ streams for later decoding  
 
+Currently broken:
 Captured IQ streams are automatically converted to `.wav` format and added to the **Recordings** library for playback and analysis.
 
 ---
@@ -110,6 +101,7 @@ Captured IQ streams are automatically converted to `.wav` format and added to th
 - **Passes** — Predicts satellite passes for the next 24 hours  
 - **Settings** — Import/export configuration files  
 - **Diagnostics** — Check RTL-SDR presence, disk space, and basic system health  
+- **Info** - Information...
 
 ---
 
