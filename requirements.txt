@@ -1,30 +1,26 @@
-# Core web framework
-Flask
+# requirements.txt
 
-# HTTP requests for fetching TLEs
-requests
+# --- Core Application ---
+Flask               # Web framework for the user interface
 
-# Astronomy & orbital mechanics
-skyfield
-sgp4
+# --- Data Fetching & Processing ---
+requests            # For making HTTP requests to fetch TLE data
+python-dateutil     # Powerful extensions to the standard datetime module
 
-# Timezone support (zoneinfo is built-in for Python >=3.9)
-# Only include this if running on Python < 3.9
-# zoneinfo; python_version < "3.9"
+# --- Orbital Mechanics & Astronomy ---
+skyfield            # High-precision astronomy and satellite tracking
+sgp4                # Core library for TLE propagation (often a dependency of skyfield)
+numpy               # Foundational package for scientific computing (dependency for skyfield/scipy)
+scipy               # Scientific and technical computing (dependency for skyfield)
 
-# Optional: if you later add automatic timezone detection
-timezonefinder==6.2.0
-psutil
+# --- Image & Audio Processing ---
+Pillow==10.2.0      # Python Imaging Library for handling image files
+pydub               # Manipulate audio with a simple and high-level interface
+
+# --- System & Utilities ---
+psutil              # For accessing system details and process utilities
+timezonefinder==6.2.0 # Efficiently find the timezone for a given lat/lng
 schedule
-python-dateutil
-Pillow==10.2.0
-scipy
-numpy
-pydub
 
-
-# SSTV decoder from GitHub
-
+# --- SSTV Decoder (from source) ---
 # git+https://github.com/colaclanth/sstv.git
-
-# Note: PD120-specific decoders were removed due to integration issues.

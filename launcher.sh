@@ -32,6 +32,11 @@ status_panel(){
   systemctl --user is-enabled sstv-groundstation >/dev/null 2>&1 && msg "$GREEN" "Systemd: ✔ Enabled" || msg "$RED" "Systemd: ✘ Not enabled"
   systemctl --user is-active --quiet sstv-groundstation && msg "$GREEN" "Service Status: ✔ Active" || msg "$RED" "Service Status: ✘ Inactive"
 
+  # --- MODIFICATION START: Added TLE updater status ---
+  systemctl --user is-enabled sstv-tle-updater.timer >/dev/null 2>&1 && msg "$GREEN" "TLE Updater: ✔ Enabled" || msg "$RED" "TLE Updater: ✘ Not enabled"
+  systemctl --user is-active --quiet sstv-tle-updater.timer && msg "$GREEN" "TLE Timer:   ✔ Active" || msg "$RED" "TLE Timer:   ✘ Inactive"
+  # --- MODIFICATION END ---
+
   if command -v rtl_test >/dev/null 2>&1; then
     rtl_test -t 2>&1 | grep -q "Found" && msg "$GREEN" "USB SDR: ✔ Detected" || msg "$RED" "USB SDR: ✘ Not detected"
   else
@@ -174,23 +179,84 @@ remove_systemd_service(){
   msg "$RED" "Systemd service removed."
 }
 
+# --- MODIFICATION START: Added TLE service management functions ---
+install_tle_updater_service(){
+  local systemd_dir="$HOME/.config/systemd/user"
+  mkdir -p "$systemd_dir"
+  
+  local service_file="$systemd_dir/sstv-tle-updater.service"
+  local timer_file="$systemd_dir/sstv-tle-updater.timer"
+
+  msg "$GREEN" "Creating TLE updater systemd service..."
+  cat >"$service_file"<<EOF
+[Unit]
+Description=TLE Updater for SSTV Groundstation
+
+[Service]
+Type=oneshot
+# Use the python from the virtualenv and point to the script in app/utils
+ExecStart=$APP_DIR/venv/bin/python3 $APP_DIR/app/utils/update_tles.py
+Environment="SSTV_APP_DIR=$APP_DIR"
+EOF
+
+  msg "$GREEN" "Creating TLE updater systemd timer (12-hour interval)..."
+  cat >"$timer_file"<<EOF
+[Unit]
+Description=Run TLE updater every 12 hours
+
+[Timer]
+# Run 5 minutes after boot, and every 12 hours thereafter
+OnBootSec=5min
+OnUnitActiveSec=12h
+Unit=sstv-tle-updater.service
+
+[Install]
+WantedBy=timers.target
+EOF
+
+  systemctl --user daemon-reload
+  systemctl --user enable --now sstv-tle-updater.timer
+  msg "$GREEN" "TLE updater timer enabled and started."
+  msg "$GREEN" "An initial TLE fetch will run in a few moments."
+}
+
+remove_tle_updater_service(){
+  systemctl --user disable --now sstv-tle-updater.timer 2>/dev/null
+  rm -f "$HOME/.config/systemd/user/sstv-tle-updater.service"
+  rm -f "$HOME/.config/systemd/user/sstv-tle-updater.timer"
+  systemctl --user daemon-reload
+  msg "$RED" "TLE updater service and timer removed."
+}
+# --- MODIFICATION END ---
+
 manage_boot(){
   while :; do
     clear
+    # --- MODIFICATION START: Updated menu for clarity and new options ---
     echo "╔════════════════════════════════╗"
-    echo "║   Boot Options                 ║"
+    echo "║   Boot & Service Options       ║"
     echo "╚════════════════════════════════╝"
-    echo "1) Enable systemd service"
-    echo "2) Disable systemd service"
-    echo "3) Update and restart service"
-    echo "4) Back"
+    echo "--- Main Application ---"
+    echo " 1) Enable web app service"
+    echo " 2) Disable web app service"
+    echo " 3) Update code & restart web app"
+    echo
+    echo "--- TLE Updater ---"
+    echo " 4) Enable TLE updater (12hr)"
+    echo " 5) Disable TLE updater"
+    echo
+    echo " 9) Back"
     read -rp "> " c
     case $c in
       1) install_systemd_service;;
       2) remove_systemd_service;;
       3) pull_update;;
-      4) break;;
+      4) install_tle_updater_service;;
+      5) remove_tle_updater_service;;
+      9) break;;
+      *) echo "Invalid option";;
     esac
+    # --- MODIFICATION END ---
     read -rp "Press Enter..."
   done
 }
