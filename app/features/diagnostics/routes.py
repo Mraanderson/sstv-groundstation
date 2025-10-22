@@ -298,10 +298,14 @@ def decode_upload():
 # --- SDR traffic-light status endpoint ---
 @bp.route("/sdr/status")
 def sdr_status():
-    if not sdr_present():
-        return jsonify({"status": "grey", "reason": "binary missing"})
-    if sdr_in_use():
-        return jsonify({"status": "red", "reason": "rtl_fm busy"})
-    if scheduled_pass_soon():
-        return jsonify({"status": "amber", "reason": "scheduled soon"})
-    return jsonify({"status": "green", "reason": "ready"})
+    try:
+        if not sdr_present():
+            return jsonify({"status": "grey", "reason": "binary missing"})
+        if sdr_in_use():
+            return jsonify({"status": "red", "reason": "rtl_fm busy"})
+        if scheduled_pass_soon():
+            return jsonify({"status": "amber", "reason": "scheduled soon"})
+        return jsonify({"status": "green", "reason": "ready"})
+    except Exception as e:
+        current_app.logger.exception("sdr_status failed")
+        return jsonify({"status": "grey", "reason": f"error: {e}"}), 500
