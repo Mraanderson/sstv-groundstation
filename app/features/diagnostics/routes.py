@@ -6,6 +6,8 @@ from app.features.diagnostics import bp
 from app.utils import passes as passes_utils
 from app.utils.decoder import process_uploaded_wav
 
+current_app.logger.info(f"PATH is {os.environ.get('PATH')}")
+
 # --- Paths & constants ---
 RECORDINGS_DIR = Path("recordings")
 SETTINGS_FILE  = Path("settings.json")
