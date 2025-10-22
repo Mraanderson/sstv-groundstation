@@ -7,7 +7,6 @@ from app.utils import passes as passes_utils
 from app.utils.decoder import process_uploaded_wav
 
 # --- Paths & constants ---
-STATE_FILE     = Path.home() / "sstv-groundstation/current_pass.json"
 RECORDINGS_DIR = Path("recordings")
 SETTINGS_FILE  = Path("settings.json")
 IMAGES_DIR     = Path("images")
@@ -37,8 +36,10 @@ def set_gain(g):
 
 # --- System checks ---
 def check_system_requirements():
-    bins = [("sox","Audio conversion"),("rtl_sdr","RTL-SDR capture"),("rtl_fm","FM demod"),("rtl_power","Spectrum")]
-    return [{"name":n,"desc":d,"found":bool(shutil.which(n)),"path":shutil.which(n) or "Not found"} for n,d in bins]
+    bins = [("sox","Audio conversion"),("rtl_sdr","RTL-SDR capture"),
+            ("rtl_fm","FM demod"),("rtl_power","Spectrum")]
+    return [{"name":n,"desc":d,"found":bool(shutil.which(n)),
+             "path":shutil.which(n) or "Not found"} for n,d in bins]
 
 def sdr_present():
     """Check for rtl_sdr binary on PATH."""
@@ -63,17 +64,6 @@ def sdr_in_use():
             continue
     return False
 
-def scheduled_pass_soon(minutes=5):
-    try:
-        now = datetime.datetime.now(datetime.timezone.utc)
-        for p in passes_utils.load_predictions():
-            aos = datetime.datetime.fromisoformat(p['aos'])
-            if now <= aos <= now + datetime.timedelta(minutes=minutes):
-                return True
-    except Exception:
-        pass
-    return False
-
 # --- Routes ---
 @bp.route("/")
 def diagnostics_page():
@@ -95,72 +85,44 @@ def diagnostics_page():
             "png": png.name if png.exists() else None,
             "meta": md
         })
-    return render_template("diagnostics/diagnostics.html", files=entries, ppm=get_ppm(), gain=get_gain())
+    return render_template("diagnostics/diagnostics.html",
+                           files=entries, ppm=get_ppm(), gain=get_gain())
 
 @bp.route("/check")
 def diagnostics_check():
     try:
-        r = subprocess.run(["rtl_test","-t"],capture_output=True,text=True,timeout=5)
-        out = (r.stdout or "") + (r.stderr or "")
-        return jsonify({"success": any(x in out for x in ("Reading samples","Found Rafael")), "output": out})
+        sw = sdr_present()
+        hw = sdr_device_connected() if sw else False
+        return jsonify({"software": sw, "hardware": hw})
     except Exception as e:
         current_app.logger.exception("rtl_test failed")
-        return jsonify({"success": False, "output": str(e)})
+        return jsonify({"software": False, "hardware": False, "error": str(e)})
 
 @bp.route("/status")
 def diagnostics_status():
     free_gb = shutil.disk_usage("/").free // (2**30)
-    pass_info, orphan = None, []
+    orphan = []
 
-    if STATE_FILE.exists():
-        try:
-            pass_info = json.loads(STATE_FILE.read_text())
-            iq = pass_info.get("iq_file")
-            if iq and os.path.exists(iq):
-                pass_info["iq_size_mb"] = round(os.path.getsize(iq)/(1024*1024), 2)
-        except Exception as e:
-            current_app.logger.exception("Failed reading state file")
-            pass_info = {"error": f"Could not read pass state: {e}"}
-
+    # Sweep for any .iq files older than 1 hour
+    cutoff = datetime.datetime.now().timestamp() - 3600
     for f in RECORDINGS_DIR.glob("*.iq"):
-        if not pass_info or str(f) != pass_info.get("iq_file"):
-            entry = {"path": str(f), "size_mb": round(f.stat().st_size/(1024*1024), 2)}
-            if free_gb < LOW_SPACE_GB:
-                try: os.remove(f); entry["deleted"] = True
-                except Exception as e: entry["delete_error"] = str(e)
-            orphan.append(entry)
+        age = f.stat().st_mtime
+        entry = {"path": str(f), "size_mb": round(f.stat().st_size/(1024*1024), 2)}
+        if age < cutoff:
+            try:
+                os.remove(f)
+                entry["deleted"] = True
+            except Exception as e:
+                entry["delete_error"] = str(e)
+        orphan.append(entry)
 
     return jsonify({
         "disk_free_gb": free_gb,
-        "pass_info": pass_info,
         "orphan_iq": orphan,
         "requirements": check_system_requirements(),
         "rtl_ppm": get_ppm(),
         "rtl_gain": get_gain()
     })
-
-@bp.route("/clear_all_iq", methods=["POST"])
-def clear_all_iq():
-    return jsonify({"success": True, "deleted": cleanup_orphan_iq()})
-
-@bp.route("/delete_iq", methods=["POST"])
-def delete_iq():
-    try:
-        path = request.get_json().get("path")
-        if path and os.path.exists(path) and path.endswith(".iq"):
-            os.remove(path)
-            return jsonify({"success": True, "message": f"Deleted {path}"})
-        return jsonify({"success": False, "message": "File not found"})
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)})
-
-@bp.route("/sdr/status")
-def sdr_status():
-    if not sdr_present(): return jsonify({"status": "grey", "reason": "binary missing"})
-    if sdr_in_use():      return jsonify({"status": "red", "reason": "rtl_fm busy"})
-    if scheduled_pass_soon(): return jsonify({"status": "amber", "reason": "scheduled soon"})
-    return jsonify({"status": "green", "reason": "ready"})
-
 @bp.route("/calibrate", methods=["POST"])
 def calibrate():
     try:
@@ -254,7 +216,7 @@ def manual_recorder():
         # DEMO branch if no dongle connected
         if not sdr_device_connected():
             demo_file = MANUAL_DIR / f"{timestamp}_demo_manual.wav"
-            flash(f"Writing DEMO to: {demo_file.resolve()}", "info")
+            flash(f"No dongle detected — running DEMO to: {demo_file.name}", "warning")
             try:
                 segs = []
                 for i in range(int(duration*2)):
@@ -275,12 +237,12 @@ def manual_recorder():
 
         # REAL SDR branch
         SAMPLE_RATE = "48000"
-        flash(f"Recording to: {wav_file.resolve()} (Gain {gain_arg}, PPM {ppm_arg})", "info")
+        flash(f"Recording to: {wav_file.name} (Gain {gain_arg}, PPM {ppm_arg})", "info")
 
+        success = False
         with open(log_file, "w") as lf:
             try:
-                cmd = ["rtl_fm","-M","fm","-f",freq,"-p",ppm_arg,"-s",SAMPLE_RATE]
-                cmd += ["-g", gain_arg]
+                cmd = ["rtl_fm","-M","fm","-f",freq,"-p",ppm_arg,"-s",SAMPLE_RATE,"-g",gain_arg]
                 p1 = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=lf)
                 p2 = subprocess.Popen(
                     ["sox","-t","raw","-r",SAMPLE_RATE,"-e","signed","-b","16","-c","1","-", str(wav_file)],
@@ -288,9 +250,10 @@ def manual_recorder():
                 )
                 p1.stdout.close()
                 p2.wait(timeout=duration+5)
+                success = True
             except subprocess.TimeoutExpired:
-                p1.terminate(); p2.terminate()
                 flash("Recording timed out", "danger")
+                p1.terminate(); p2.terminate()
             finally:
                 if p1.poll() is None: p1.terminate()
                 if p2.poll() is None: p2.terminate()
@@ -307,30 +270,38 @@ def manual_recorder():
         try: meta_file.write_text(json.dumps(meta, indent=2))
         except Exception as e: current_app.logger.warning(f"Failed to write meta: {e}")
 
-        flash(f"Recording complete: {wav_file.name} (Gain {gain_arg}, PPM {ppm_arg})", "success")
+        if success:
+            flash(f"Recording complete: {wav_file.name} (Gain {gain_arg}, PPM {ppm_arg})", "success")
+
         return redirect(url_for("diagnostics.manual_recorder"))
 
     # GET → render form + list
     return render_template("diagnostics/diagnostics.html", files=files, ppm=ppm, gain=gain)
-
-# --- Endpoints for orphan IQ cleanup already above ---
-
-# You already have /sdr/status defined in part 1
-
-# The manual recorder route is in part 2
-
-# If you want to add a simple decoder hook for uploaded WAVs, you can keep it here:
+# --- Optional decode-upload endpoint ---
 @bp.route("/decode_upload", methods=["POST"])
 def decode_upload():
-    """Optional: allow user to upload a WAV and run decoder."""
+    """Allow user to upload a WAV and run the decoder."""
     try:
         file = request.files.get("file")
         if not file or not file.filename.endswith(".wav"):
             return jsonify({"success": False, "error": "No WAV file provided"}), 400
+
         save_path = MANUAL_DIR / file.filename
         file.save(save_path)
+
         result = process_uploaded_wav(save_path)
         return jsonify({"success": True, "result": result})
     except Exception as e:
         current_app.logger.exception("Decode upload failed")
         return jsonify({"success": False, "error": str(e)}), 500
+
+# --- SDR traffic-light status endpoint ---
+@bp.route("/sdr/status")
+def sdr_status():
+    if not sdr_present():
+        return jsonify({"status": "grey", "reason": "binary missing"})
+    if sdr_in_use():
+        return jsonify({"status": "red", "reason": "rtl_fm busy"})
+    if scheduled_pass_soon():
+        return jsonify({"status": "amber", "reason": "scheduled soon"})
+    return jsonify({"status": "green", "reason": "ready"})
