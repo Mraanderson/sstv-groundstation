@@ -2,7 +2,6 @@
 {% block title %}Diagnostics{% endblock %}
 {% block content %}
 
-{# --- 1. ADD FLASH MESSAGE DISPLAY (Crucial for showing POST results) --- #}
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
     <div class="flashes">
@@ -14,112 +13,79 @@
 {% endwith %}
 
 <h1>RTL‑SDR Diagnostics</h1>
-
-<p>
-This page helps you check that your RTL‑SDR dongle is connected, working correctly, and properly calibrated. 
-Each section below runs a different test or maintenance task and explains why it matters.
-</p>
+<p>This page helps you check that your RTL‑SDR dongle is connected, calibrated, and ready.</p>
 
 <hr>
-
 <h2>Dongle Presence Check</h2>
-<p>
-This test runs <code>rtl_test</code> briefly to confirm that the SDR hardware is detected by the system 
-and can stream samples.
-</p>
 <span id="statusBadge" class="badge bg-secondary">Checking…</span>
 <pre id="outputBox" class="mt-3"></pre>
 
 <hr>
-
 <h2>System Status</h2>
 <p id="diskInfo">Disk free: …</p>
 <p id="passInfo">Pass status: …</p>
 <ul id="orphanList"><li>Loading…</li></ul>
 
 <hr>
-
 <h2>SDR Traffic‑Light Status</h2>
-<p>
-This indicator shows whether the SDR is present and available, busy with another process, 
-reserved for a scheduled pass, or missing entirely.
-</p>
 <span id="sdrLight" class="badge bg-secondary">Checking…</span>
 
 <hr>
-
 <h2>Calibration</h2>
-<p>
-Calibration measures how far your dongle’s internal clock drifts from true frequency. 
-It scans the FM broadcast band, finds a strong station, and compares the measured frequency 
-to the expected channel. The result is a <strong>PPM correction number</strong>. 
-This number is then applied automatically to all future recordings.
-</p>
-<div class="alert alert-info">
-  Why calibrate? SDR dongles use inexpensive crystal oscillators that can drift by tens of kHz. 
-  Calibration measures this error and applies a correction (PPM). Without it, narrowband signals 
-  like satellites may be missed or distorted. 
-  <a href="https://osmocom.org/projects/rtl-sdr/wiki/Rtl-sdr" target="_blank">Learn more</a>.
-</div>
-
 <div id="ppmBox" class="alert alert-secondary">
-  Current PPM correction: <span id="ppmValue">loading…</span>
+  Current PPM correction: <span id="ppmValue">{{ ppm }}</span>
 </div>
-
 <button id="calibrateBtn" class="btn btn-warning">🛠️ Calibrate SDR</button>
 <div id="calibrationResult" class="mt-3"></div>
 
 <hr>
-
 <h2>Manual Recorder</h2>
-<p>
-Manually trigger a recording to test the SDR, audio pipeline, and decoder outside of the scheduler. 
-Files are saved in the <code>recordings/manual</code> directory.
-</p>
-
-{# --- 2. ADD COMPLETE MANUAL RECORDER FORM --- #}
 <form method="post" action="{{ url_for('diagnostics.manual_recorder') }}" class="row g-3 align-items-end mb-4">
-    <div class="col-md-3">
-        <label for="frequency" class="form-label">Frequency (e.g., 145.800M)</label>
-        <input type="text" class="form-control" id="frequency" name="frequency" value="145.800M" required>
-    </div>
-    <div class="col-md-3">
-        <label for="duration" class="form-label">Duration (seconds)</label>
-        <input type="number" class="form-control" id="duration" name="duration" value="30" required>
-    </div>
-    <div class="col-md-3">
-        <label for="ppm" class="form-label">PPM Correction</label>
-        <input type="number" class="form-control" id="ppm" name="ppm" value="{{ ppm }}" required>
-        <div class="form-text">Current calibrated value is suggested.</div>
-    </div>
-    <div class="col-md-3">
-        <button type="submit" class="btn btn-primary w-100">Start Manual Record</button>
-    </div>
+  <div class="col-md-3">
+    <label for="frequency" class="form-label">Frequency</label>
+    <input type="text" class="form-control" id="frequency" name="frequency" value="145.800M" required>
+  </div>
+  <div class="col-md-2">
+    <label for="duration" class="form-label">Duration (s)</label>
+    <input type="number" class="form-control" id="duration" name="duration" value="30" required>
+  </div>
+  <div class="col-md-2">
+    <label for="ppm" class="form-label">PPM</label>
+    <input type="number" class="form-control" id="ppm" name="ppm" value="{{ ppm }}" required>
+  </div>
+  <div class="col-md-3">
+    <label for="gain" class="form-label">Gain</label>
+    <select class="form-select" id="gain" name="gain">
+      <option value="0" {% if gain=="0" %}selected{% endif %}>0 (AGC)</option>
+      {% for g in ["0.9","4.0","7.7","11.6","14.4","15.7","16.6","19.7","20.7","22.9","25.4","28.0","29.7","32.8","33.8","36.4","37.2","38.6","40.2","42.1","43.4","43.9","44.5","48.0","49.6"] %}
+        <option value="{{ g }}" {% if gain==g %}selected{% endif %}>{{ g }} dB</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-2">
+    <button type="submit" class="btn btn-primary w-100">Start Record</button>
+  </div>
 </form>
 
-{# --- 3. ADD HISTORY AND LINKS FOR MANUAL RUNS --- #}
-<h4 class="mt-4">Manual Recordings History</h4>
+<h4>Manual Recordings History</h4>
 <ul class="list-group">
-  {% for f in files %}
-    {# Derive file names for log and PNG from the WAV name #}
-    {% set base_name = f.stem.split('_manual')[0] %}
-    {% set log_file = base_name + '_manual.txt' %}
-    {% set png_file = base_name + '_manual.png' %}
-    
+  {% for entry in files %}
     <li class="list-group-item {% if loop.first %}list-group-item-info{% endif %}">
-      <strong>{{ f.name }} 
-      {% if loop.first %}(LATEST RUN){% endif %}
-      </strong>
-      <div class="btn-group float-end" role="group">
-        {# Link to WAV file #}
-        <a href="{{ url_for('recordings.recordings_file', filename='manual/' + f.name) }}" class="btn btn-sm btn-outline-secondary" target="_blank">WAV</a>
-        
-        {# Link to Log file #}
-        <a href="{{ url_for('recordings.recordings_file', filename='manual/' + log_file) }}" class="btn btn-sm btn-outline-secondary" target="_blank">Log</a>
-        
-        {# Link to SSTV PNG (check if it exists) #}
-        {% if f.parent.joinpath(png_file).exists() %}
-          <a href="{{ url_for('recordings.recordings_file', filename='manual/' + png_file) }}" class="btn btn-sm btn-outline-success" target="_blank">SSTV Image</a>
+      <strong>{{ entry.wav }}</strong>
+      {% if entry.meta %}
+        <span class="badge bg-info">Gain {{ entry.meta.gain }}</span>
+        <span class="badge bg-secondary">PPM {{ entry.meta.ppm }}</span>
+        <span class="badge bg-light text-dark">Freq {{ entry.meta.frequency }}</span>
+      {% endif %}
+      <div class="btn-group float-end">
+        {% if entry.wav %}
+          <a href="{{ url_for('recordings.recordings_file', filename='manual/' + entry.wav) }}" class="btn btn-sm btn-outline-secondary">WAV</a>
+        {% endif %}
+        {% if entry.log %}
+          <a href="{{ url_for('recordings.recordings_file', filename='manual/' + entry.log) }}" class="btn btn-sm btn-outline-secondary">Log</a>
+        {% endif %}
+        {% if entry.png %}
+          <a href="{{ url_for('recordings.recordings_file', filename='manual/' + entry.png) }}" class="btn btn-sm btn-outline-success">SSTV</a>
         {% endif %}
       </div>
     </li>
@@ -127,8 +93,6 @@ Files are saved in the <code>recordings/manual</code> directory.
     <li class="list-group-item">No manual recordings found.</li>
   {% endfor %}
 </ul>
-
-
 <script>
 async function runDongleCheck() {
   try {
@@ -148,7 +112,7 @@ async function runDongleCheck() {
     const badge = document.getElementById("statusBadge");
     badge.textContent = "Error";
     badge.className = "badge bg-warning";
-    document.getElementById("outputBox").textContent = err;
+    document.getElementById("outputBox").textContent = String(err);
   }
 }
 
@@ -160,7 +124,7 @@ async function updateStatus() {
     document.getElementById("diskInfo").innerText =
       "Disk free: " + data.disk_free_gb + " GB";
 
-    if (data.pass_info) {
+    if (data.pass_info && !data.pass_info.error) {
       let msg = "Pass in progress: " + data.pass_info.satellite +
                 " (IQ: " + data.pass_info.iq_file + ")";
       if (data.pass_info.iq_size_mb !== undefined) {
@@ -186,12 +150,11 @@ async function updateStatus() {
       list.innerHTML = "<li>No orphan IQ files</li>";
     }
 
-    // Update PPM box
     const ppmBox = document.getElementById("ppmBox");
     const ppmValue = document.getElementById("ppmValue");
     if (data.rtl_ppm !== undefined) {
       ppmValue.textContent = data.rtl_ppm + " ppm";
-      if (data.rtl_ppm === 0) {
+      if (parseInt(data.rtl_ppm) === 0) {
         ppmBox.className = "alert alert-warning";
         ppmBox.innerHTML = "⚠️ No calibration value found (using 0 ppm). Please run calibration.";
       }
@@ -244,30 +207,30 @@ document.getElementById("calibrateBtn").addEventListener("click", async function
         <div class="row">
           <div class="col-md-6">
             <h6>Before</h6>
-            <img src="/gallery/gallery/image/${data.png_before}" class="img-fluid border rounded">
+            <img src="/gallery/gallery/image/${data.png_before}" class="img-fluid border rounded" alt="Before calibration">
           </div>
           <div class="col-md-6">
             <h6>After</h6>
-            <img src="/gallery/gallery/image/${data.png_after}" class="img-fluid border rounded">
+            <img src="/gallery/gallery/image/${data.png_after}" class="img-fluid border rounded" alt="After calibration">
           </div>
         </div>`;
     } else {
       resultBox.innerHTML = `<div class="alert alert-danger">Calibration failed: ${data.error}</div>`;
     }
   } catch (err) {
-    resultBox.innerHTML = `<div class="alert alert-warning">Error: ${err}</div>`;
+    resultBox.innerHTML = `<div class="alert alert-warning">Error: ${String(err)}</div>`;
   }
   this.disabled = false;
   this.textContent = "🛠️ Calibrate SDR";
-  // Refresh status and PPM after successful calibration
-  updateStatus(); 
+  updateStatus();
 });
 
-// Run checks on load and poll status
-runDongleCheck();
-setInterval(updateStatus, 5000);
-updateStatus();
-setInterval(updateSdrLight, 5000);
-updateSdrLight();
+document.addEventListener("DOMContentLoaded", () => {
+  runDongleCheck();
+  updateStatus();
+  updateSdrLight();
+  setInterval(updateStatus, 5000);
+  setInterval(updateSdrLight, 5000);
+});
 </script>
 {% endblock %}
