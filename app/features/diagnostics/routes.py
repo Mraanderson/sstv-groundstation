@@ -21,44 +21,66 @@ def load_settings():
     except Exception:
         return {}
 
-def save_settings(s): SETTINGS_FILE.write_text(json.dumps(s, indent=2))
+def save_settings(s):
+    SETTINGS_FILE.write_text(json.dumps(s, indent=2))
 
 def get_ppm():
-    try: return int(load_settings().get("rtl_ppm", 0))
-    except (ValueError, TypeError): return 0
+    try:
+        return int(load_settings().get("rtl_ppm", 0))
+    except (ValueError, TypeError):
+        return 0
 
 def get_gain():
-    try: return str(load_settings().get("rtl_gain", "0"))
-    except Exception: return "0"
+    try:
+        return str(load_settings().get("rtl_gain", "0"))
+    except Exception:
+        return "0"
 
 def set_gain(g):
-    s = load_settings(); s["rtl_gain"] = str(g); save_settings(s)
+    s = load_settings()
+    s["rtl_gain"] = str(g)
+    save_settings(s)
 
 # --- System checks ---
 def check_system_requirements():
-    bins = [("sox","Audio conversion"),("rtl_sdr","RTL-SDR capture"),
-            ("rtl_fm","FM demod"),("rtl_power","Spectrum")]
-    return [{"name":n,"desc":d,"found":bool(shutil.which(n)),
-             "path":shutil.which(n) or "Not found"} for n,d in bins]
+    bins = [
+        ("sox", "Audio conversion"),
+        ("rtl_sdr", "RTL-SDR capture"),
+        ("rtl_fm", "FM demod"),
+        ("rtl_power", "Spectrum scan"),
+    ]
+    return [
+        {
+            "name": n,
+            "desc": d,
+            "found": bool(shutil.which(n)),
+            "path": shutil.which(n) or "Not found",
+        }
+        for n, d in bins
+    ]
 
-def sdr_present():
-    """Check for rtl_sdr binary on PATH."""
+def sdr_software_installed():
+    """Check if rtl_sdr binary is available on PATH."""
     return bool(shutil.which("rtl_sdr"))
 
-def sdr_device_connected():
+def sdr_hardware_connected():
     """Probe the dongle via `rtl_test -t`; returns True if hardware responds."""
     try:
-        res = subprocess.run(["rtl_test","-t"], capture_output=True, text=True, timeout=3)
+        res = subprocess.run(
+            ["rtl_test", "-t"], capture_output=True, text=True, timeout=3
+        )
         out = (res.stdout or "") + (res.stderr or "")
         return any(k in out for k in ("Reading samples", "Found Rafael"))
     except Exception:
         return False
 
 def sdr_in_use():
-    for proc in psutil.process_iter(['name','cmdline']):
+    """Detect if rtl_fm is currently running."""
+    for proc in psutil.process_iter(["name", "cmdline"]):
         try:
-            if (proc.info['name'] and 'rtl_fm' in proc.info['name']) or \
-               (proc.info['cmdline'] and any('rtl_fm' in c for c in proc.info['cmdline'])):
+            if (proc.info["name"] and "rtl_fm" in proc.info["name"]) or (
+                proc.info["cmdline"] and any("rtl_fm" in c for c in proc.info["cmdline"])
+            ):
                 return True
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
@@ -295,17 +317,19 @@ def decode_upload():
         current_app.logger.exception("Decode upload failed")
         return jsonify({"success": False, "error": str(e)}), 500
 
-# --- SDR traffic-light status endpoint ---
 @bp.route("/sdr/status")
 def sdr_status():
     try:
-        if not sdr_present():
-            return jsonify({"status": "grey", "reason": "binary missing"})
+        if not sdr_software_installed():
+            return jsonify({"status": "grey", "reason": "software missing"})
         if sdr_in_use():
             return jsonify({"status": "red", "reason": "rtl_fm busy"})
         if scheduled_pass_soon():
             return jsonify({"status": "amber", "reason": "scheduled soon"})
-        return jsonify({"status": "green", "reason": "ready"})
+        if sdr_hardware_connected():
+            return jsonify({"status": "green", "reason": "ready"})
+        else:
+            return jsonify({"status": "grey", "reason": "no dongle"})
     except Exception as e:
         current_app.logger.exception("sdr_status failed")
         return jsonify({"status": "grey", "reason": f"error: {e}"}), 500
