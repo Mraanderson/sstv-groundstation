@@ -133,3 +133,74 @@ def diagnostics_status():
         "rtl_ppm": get_ppm(),
         "rtl_gain": get_gain()
     })
+
+@bp.route("/calibrate", methods=["POST"])
+def calibrate():
+    try:
+        CAL_DIR = RECORDINGS_DIR / "calibration"
+        CAL_DIR.mkdir(parents=True, exist_ok=True)
+        fm_csv = CAL_DIR / "scan_fm.csv"
+
+        # Scan FM band for strong signal
+        subprocess.run(
+            ["rtl_power", "-f", "88M:108M:100k", "-g", "20", "-e", "6", str(fm_csv)],
+            check=True
+        )
+
+        # Parse CSV for strongest peak
+        best_freq, best_power = None, -1e9
+        lines = fm_csv.read_text().splitlines()
+        for line in lines:
+            parts = [p.strip() for p in line.split(",")]
+            if len(parts) < 7: continue
+            f_start, f_end = float(parts[2]), float(parts[3])
+            bins = [float(x) for x in parts[6:] if x]
+            if not bins: continue
+            idx, power = max(enumerate(bins), key=lambda kv: kv[1])
+            if power > best_power:
+                best_power = power
+                bin_size = (f_end - f_start) / len(bins)
+                best_freq = f_start + (idx + 0.5) * bin_size
+
+        if not best_freq:
+            return jsonify({"success": False, "error": "No strong FM peak found"})
+
+        expected = round(best_freq / 100_000) * 100_000
+        ppm = int(round(((best_freq - expected) / expected) * 1e6))
+        ppm = max(min(ppm, 3000), -3000)
+
+        settings = load_settings()
+        settings["rtl_ppm"] = ppm
+        save_settings(settings)
+
+        def nf_capture(label, ppm_arg=None):
+            rate, png = 48000, IMAGES_DIR / f"calibration_{label}.png"
+            ppm_opts = ["-p", str(ppm_arg)] if ppm_arg is not None else []
+            cmd = [
+                "timeout", "8", "rtl_fm", "-f", str(expected), "-M", "fm", "-s", str(rate),
+                "-g", "29.7", "-l", "0"
+            ] + ppm_opts
+            p1 = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+            p2 = subprocess.Popen(
+                ["sox", "-t", "raw", "-r", str(rate), "-e", "signed", "-b", "16", "-c", "1", "-",
+                 "-n", "spectrogram", "-o", str(png)],
+                stdin=p1.stdout
+            )
+            p1.stdout.close()
+            p2.wait()
+            return png.name
+
+        return jsonify({
+            "success": True,
+            "timestamp": datetime.datetime.now().isoformat(),
+            "measured_hz": int(best_freq),
+            "expected_hz": int(expected),
+            "ppm": ppm,
+            "csv_preview": lines[:5],
+            "png_before": nf_capture("before"),
+            "png_after": nf_capture("after", ppm)
+        })
+    except Exception as e:
+        current_app.logger.exception("Calibration failed")
+        return jsonify({"success": False, "error": str(e)}), 500
+        
