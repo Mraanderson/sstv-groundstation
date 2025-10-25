@@ -204,3 +204,98 @@ def calibrate():
         current_app.logger.exception("Calibration failed")
         return jsonify({"success": False, "error": str(e)}), 500
         
+@bp.route("/recorder", methods=["GET", "POST"])
+def manual_recorder():
+    try:
+        files = sorted(MANUAL_DIR.glob("*.wav"), key=os.path.getmtime, reverse=True)[:5]
+        ppm = get_ppm()
+        gain = get_gain()
+    except Exception as e:
+        current_app.logger.exception("Failed to load manual recordings or PPM")
+        flash(f"Error loading manual recordings: {e}", "danger")
+        files, ppm, gain = [], 0, "0"
+
+    if request.method == "POST":
+        duration = int(request.form.get("duration", 30))
+        freq = request.form.get("frequency", "145.800M")
+        ppm_arg = "0"  # Reset PPM for manual recordings
+        gain_arg = request.form.get("gain", get_gain())
+        set_gain(gain_arg)
+
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        wav_file = MANUAL_DIR / f"{timestamp}_manual.wav"
+        log_file = MANUAL_DIR / f"{timestamp}_manual.txt"
+        meta_file = MANUAL_DIR / f"{timestamp}_manual.json"
+
+        if not sdr_device_connected():
+            demo_file = MANUAL_DIR / f"{timestamp}_demo_manual.wav"
+            flash(f"No dongle detected — running DEMO to: {demo_file.name}", "warning")
+            try:
+                segs = []
+                for i in range(int(duration * 2)):
+                    freq_tone = 440 if (i % 2 == 0) else 880
+                    seg = MANUAL_DIR / f"{timestamp}_seg{i}.wav"
+                    subprocess.run(["sox", "-n", str(seg), "synth", "0.5", "sin", str(freq_tone)], check=True)
+                    segs.append(str(seg))
+                subprocess.run(["sox"] + segs + [str(demo_file)], check=True)
+                for s in segs: os.remove(s)
+                flash(f"Demo recording created: {demo_file.name}", "success")
+            except Exception as e:
+                current_app.logger.exception("Demo recording failed")
+                flash(f"Demo error: {e}", "danger")
+            return redirect(url_for("diagnostics.manual_recorder"))
+
+        SAMPLE_RATE = "48000"
+        flash(f"Recording to: {wav_file.name} (Gain {gain_arg}, PPM {ppm_arg})", "info")
+
+        success = False
+        with open(log_file, "w") as lf:
+            try:
+                cmd1 = ["rtl_fm", "-M", "fm", "-f", freq, "-p", ppm_arg, "-s", SAMPLE_RATE, "-g", gain_arg]
+                cmd2 = ["sox", "-t", "raw", "-r", SAMPLE_RATE, "-e", "signed", "-b", "16", "-c", "1", "-", str(wav_file)]
+                p1 = subprocess.Popen(cmd1, stdout=subprocess.PIPE, stderr=lf)
+                p2 = subprocess.Popen(cmd2, stdin=p1.stdout, stderr=lf)
+                p1.stdout.close()
+                p2.wait(timeout=duration + 5)
+                success = True
+            except subprocess.TimeoutExpired:
+                flash("Recording timed out", "danger")
+                p1.terminate(); p2.terminate()
+            finally:
+                if p1.poll() is None: p1.terminate()
+                if p2.poll() is None: p2.terminate()
+
+        meta = {
+            "frequency": freq,
+            "duration": duration,
+            "ppm": ppm_arg,
+            "gain": gain_arg,
+            "wav": wav_file.name,
+            "log": log_file.name
+        }
+        try: meta_file.write_text(json.dumps(meta, indent=2))
+        except Exception as e: current_app.logger.warning(f"Failed to write meta: {e}")
+
+        if success:
+            flash(f"Recording complete: {wav_file.name} (Gain {gain_arg}, PPM {ppm_arg})", "success")
+
+        return redirect(url_for("diagnostics.manual_recorder"))
+
+    return render_template("diagnostics/diagnostics.html", files=files, ppm=ppm, gain=gain)
+
+@bp.route("/decode_upload", methods=["POST"])
+def decode_upload():
+    try:
+        file = request.files.get("file")
+        if not file or not file.filename.endswith(".wav"):
+            return jsonify({"success": False, "error": "No WAV file provided"}), 400
+
+        save_path = MANUAL_DIR / file.filename
+        file.save(save_path)
+
+        result = process_uploaded_wav(save_path)
+        return jsonify({"success": True, "result": result})
+    except Exception as e:
+        current_app.logger.exception("Decode upload failed")
+        return jsonify({"success": False, "error": str(e)}), 500
+        
