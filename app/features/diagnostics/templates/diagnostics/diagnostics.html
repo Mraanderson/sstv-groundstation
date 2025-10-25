@@ -204,6 +204,114 @@ document.getElementById("calibrateBtn").addEventListener("click", async function
         <div class="row">
           <div class="col-md-6">
             <h6>Before</h6>
+
+<script>
+async function runDongleCheck() {
+  try {
+    const res = await fetch("{{ url_for('diagnostics.diagnostics_check') }}");
+    const data = await res.json();
+    const swBadge = document.getElementById("swBadge");
+    const hwBadge = document.getElementById("hwBadge");
+    const output = document.getElementById("outputBox");
+
+    swBadge.textContent = data.software ? "Software Installed" : "Software Missing";
+    swBadge.className = data.software ? "badge bg-success" : "badge bg-danger";
+
+    hwBadge.textContent = data.hardware ? "Dongle Detected" : "No Dongle";
+    hwBadge.className = data.hardware ? "badge bg-success" : "badge bg-danger";
+
+    if (data.output) output.textContent = data.output;
+  } catch (err) {
+    document.getElementById("swBadge").textContent = "Error";
+    document.getElementById("hwBadge").textContent = "Error";
+    document.getElementById("outputBox").textContent = String(err);
+  }
+}
+
+async function updateStatus() {
+  try {
+    const res = await fetch("{{ url_for('diagnostics.diagnostics_status') }}");
+    const data = await res.json();
+
+    const diskInfo = document.getElementById("diskInfo");
+    if (typeof data.disk_free_gb === "number") {
+      diskInfo.innerText = "Disk free: " + data.disk_free_gb + " GB";
+    } else {
+      diskInfo.innerText = "Disk free: unknown";
+    }
+
+    const list = document.getElementById("orphanList");
+    list.innerHTML = "";
+    if (data.orphan_iq?.length) {
+      data.orphan_iq.forEach(file => {
+        const li = document.createElement("li");
+        let text = file.path + " (" + file.size_mb + " MB)";
+        if (file.deleted) text += " — auto‑deleted (stale)";
+        if (file.delete_error) text += " — error: " + file.delete_error;
+        li.textContent = text;
+        list.appendChild(li);
+      });
+    } else {
+      list.innerHTML = "<li>No orphan files</li>";
+    }
+
+    const ppmBox = document.getElementById("ppmBox");
+    const ppmValue = document.getElementById("ppmValue");
+    if (data.rtl_ppm !== undefined) {
+      ppmValue.textContent = data.rtl_ppm + " ppm";
+      if (parseInt(data.rtl_ppm) === 0) {
+        ppmBox.className = "alert alert-warning";
+        ppmBox.innerHTML = "⚠️ No calibration value found (using 0 ppm). Please run calibration.";
+      }
+    } else {
+      ppmValue.textContent = "not available";
+    }
+  } catch (err) {
+    document.getElementById("diskInfo").innerText = "Disk free: error";
+    document.getElementById("orphanList").innerHTML = "<li>Error loading orphan files</li>";
+  }
+}
+
+async function updateSdrLight() {
+  try {
+    const res = await fetch("{{ url_for('diagnostics.sdr_status') }}");
+    const data = await res.json();
+    const el = document.getElementById("sdrLight");
+    const map = {
+      green: {cls: "badge bg-success", text: "🟢 Ready"},
+      red:   {cls: "badge bg-danger",  text: "🔴 In Use"},
+      amber: {cls: "badge bg-warning text-dark", text: "🟠 Scheduled Soon"},
+      grey:  {cls: "badge bg-secondary", text: "⚪ Not Present"}
+    };
+    const st = map[data.status] || map.grey;
+    el.className = st.cls;
+    el.textContent = st.text;
+  } catch (err) {
+    const el = document.getElementById("sdrLight");
+    el.className = "badge bg-warning text-dark";
+    el.textContent = "Error";
+  }
+}
+
+document.getElementById("calibrateBtn").addEventListener("click", async function() {
+  this.disabled = true;
+  this.textContent = "Calibrating...";
+  const resultBox = document.getElementById("calibrationResult");
+  resultBox.innerHTML = "";
+  try {
+    const res = await fetch("{{ url_for('diagnostics.calibrate') }}", {method: "POST"});
+    const data = await res.json();
+    if (data.success) {
+      resultBox.innerHTML = `
+        <div class="alert alert-success">
+          <strong>PPM correction:</strong> ${data.ppm}<br>
+          <strong>Measured:</strong> ${data.measured_hz} Hz<br>
+          <strong>Expected:</strong> ${data.expected_hz} Hz<br>
+          <strong>Timestamp:</strong> ${data.timestamp}
+        </div>
+        <div class="row">
+          <div class="col-md-6">
+            <h6>Before</h6>
             <img src="/gallery/gallery/image/${data.png_before}" class="img-fluid border rounded" alt="Before calibration">
           </div>
           <div class="col-md-6">
