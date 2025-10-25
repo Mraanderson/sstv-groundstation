@@ -112,12 +112,20 @@ def reset_ppm_route():
 
 @bp.route("/status")
 def diagnostics_status():
-    free_gb = shutil.disk_usage("/").free // (2**30)
+    # Try to get disk space from recordings directory first
+    try:
+        free_gb = shutil.disk_usage(str(RECORDINGS_DIR)).free // (2**30)
+    except Exception:
+        try:
+            free_gb = shutil.disk_usage("/").free // (2**30)
+        except Exception:
+            free_gb = None
+
     orphan = []
     cutoff = datetime.datetime.now().timestamp() - 3600
     for f in RECORDINGS_DIR.glob("*.iq"):
         age = f.stat().st_mtime
-        entry = {"path": str(f), "size_mb": round(f.stat().st_size/(1024*1024), 2)}
+        entry = {"path": str(f), "size_mb": round(f.stat().st_size / (1024 * 1024), 2)}
         if age < cutoff:
             try:
                 os.remove(f)
