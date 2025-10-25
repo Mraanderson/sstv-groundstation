@@ -299,3 +299,19 @@ def decode_upload():
         current_app.logger.exception("Decode upload failed")
         return jsonify({"success": False, "error": str(e)}), 500
         
+@bp.route("/sdr/status")
+def sdr_status():
+    try:
+        if not sdr_present():
+            return jsonify({"status": "grey", "reason": "SDR software not found"})
+        if sdr_in_use():
+            return jsonify({"status": "red", "reason": "SDR currently in use"})
+        if hasattr(passes_utils, "scheduled_pass_soon") and passes_utils.scheduled_pass_soon():
+            return jsonify({"status": "amber", "reason": "Scheduled pass approaching"})
+        if sdr_device_connected():
+            return jsonify({"status": "green", "reason": "SDR ready"})
+        return jsonify({"status": "grey", "reason": "SDR hardware not detected"})
+    except Exception as e:
+        current_app.logger.exception("sdr_status failed")
+        return jsonify({"status": "grey", "reason": f"Error: {e}"}), 500
+        
