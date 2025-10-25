@@ -2,7 +2,6 @@
 {% block title %}Diagnostics{% endblock %}
 {% block content %}
 
-{# Flash messages #}
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
     <div class="flashes">
@@ -39,6 +38,7 @@
   Current PPM correction: <span id="ppmValue">{{ ppm }}</span>
 </div>
 <button id="calibrateBtn" class="btn btn-warning">🛠️ Calibrate SDR</button>
+<button id="resetPpmBtn" class="btn btn-outline-danger ms-2">Reset PPM</button>
 <div id="calibrationResult" class="mt-3"></div>
 
 <hr>
@@ -53,8 +53,8 @@
     <input type="number" class="form-control" id="duration" name="duration" value="30" required>
   </div>
   <div class="col-md-2">
-    <label for="ppm" class="form-label">PPM</label>
-    <input type="number" class="form-control" id="ppm" name="ppm" value="{{ ppm }}" required>
+    <label class="form-label">PPM</label>
+    <div class="form-control-plaintext text-muted">Auto-set to 0</div>
   </div>
   <div class="col-md-3">
     <label for="gain" class="form-label">Gain</label>
@@ -101,8 +101,8 @@
   {% else %}
     <li class="list-group-item">No manual recordings found.</li>
   {% endfor %}
-</ul>
-<script>
+            </ul>
+            <script>
 async function runDongleCheck() {
   try {
     const res = await fetch("{{ url_for('diagnostics.diagnostics_check') }}");
@@ -111,21 +111,11 @@ async function runDongleCheck() {
     const hwBadge = document.getElementById("hwBadge");
     const output = document.getElementById("outputBox");
 
-    if (data.software) {
-      swBadge.textContent = "Software Installed";
-      swBadge.className = "badge bg-success";
-    } else {
-      swBadge.textContent = "Software Missing";
-      swBadge.className = "badge bg-danger";
-    }
+    swBadge.textContent = data.software ? "Software Installed" : "Software Missing";
+    swBadge.className = data.software ? "badge bg-success" : "badge bg-danger";
 
-    if (data.hardware) {
-      hwBadge.textContent = "Dongle Detected";
-      hwBadge.className = "badge bg-success";
-    } else {
-      hwBadge.textContent = "No Dongle";
-      hwBadge.className = "badge bg-danger";
-    }
+    hwBadge.textContent = data.hardware ? "Dongle Detected" : "No Dongle";
+    hwBadge.className = data.hardware ? "badge bg-success" : "badge bg-danger";
 
     if (data.output) output.textContent = data.output;
   } catch (err) {
@@ -140,12 +130,11 @@ async function updateStatus() {
     const res = await fetch("{{ url_for('diagnostics.diagnostics_status') }}");
     const data = await res.json();
 
-    document.getElementById("diskInfo").innerText =
-      "Disk free: " + data.disk_free_gb + " GB";
+    document.getElementById("diskInfo").innerText = "Disk free: " + data.disk_free_gb + " GB";
 
     const list = document.getElementById("orphanList");
     list.innerHTML = "";
-    if (data.orphan_iq && data.orphan_iq.length > 0) {
+    if (data.orphan_iq?.length) {
       data.orphan_iq.forEach(file => {
         const li = document.createElement("li");
         let text = file.path + " (" + file.size_mb + " MB)";
@@ -209,7 +198,8 @@ document.getElementById("calibrateBtn").addEventListener("click", async function
         <div class="alert alert-success">
           <strong>PPM correction:</strong> ${data.ppm}<br>
           <strong>Measured:</strong> ${data.measured_hz} Hz<br>
-          <strong>Expected:</strong> ${data.expected_hz} Hz
+          <strong>Expected:</strong> ${data.expected_hz} Hz<br>
+          <strong>Timestamp:</strong> ${data.timestamp}
         </div>
         <div class="row">
           <div class="col-md-6">
@@ -220,7 +210,9 @@ document.getElementById("calibrateBtn").addEventListener("click", async function
             <h6>After</h6>
             <img src="/gallery/gallery/image/${data.png_after}" class="img-fluid border rounded" alt="After calibration">
           </div>
-        </div>`;
+        </div>
+        <h6 class="mt-3">CSV Preview</h6>
+        <pre class="bg-light p-2 border rounded">${data.csv_preview.join('\n')}</pre>`;
     } else {
       resultBox.innerHTML = `<div class="alert alert-danger">Calibration failed: ${data.error}</div>`;
     }
@@ -230,6 +222,23 @@ document.getElementById("calibrateBtn").addEventListener("click", async function
   this.disabled = false;
   this.textContent = "🛠️ Calibrate SDR";
   updateStatus();
+});
+
+document.getElementById("resetPpmBtn").addEventListener("click", async function() {
+  this.disabled = true;
+  try {
+    const res = await fetch("{{ url_for('diagnostics.reset_ppm_route') }}", {method: "POST"});
+    const data = await res.json();
+    if (data.success) {
+      document.getElementById("ppmValue").textContent = "0 ppm";
+      alert("PPM reset to 0.");
+    } else {
+      alert("Reset failed: " + data.error);
+    }
+  } catch (err) {
+    alert("Error resetting PPM: " + err);
+  }
+  this.disabled = false;
 });
 
 document.addEventListener("DOMContentLoaded", () => {
