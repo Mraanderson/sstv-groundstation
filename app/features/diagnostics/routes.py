@@ -323,30 +323,64 @@ def manual_recorder():
                 flash(f"Demo error: {e}", "danger")
             return redirect(url_for("diagnostics.manual_recorder"))
 
-        SAMPLE_RATE = "48000"
+        SAMPLE_RATE = 48000  # use integer and consistent formatting
         flash(f"Recording to: {wav_file.name} (Gain {gain_arg}, PPM {ppm_arg})", "info")
 
         success = False
         p1 = p2 = None
         with open(log_file, "w") as lf:
             try:
-                cmd1 = ["rtl_fm", "-M", "fm", "-f", freq, "-p", str(ppm_arg), "-s", SAMPLE_RATE, "-g", gain_arg]
-                cmd2 = ["sox", "-t", "raw", "-r", SAMPLE_RATE, "-e", "signed", "-b", "16", "-c", "1", "-", str(wav_file)]
+                cmd1 = ["rtl_fm", "-M", "fm", "-f", freq, "-p", str(ppm_arg), "-s", str(SAMPLE_RATE), "-g", str(gain_arg)]
+                cmd2 = ["sox", "-t", "raw", "-r", str(SAMPLE_RATE), "-e", "signed", "-b", "16", "-c", "1", "-", str(wav_file)]
+                current_app.logger.debug("Starting recorder: %s | %s", cmd1, cmd2)
                 p1 = subprocess.Popen(cmd1, stdout=subprocess.PIPE, stderr=lf)
                 p2 = subprocess.Popen(cmd2, stdin=p1.stdout, stderr=lf)
                 p1.stdout.close()
-                p2.wait(timeout=duration + 5)
-                success = True
-            except subprocess.TimeoutExpired:
-                flash("Recording timed out", "danger")
-                if p1: p1.terminate()
-                if p2: p2.terminate()
+
+                # wait up to duration + 10s for the pipeline to finish
+                try:
+                    p2.wait(timeout=duration + 10)
+                except subprocess.TimeoutExpired:
+                    current_app.logger.warning("Recording timed out; terminating processes")
+                    if p1: p1.terminate()
+                    if p2: p2.terminate()
+                # give a short grace for processes to exit
+                time_waited = 0
+                for _ in range(5):
+                    if (p1 and p1.poll() is not None) and (p2 and p2.poll() is not None):
+                        break
+                    time.sleep(0.2)
+                    time_waited += 0.2
+
+                # log return codes
+                rc1 = p1.returncode if p1 else None
+                rc2 = p2.returncode if p2 else None
+                current_app.logger.debug("Recorder exit codes: rtl_fm=%s sox=%s file=%s", rc1, rc2, wav_file)
+
+                # verify produced file is non-trivial
+                if wav_file.exists():
+                    size = wav_file.stat().st_size
+                    # WAV header is ~44 bytes, require > 1000 bytes for a valid short recording
+                    if size > 1000:
+                        success = True
+                    else:
+                        current_app.logger.warning("Recorded wav exists but too small (%s bytes) — treating as failure", size)
+                        try:
+                            wav_file.unlink()
+                        except Exception:
+                            current_app.logger.exception("Could not remove tiny wav file")
+                else:
+                    current_app.logger.warning("No wav file produced")
+
+            except Exception as e:
+                current_app.logger.exception("Recording pipeline failed")
+                flash(f"Recording error: {e}", "danger")
             finally:
                 try:
                     if p1 and p1.poll() is None: p1.terminate()
                     if p2 and p2.poll() is None: p2.terminate()
                 except Exception:
-                    pass
+                    current_app.logger.debug("Error terminating recorder processes", exc_info=True)
 
         meta = {
             "frequency": freq,
@@ -356,7 +390,18 @@ def manual_recorder():
             "wav": wav_file.name,
             "log": log_file.name
         }
+        # write meta only if wav exists (or always write to keep trace)
         try:
+            if wav_file.exists():
+                # attempt to compute actual wav duration (best-effort using file size)
+                try:
+                    size = wav_file.stat().st_size
+                    # rough duration estimate: (size - 44 bytes header) / (sample_rate * bytes_per_sample)
+                    bytes_per_sample = 2  # 16-bit mono
+                    est_sec = max(0, (size - 44) / (SAMPLE_RATE * bytes_per_sample))
+                    meta["actual_seconds"] = round(est_sec, 2)
+                except Exception:
+                    pass
             meta_file.write_text(json.dumps(meta, indent=2))
         except Exception as e:
             current_app.logger.warning(f"Failed to write meta: {e}")
@@ -364,17 +409,21 @@ def manual_recorder():
         # generate spectrogram image for the wav (best effort)
         if success:
             try:
-                subprocess.run(["sox", str(wav_file), "-n", "spectrogram", "-o", str(png_file)], check=True, timeout=20)
+                subprocess.run(["sox", str(wav_file), "-n", "spectrogram", "-o", str(png_file)], check=True, timeout=60)
                 # update meta with png name if created
                 if png_file.exists():
                     meta["png"] = png_file.name
-                    try: meta_file.write_text(json.dumps(meta, indent=2))
-                    except Exception: current_app.logger.debug("Could not update meta with png")
+                    try:
+                        meta_file.write_text(json.dumps(meta, indent=2))
+                    except Exception:
+                        current_app.logger.debug("Could not update meta with png")
             except Exception as e:
                 current_app.logger.debug("Spectrogram creation failed: %s", e)
 
         if success:
             flash(f"Recording complete: {wav_file.name} (Gain {gain_arg}, PPM {ppm_arg})", "success")
+        else:
+            flash("Recording failed or produced no audio; check the log for details", "danger")
 
         return redirect(url_for("diagnostics.manual_recorder"))
 
