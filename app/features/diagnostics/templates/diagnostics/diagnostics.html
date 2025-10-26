@@ -91,17 +91,17 @@
                 </div>
                 <p class="mb-1">
                   {% if e.png %}
-                    <img src="{{ url_for('diagnostics.download_manual_file', filename=e.png, attachment=0) }}" alt="spectrogram" class="img-fluid" style="max-width:240px;">
+                    <img src="/recordings/files/manual/{{ e.png }}?attachment=0" alt="spectrogram" class="img-fluid" style="max-width:240px;">
                   {% endif %}
                 </p>
                 <small class="text-muted">{{ e.log or '' }}</small>
               </div>
 
               <div class="d-flex flex-column align-items-end">
-                <a class="btn btn-sm btn-outline-primary mb-1" href="{{ url_for('diagnostics.download_manual_file', filename=e.wav, attachment=1) }}">WAV</a>
+                <a class="btn btn-sm btn-outline-primary mb-1" href="/recordings/files/manual/{{ e.wav }}">WAV</a>
 
                 {% if e.meta_filename %}
-                  <a class="btn btn-sm btn-outline-secondary mb-1" href="{{ url_for('diagnostics.download_manual_file', filename=e.meta_filename, attachment=1) }}">JSON</a>
+                  <a class="btn btn-sm btn-outline-secondary mb-1" href="/recordings/files/manual/{{ e.meta_filename }}">JSON</a>
                 {% else %}
                   <button class="btn btn-sm btn-outline-secondary mb-1" disabled>JSON</button>
                 {% endif %}

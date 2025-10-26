@@ -132,9 +132,11 @@ def download_manual_file(filename):
     try:
         safe = Path(filename).name
         attach = request.args.get("attachment", "1") == "1"
-        return send_from_directory(str(MANUAL_DIR), safe, as_attachment=attach)
+        # Redirect to the canonical recordings URL (preserve attachment flag)
+        target = f"/recordings/files/manual/{safe}?attachment={'1' if attach else '0'}"
+        return redirect(target)
     except Exception:
-        current_app.logger.exception("download_manual_file failed")
+        current_app.logger.exception("download_manual_file redirect failed")
         abort(404)
 
 # delete manual recording (works with form POST or AJAX)
