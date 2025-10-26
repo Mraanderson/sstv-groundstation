@@ -1,360 +1,239 @@
 {% extends "base.html" %}
-{% block title %}Diagnostics{% endblock %}
+{% block title %}Diagnostics - SSTV Groundstation{% endblock %}
+
 {% block content %}
+<div class="row">
+  <div class="col-md-8">
+    <h3>Diagnostics</h3>
 
-{% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-    <div class="flashes">
-      {% for category, message in messages %}
-        <div class="alert alert-{{ category }}" role="alert">{{ message }}</div>
-      {% endfor %}
-    </div>
-  {% endif %}
-{% endwith %}
+    <div id="alerts"></div>
 
-<h1>RTL‑SDR Diagnostics</h1>
-<p>Check dongle presence, calibrate PPM, and run manual recordings.</p>
-
-<hr>
-<h2>Dongle / Software Presence</h2>
-<p>
-  <span id="swBadge" class="badge bg-secondary">Checking software…</span>
-  <span id="hwBadge" class="badge bg-secondary">Checking hardware…</span>
-</p>
-<pre id="outputBox" class="mt-3"></pre>
-
-<hr>
-<h2>System Status</h2>
-<p id="diskInfo">Disk free: …</p>
-<ul id="orphanList"><li>Loading orphan IQ info…</li></ul>
-
-<hr>
-<h2>SDR Traffic‑Light Status</h2>
-<span id="sdrLight" class="badge bg-secondary">Checking…</span>
-
-<hr>
-<h2>Calibration</h2>
-<div id="ppmBox" class="alert alert-secondary">
-  Current PPM correction: <span id="ppmValue">{{ ppm }}</span>
-</div>
-<button id="calibrateBtn" class="btn btn-warning">🛠️ Calibrate SDR</button>
-<button id="resetPpmBtn" class="btn btn-outline-danger ms-2">Reset PPM</button>
-<div id="calibrationResult" class="mt-3"></div>
-
-<hr>
-<h2>Manual Recorder</h2>
-<form method="post" action="{{ url_for('diagnostics.manual_recorder') }}" class="row g-3 align-items-end mb-4">
-  <div class="col-md-3">
-    <label for="frequency" class="form-label">Frequency</label>
-    <input type="text" class="form-control" id="frequency" name="frequency" value="145.800M" required>
-  </div>
-  <div class="col-md-2">
-    <label for="duration" class="form-label">Duration (s)</label>
-    <input type="number" class="form-control" id="duration" name="duration" value="30" required>
-  </div>
-  <div class="col-md-2">
-    <label class="form-label">PPM</label>
-    <div class="form-control-plaintext text-muted">Auto-set to 0</div>
-  </div>
-  <div class="col-md-3">
-    <label for="gain" class="form-label">Gain</label>
-    <select class="form-select" id="gain" name="gain">
-      <option value="0" {% if gain=="0" %}selected{% endif %}>0 (AGC)</option>
-      {% for g in ["0.9","4.0","7.7","11.6","14.4","15.7","16.6","19.7","20.7","22.9","25.4","28.0","29.7","32.8","33.8","36.4","37.2","38.6","40.2","42.1","43.4","43.9","44.5","48.0","49.6"] %}
-        <option value="{{ g }}" {% if gain==g %}selected{% endif %}>{{ g }} dB</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div class="col-md-2">
-    <button type="submit" class="btn btn-primary w-100">Start Record</button>
-  </div>
-</form>
-
-<h4>Manual Recordings History</h4>
-<ul class="list-group">
-  {% for entry in files %}
-    <li class="list-group-item {% if loop.first %}list-group-item-info{% endif %}">
-      <strong>{{ entry.wav }}</strong>
-      {% if entry.meta %}
-        {% if entry.meta.gain %}
-          <span class="badge bg-info">Gain {{ entry.meta.gain }}</span>
-        {% endif %}
-        {% if entry.meta.ppm %}
-          <span class="badge bg-secondary">PPM {{ entry.meta.ppm }}</span>
-        {% endif %}
-        {% if entry.meta.frequency %}
-          <span class="badge bg-light text-dark">Freq {{ entry.meta.frequency }}</span>
-        {% endif %}
-      {% endif %}
-      <div class="btn-group float-end">
-        {% if entry.wav %}
-          <a href="{{ url_for('recordings.recordings_file', filename='manual/' + entry.wav) }}" class="btn btn-sm btn-outline-secondary">WAV</a>
-        {% endif %}
-        {% if entry.log %}
-          <a href="{{ url_for('recordings.recordings_file', filename='manual/' + entry.log) }}" class="btn btn-sm btn-outline-secondary">Log</a>
-        {% endif %}
-        {% if entry.png %}
-          <a href="{{ url_for('recordings.recordings_file', filename='manual/' + entry.png) }}" class="btn btn-sm btn-outline-success">SSTV</a>
-        {% endif %}
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5 class="card-title">SDR Status</h5>
+        <p>
+          <span id="pageSdrLight" class="badge bg-secondary">Checking…</span>
+        </p>
+        <p id="sdrReason" class="text-muted small"></p>
       </div>
-    </li>
-  {% else %}
-    <li class="list-group-item">No manual recordings found.</li>
-  {% endfor %}
-            </ul>
-            <script>
-async function runDongleCheck() {
-  try {
-    const res = await fetch("{{ url_for('diagnostics.diagnostics_check') }}");
-    const data = await res.json();
-    const swBadge = document.getElementById("swBadge");
-    const hwBadge = document.getElementById("hwBadge");
-    const output = document.getElementById("outputBox");
+    </div>
 
-    swBadge.textContent = data.software ? "Software Installed" : "Software Missing";
-    swBadge.className = data.software ? "badge bg-success" : "badge bg-danger";
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Disk</h5>
+        <p>Free: <strong id="diskFree">…</strong> GB</p>
+        <p>
+          <span id="diskBadge" class="badge bg-secondary">Checking…</span>
+          <small class="text-muted ms-2">Requires at least 2 GB free</small>
+        </p>
+      </div>
+    </div>
 
-    hwBadge.textContent = data.hardware ? "Dongle Detected" : "No Dongle";
-    hwBadge.className = data.hardware ? "badge bg-success" : "badge bg-danger";
-
-    if (data.output) output.textContent = data.output;
-  } catch (err) {
-    document.getElementById("swBadge").textContent = "Error";
-    document.getElementById("hwBadge").textContent = "Error";
-    document.getElementById("outputBox").textContent = String(err);
-  }
-}
-
-async function updateStatus() {
-  try {
-    const res = await fetch("{{ url_for('diagnostics.diagnostics_status') }}");
-    const data = await res.json();
-
-    document.getElementById("diskInfo").innerText = "Disk free: " + data.disk_free_gb + " GB";
-
-    const list = document.getElementById("orphanList");
-    list.innerHTML = "";
-    if (data.orphan_iq?.length) {
-      data.orphan_iq.forEach(file => {
-        const li = document.createElement("li");
-        let text = file.path + " (" + file.size_mb + " MB)";
-        if (file.deleted) text += " — auto‑deleted (stale)";
-        if (file.delete_error) text += " — error: " + file.delete_error;
-        li.textContent = text;
-        list.appendChild(li);
-      });
-    } else {
-      list.innerHTML = "<li>No orphan files</li>";
-    }
-
-    const ppmBox = document.getElementById("ppmBox");
-    const ppmValue = document.getElementById("ppmValue");
-    if (data.rtl_ppm !== undefined) {
-      ppmValue.textContent = data.rtl_ppm + " ppm";
-      if (parseInt(data.rtl_ppm) === 0) {
-        ppmBox.className = "alert alert-warning";
-        ppmBox.innerHTML = "⚠️ No calibration value found (using 0 ppm). Please run calibration.";
-      }
-    } else {
-      ppmValue.textContent = "not available";
-    }
-  } catch (err) {
-    document.getElementById("diskInfo").innerText = "Disk free: error";
-    document.getElementById("orphanList").innerHTML = "<li>Error loading orphan files</li>";
-  }
-}
-
-async function updateSdrLight() {
-  try {
-    const res = await fetch("{{ url_for('diagnostics.sdr_status') }}");
-    const data = await res.json();
-    const el = document.getElementById("sdrLight");
-    const map = {
-      green: {cls: "badge bg-success", text: "🟢 Ready"},
-      red:   {cls: "badge bg-danger",  text: "🔴 In Use"},
-      amber: {cls: "badge bg-warning text-dark", text: "🟠 Scheduled Soon"},
-      grey:  {cls: "badge bg-secondary", text: "⚪ Not Present"}
-    };
-    const st = map[data.status] || map.grey;
-    el.className = st.cls;
-    el.textContent = st.text;
-  } catch (err) {
-    const el = document.getElementById("sdrLight");
-    el.className = "badge bg-warning text-dark";
-    el.textContent = "Error";
-  }
-}
-
-document.getElementById("calibrateBtn").addEventListener("click", async function() {
-  this.disabled = true;
-  this.textContent = "Calibrating...";
-  const resultBox = document.getElementById("calibrationResult");
-  resultBox.innerHTML = "";
-  try {
-    const res = await fetch("{{ url_for('diagnostics.calibrate') }}", {method: "POST"});
-    const data = await res.json();
-    if (data.success) {
-      resultBox.innerHTML = `
-        <div class="alert alert-success">
-          <strong>PPM correction:</strong> ${data.ppm}<br>
-          <strong>Measured:</strong> ${data.measured_hz} Hz<br>
-          <strong>Expected:</strong> ${data.expected_hz} Hz<br>
-          <strong>Timestamp:</strong> ${data.timestamp}
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5 class="card-title">RTL Settings</h5>
+        <p>PPM: <span id="rtlPpm">{{ ppm }}</span></p>
+        <p>Gain: <span id="rtlGain">{{ gain }}</span></p>
+        <div class="d-flex gap-2">
+          <button id="btnResetPpm" class="btn btn-sm btn-outline-secondary">Reset PPM</button>
+          <button id="btnCalibrate" class="btn btn-sm btn-primary">Calibrate SDR</button>
         </div>
-        <div class="row">
-          <div class="col-md-6">
-            <h6>Before</h6>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Manual Recorder</h5>
+        <form id="manualForm" method="post" action="{{ url_for('diagnostics.manual_recorder') }}">
+          <div class="row g-2">
+            <div class="col-md-4">
+              <label class="form-label">Frequency</label>
+              <input name="frequency" class="form-control" value="145.800M">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Duration (s)</label>
+              <input name="duration" type="number" class="form-control" value="30" min="1">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Gain</label>
+              <input name="gain" class="form-control" value="{{ gain }}">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">PPM</label>
+              <input name="ppm" class="form-control" value="{{ ppm }}">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+              <button id="btnRecord" type="submit" class="btn btn-success w-100">Record</button>
+            </div>
+          </div>
+        </form>
+        <small class="form-text text-muted mt-2">If no dongle is present a demo recording will be created.</small>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Recent Manual Recordings</h5>
+        <div id="recentList" class="list-group">
+          {% for e in files %}
+            <div class="list-group-item">
+              <div class="d-flex w-100 justify-content-between">
+                <h6 class="mb-1">{{ e.wav }}</h6>
+                <small class="text-muted">{{ e.meta.duration if e.meta and e.meta.duration else "" }}</small>
+              </div>
+              <p class="mb-1">
+                {% if e.png %}
+                  <img src="{{ url_for('static', filename='diagnostics/manual/' ~ e.png) }}" alt="preview" class="img-fluid" style="max-width:240px;">
+                {% endif %}
+              </p>
+              <small class="text-muted">{{ e.log or '' }}</small>
+            </div>
+          {% else %}
+            <div class="list-group-item">No manual recordings yet.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <h5>System Requirements</h5>
+    <ul id="reqList" class="list-group mb-3"></ul>
+    <h5>Calibration / CSV preview</h5>
+    <pre id="calPreview" class="small bg-light p-2" style="max-height:240px; overflow:auto"></pre>
+  </div>
+</div>
 
 <script>
-async function runDongleCheck() {
-  try {
-    const res = await fetch("{{ url_for('diagnostics.diagnostics_check') }}");
-    const data = await res.json();
-    const swBadge = document.getElementById("swBadge");
-    const hwBadge = document.getElementById("hwBadge");
-    const output = document.getElementById("outputBox");
+const statusUrl = "{{ url_for('diagnostics.diagnostics_status') }}";
+const sdrStatusUrl = "{{ url_for('diagnostics.sdr_status') }}";
+const calibrateUrl = "{{ url_for('diagnostics.calibrate') }}";
+const resetPpmUrl = "{{ url_for('diagnostics.reset_ppm_route') }}";
 
-    swBadge.textContent = data.software ? "Software Installed" : "Software Missing";
-    swBadge.className = data.software ? "badge bg-success" : "badge bg-danger";
+let enoughSpace = false;
 
-    hwBadge.textContent = data.hardware ? "Dongle Detected" : "No Dongle";
-    hwBadge.className = data.hardware ? "badge bg-success" : "badge bg-danger";
-
-    if (data.output) output.textContent = data.output;
-  } catch (err) {
-    document.getElementById("swBadge").textContent = "Error";
-    document.getElementById("hwBadge").textContent = "Error";
-    document.getElementById("outputBox").textContent = String(err);
-  }
+function showAlert(msg, cls="info", timeout=6000) {
+  const a = document.createElement("div");
+  a.className = `alert alert-${cls} alert-dismissible`;
+  a.role = "alert";
+  a.innerHTML = `${msg} <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>`;
+  document.getElementById("alerts").appendChild(a);
+  if (timeout) setTimeout(()=>{ try{ a.remove() }catch(e){} }, timeout);
 }
 
-async function updateStatus() {
+async function updatePageStatus() {
   try {
-    const res = await fetch("{{ url_for('diagnostics.diagnostics_status') }}");
+    const res = await fetch(statusUrl, {cache: "no-store"});
     const data = await res.json();
-
-    const diskInfo = document.getElementById("diskInfo");
-    if (typeof data.disk_free_gb === "number") {
-      diskInfo.innerText = "Disk free: " + data.disk_free_gb + " GB";
-    } else {
-      diskInfo.innerText = "Disk free: unknown";
-    }
-
-    const list = document.getElementById("orphanList");
-    list.innerHTML = "";
-    if (data.orphan_iq?.length) {
-      data.orphan_iq.forEach(file => {
+    const df = document.getElementById("diskFree");
+    const db = document.getElementById("diskBadge");
+    df.textContent = data.disk_free_gb !== null ? data.disk_free_gb : "error";
+    enoughSpace = !!data.enough_space;
+    db.className = enoughSpace ? "badge bg-success" : "badge bg-danger";
+    db.textContent = enoughSpace ? "Enough space" : "Low space";
+    // requirements
+    const reqList = document.getElementById("reqList");
+    reqList.innerHTML = "";
+    if (data.requirements) {
+      for (const [k,v] of Object.entries(data.requirements)) {
         const li = document.createElement("li");
-        let text = file.path + " (" + file.size_mb + " MB)";
-        if (file.deleted) text += " — auto‑deleted (stale)";
-        if (file.delete_error) text += " — error: " + file.delete_error;
-        li.textContent = text;
-        list.appendChild(li);
-      });
-    } else {
-      list.innerHTML = "<li>No orphan files</li>";
-    }
-
-    const ppmBox = document.getElementById("ppmBox");
-    const ppmValue = document.getElementById("ppmValue");
-    if (data.rtl_ppm !== undefined) {
-      ppmValue.textContent = data.rtl_ppm + " ppm";
-      if (parseInt(data.rtl_ppm) === 0) {
-        ppmBox.className = "alert alert-warning";
-        ppmBox.innerHTML = "⚠️ No calibration value found (using 0 ppm). Please run calibration.";
+        li.className = "list-group-item d-flex justify-content-between align-items-center";
+        li.textContent = k;
+        const span = document.createElement("span");
+        span.className = v ? "badge bg-success" : "badge bg-danger";
+        span.textContent = v ? "OK" : "MISSING";
+        li.appendChild(span);
+        reqList.appendChild(li);
       }
-    } else {
-      ppmValue.textContent = "not available";
     }
+    // rtl settings
+    if (data.rtl_ppm !== undefined) document.getElementById("rtlPpm").textContent = data.rtl_ppm;
+    if (data.rtl_gain !== undefined) document.getElementById("rtlGain").textContent = data.rtl_gain;
   } catch (err) {
-    document.getElementById("diskInfo").innerText = "Disk free: error";
-    document.getElementById("orphanList").innerHTML = "<li>Error loading orphan files</li>";
+    document.getElementById("diskFree").textContent = "error";
+    document.getElementById("diskBadge").className = "badge bg-warning";
+    document.getElementById("diskBadge").textContent = "Error";
   }
 }
 
-async function updateSdrLight() {
+async function updateSdrLightLocal() {
   try {
-    const res = await fetch("{{ url_for('diagnostics.sdr_status') }}");
+    const res = await fetch(sdrStatusUrl, {cache: "no-store"});
     const data = await res.json();
-    const el = document.getElementById("sdrLight");
+    const el = document.getElementById("pageSdrLight");
     const map = {
-      green: {cls: "badge bg-success", text: "🟢 Ready"},
-      red:   {cls: "badge bg-danger",  text: "🔴 In Use"},
-      amber: {cls: "badge bg-warning text-dark", text: "🟠 Scheduled Soon"},
-      grey:  {cls: "badge bg-secondary", text: "⚪ Not Present"}
+      green: {cls: "badge bg-success", text: "🟢 SDR Ready"},
+      red:   {cls: "badge bg-danger", text: "🔴 SDR In Use"},
+      amber: {cls: "badge bg-warning text-dark", text: "🟠 SDR Scheduled"},
+      grey:  {cls: "badge bg-secondary", text: "⚪ SDR Missing"}
     };
     const st = map[data.status] || map.grey;
     el.className = st.cls;
     el.textContent = st.text;
+    document.getElementById("sdrReason").textContent = data.reason || "";
   } catch (err) {
-    const el = document.getElementById("sdrLight");
-    el.className = "badge bg-warning text-dark";
-    el.textContent = "Error";
+    const el = document.getElementById("pageSdrLight");
+    el.className = "badge bg-warning";
+    el.textContent = "SDR Error";
   }
 }
 
-document.getElementById("calibrateBtn").addEventListener("click", async function() {
-  this.disabled = true;
-  this.textContent = "Calibrating...";
-  const resultBox = document.getElementById("calibrationResult");
-  resultBox.innerHTML = "";
+document.getElementById("btnCalibrate").addEventListener("click", async () => {
+  const btn = document.getElementById("btnCalibrate");
+  btn.disabled = true;
+  btn.textContent = "Calibrating…";
   try {
-    const res = await fetch("{{ url_for('diagnostics.calibrate') }}", {method: "POST"});
+    const res = await fetch(calibrateUrl, {method: "POST"});
     const data = await res.json();
     if (data.success) {
-      resultBox.innerHTML = `
-        <div class="alert alert-success">
-          <strong>PPM correction:</strong> ${data.ppm}<br>
-          <strong>Measured:</strong> ${data.measured_hz} Hz<br>
-          <strong>Expected:</strong> ${data.expected_hz} Hz<br>
-          <strong>Timestamp:</strong> ${data.timestamp}
-        </div>
-        <div class="row">
-          <div class="col-md-6">
-            <h6>Before</h6>
-            <img src="/gallery/gallery/image/${data.png_before}" class="img-fluid border rounded" alt="Before calibration">
-          </div>
-          <div class="col-md-6">
-            <h6>After</h6>
-            <img src="/gallery/gallery/image/${data.png_after}" class="img-fluid border rounded" alt="After calibration">
-          </div>
-        </div>
-        <h6 class="mt-3">CSV Preview</h6>
-        <pre class="bg-light p-2 border rounded">${data.csv_preview.join('\n')}</pre>`;
+      showAlert("Calibration complete (PPM: " + data.ppm + ")", "success");
+      document.getElementById("calPreview").textContent = (data.csv_preview || []).join("\n");
+      // update ppm shown
+      document.getElementById("rtlPpm").textContent = data.ppm;
     } else {
-      resultBox.innerHTML = `<div class="alert alert-danger">Calibration failed: ${data.error}</div>`;
+      showAlert("Calibration failed: " + (data.error || "unknown"), "danger");
     }
   } catch (err) {
-    resultBox.innerHTML = `<div class="alert alert-warning">Error: ${String(err)}</div>`;
+    showAlert("Calibration error: " + err, "danger");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Calibrate SDR";
   }
-  this.disabled = false;
-  this.textContent = "🛠️ Calibrate SDR";
-  updateStatus();
 });
 
-document.getElementById("resetPpmBtn").addEventListener("click", async function() {
-  this.disabled = true;
+document.getElementById("btnResetPpm").addEventListener("click", async () => {
+  const b = document.getElementById("btnResetPpm");
+  b.disabled = true;
   try {
-    const res = await fetch("{{ url_for('diagnostics.reset_ppm_route') }}", {method: "POST"});
+    const res = await fetch(resetPpmUrl, {method: "POST"});
     const data = await res.json();
     if (data.success) {
-      document.getElementById("ppmValue").textContent = "0 ppm";
-      alert("PPM reset to 0.");
+      document.getElementById("rtlPpm").textContent = data.ppm;
+      showAlert("PPM reset to 0", "success");
     } else {
-      alert("Reset failed: " + data.error);
+      showAlert("Reset failed: " + (data.error || "unknown"), "danger");
     }
   } catch (err) {
-    alert("Error resetting PPM: " + err);
+    showAlert("Reset error: " + err, "danger");
+  } finally {
+    b.disabled = false;
   }
-  this.disabled = false;
 });
 
-document.addEventListener("DOMContentLoaded", () => {
-  runDongleCheck();
-  updateStatus();
-  updateSdrLight();
-  setInterval(updateStatus, 5000);
-  setInterval(updateSdrLight, 5000);
+document.getElementById("manualForm").addEventListener("submit", (ev) => {
+  if (!enoughSpace) {
+    ev.preventDefault();
+    if (confirm("Disk space is low. Proceed with recording anyway?")) {
+      // allow submission despite low space
+      ev.target.submit();
+    }
+  }
 });
+
+// initial update + polling
+updatePageStatus();
+updateSdrLightLocal();
+setInterval(updatePageStatus, 5000);
+setInterval(updateSdrLightLocal, 5000);
 </script>
 {% endblock %}

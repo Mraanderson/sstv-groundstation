@@ -1,3 +1,4 @@
+# ...existing code...
 import os, json, shutil, subprocess, psutil, datetime
 from pathlib import Path
 from flask import render_template, jsonify, request, current_app, redirect, url_for, flash
@@ -13,6 +14,7 @@ IMAGES_DIR     = Path("images")
 LOW_SPACE_GB   = 2
 MANUAL_DIR     = RECORDINGS_DIR / "manual"
 MANUAL_DIR.mkdir(parents=True, exist_ok=True)
+IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
 # --- Settings helpers ---
 def load_settings():
@@ -46,6 +48,11 @@ def reset_ppm():
     s["rtl_ppm"] = 0
     save_settings(s)
 
+# --- Simple requirements checker used by diagnostics/status ---
+def check_system_requirements():
+    tools = ["rtl_sdr", "rtl_fm", "rtl_power", "sox"]
+    return {t: bool(shutil.which(t)) for t in tools}
+
 # --- SDR detection ---
 def sdr_present():
     return bool(shutil.which("rtl_sdr"))
@@ -68,7 +75,7 @@ def sdr_in_use():
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
     return False
-    # --- Routes ---
+# --- Routes ---
 @bp.route("/")
 def diagnostics_page():
     files = sorted(MANUAL_DIR.glob("*.wav"), key=lambda p: p.stat().st_mtime, reverse=True)[:5]
@@ -112,35 +119,30 @@ def reset_ppm_route():
 
 @bp.route("/status")
 def diagnostics_status():
-    # Try to get disk space from recordings directory first
     try:
-        free_gb = shutil.disk_usage(str(RECORDINGS_DIR)).free // (2**30)
-    except Exception:
-        try:
-            free_gb = shutil.disk_usage("/").free // (2**30)
-        except Exception:
-            free_gb = None
+        # Query disk usage for the recordings path (falls back to project cwd)
+        target_path = RECORDINGS_DIR.resolve() if RECORDINGS_DIR.exists() else Path(".").resolve()
+        usage = shutil.disk_usage(str(target_path))
+        free_gb = round(usage.free / (1024 ** 3), 2)
+        enough = free_gb >= LOW_SPACE_GB
 
-    orphan = []
-    cutoff = datetime.datetime.now().timestamp() - 3600
-    for f in RECORDINGS_DIR.glob("*.iq"):
-        age = f.stat().st_mtime
-        entry = {"path": str(f), "size_mb": round(f.stat().st_size / (1024 * 1024), 2)}
-        if age < cutoff:
-            try:
-                os.remove(f)
-                entry["deleted"] = True
-            except Exception as e:
-                entry["delete_error"] = str(e)
-        orphan.append(entry)
-
-    return jsonify({
-        "disk_free_gb": free_gb,
-        "orphan_iq": orphan,
-        "requirements": check_system_requirements(),
-        "rtl_ppm": get_ppm(),
-        "rtl_gain": get_gain()
-    })
+        return jsonify({
+            "disk_free_gb": free_gb,
+            "enough_space": enough,
+            "requirements": check_system_requirements(),
+            "rtl_ppm": get_ppm(),
+            "rtl_gain": get_gain()
+        })
+    except Exception as e:
+        current_app.logger.exception("diagnostics_status failed")
+        return jsonify({
+            "disk_free_gb": None,
+            "enough_space": False,
+            "requirements": check_system_requirements(),
+            "rtl_ppm": get_ppm(),
+            "rtl_gain": get_gain(),
+            "error": str(e)
+        }), 200
 
 @bp.route("/calibrate", methods=["POST"])
 def calibrate():
@@ -226,7 +228,7 @@ def manual_recorder():
     if request.method == "POST":
         duration = int(request.form.get("duration", 30))
         freq = request.form.get("frequency", "145.800M")
-        ppm_arg = "0"  # Reset PPM for manual recordings
+        ppm_arg = request.form.get("ppm", str(ppm))  # use provided ppm or current setting
         gain_arg = request.form.get("gain", get_gain())
         set_gain(gain_arg)
 
@@ -257,9 +259,10 @@ def manual_recorder():
         flash(f"Recording to: {wav_file.name} (Gain {gain_arg}, PPM {ppm_arg})", "info")
 
         success = False
+        p1 = p2 = None
         with open(log_file, "w") as lf:
             try:
-                cmd1 = ["rtl_fm", "-M", "fm", "-f", freq, "-p", ppm_arg, "-s", SAMPLE_RATE, "-g", gain_arg]
+                cmd1 = ["rtl_fm", "-M", "fm", "-f", freq, "-p", str(ppm_arg), "-s", SAMPLE_RATE, "-g", gain_arg]
                 cmd2 = ["sox", "-t", "raw", "-r", SAMPLE_RATE, "-e", "signed", "-b", "16", "-c", "1", "-", str(wav_file)]
                 p1 = subprocess.Popen(cmd1, stdout=subprocess.PIPE, stderr=lf)
                 p2 = subprocess.Popen(cmd2, stdin=p1.stdout, stderr=lf)
@@ -268,10 +271,14 @@ def manual_recorder():
                 success = True
             except subprocess.TimeoutExpired:
                 flash("Recording timed out", "danger")
-                p1.terminate(); p2.terminate()
+                if p1: p1.terminate()
+                if p2: p2.terminate()
             finally:
-                if p1.poll() is None: p1.terminate()
-                if p2.poll() is None: p2.terminate()
+                try:
+                    if p1 and p1.poll() is None: p1.terminate()
+                    if p2 and p2.poll() is None: p2.terminate()
+                except Exception:
+                    pass
 
         meta = {
             "frequency": freq,
@@ -322,4 +329,4 @@ def sdr_status():
     except Exception as e:
         current_app.logger.exception("sdr_status failed")
         return jsonify({"status": "grey", "reason": f"Error: {e}"}), 500
-        
+# ...existing code...
