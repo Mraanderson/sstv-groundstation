@@ -1,7 +1,7 @@
 # ...existing code...
 import os, json, shutil, subprocess, psutil, datetime
 from pathlib import Path
-from flask import render_template, jsonify, request, current_app, redirect, url_for, flash
+from flask import render_template, jsonify, request, current_app, redirect, url_for, flash, send_from_directory, abort
 from app.utils.iq_cleanup import cleanup_orphan_iq
 from app.features.diagnostics import bp
 from app.utils import passes as passes_utils
@@ -87,16 +87,56 @@ def diagnostics_page():
         meta = MANUAL_DIR / f"{ts}_manual.json"
         md = {}
         if meta.exists():
-            try: md = json.loads(meta.read_text())
-            except Exception: md = {}
+            try:
+                md = json.loads(meta.read_text())
+            except Exception:
+                md = {}
         entries.append({
             "wav": f.name,
+            "wav_path": str(f),
             "log": log.name if log.exists() else None,
             "png": png.name if png.exists() else None,
-            "meta": md
+            "meta": md,
+            "meta_filename": meta.name if meta.exists() else None
         })
     return render_template("diagnostics/diagnostics.html",
                            files=entries, ppm=get_ppm(), gain=get_gain())
+
+# new helper to serve manual files
+@bp.route("/manual/file/<path:filename>")
+def download_manual_file(filename):
+    try:
+        safe = Path(filename).name
+        return send_from_directory(str(MANUAL_DIR), safe, as_attachment=True)
+    except Exception:
+        current_app.logger.exception("download_manual_file failed")
+        abort(404)
+
+# delete manual recording (works with form POST or AJAX)
+@bp.route("/manual/delete", methods=["POST"])
+def delete_manual():
+    fname = request.form.get("filename") or (request.json and request.json.get("filename"))
+    if not fname:
+        return jsonify({"success": False, "error": "missing filename"}), 400
+    base = Path(fname).stem.split("_manual")[0]
+    removed = []
+    errors = []
+    for p in MANUAL_DIR.glob(f"{base}_manual*"):
+        try:
+            p.unlink()
+            removed.append(p.name)
+        except Exception as e:
+            current_app.logger.exception("Failed to delete manual file")
+            errors.append(f"{p.name}: {e}")
+    if errors:
+        if request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"success": False, "removed": removed, "errors": errors}), 500
+        flash("Some files could not be deleted: " + "; ".join(errors), "warning")
+    else:
+        flash("Deleted: " + ", ".join(removed), "success")
+    if request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return jsonify({"success": True, "removed": removed})
+    return redirect(url_for("diagnostics.manual_recorder"))
 
 @bp.route("/check")
 def diagnostics_check():
@@ -329,4 +369,3 @@ def sdr_status():
     except Exception as e:
         current_app.logger.exception("sdr_status failed")
         return jsonify({"status": "grey", "reason": f"Error: {e}"}), 500
-# ...existing code...
