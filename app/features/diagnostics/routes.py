@@ -1,4 +1,3 @@
-# ...existing code...
 import os, json, shutil, subprocess, psutil, datetime
 from pathlib import Path
 from flask import render_template, jsonify, request, current_app, redirect, url_for, flash, send_from_directory, abort
@@ -99,15 +98,41 @@ def diagnostics_page():
             "meta": md,
             "meta_filename": meta.name if meta.exists() else None
         })
-    return render_template("diagnostics/diagnostics.html",
-                           files=entries, ppm=get_ppm(), gain=get_gain())
 
-# new helper to serve manual files
+    # try to offer a calibration frequency guess from the last calibration CSV if present
+    cal_guess = "145.800M"
+    try:
+        cal_csv = RECORDINGS_DIR / "calibration" / "scan_fm.csv"
+        if cal_csv.exists():
+            best_freq = None
+            for line in cal_csv.read_text().splitlines():
+                parts = [p.strip() for p in line.split(",")]
+                if len(parts) < 7:
+                    continue
+                f_start, f_end = float(parts[2]), float(parts[3])
+                bins = [float(x) for x in parts[6:] if x]
+                if not bins:
+                    continue
+                idx, power = max(enumerate(bins), key=lambda kv: kv[1])
+                bin_size = (f_end - f_start) / len(bins)
+                candidate = f_start + (idx + 0.5) * bin_size
+                if best_freq is None or power > 0:
+                    best_freq = candidate
+            if best_freq:
+                cal_guess = f"{best_freq/1_000_000:.3f}M"
+    except Exception:
+        current_app.logger.debug("calibration guess unavailable")
+
+    return render_template("diagnostics/diagnostics.html",
+                           files=entries, ppm=get_ppm(), gain=get_gain(), cal_guess=cal_guess)
+
+# new helper to serve manual files (inline for images if ?attachment=0, otherwise attachment)
 @bp.route("/manual/file/<path:filename>")
 def download_manual_file(filename):
     try:
         safe = Path(filename).name
-        return send_from_directory(str(MANUAL_DIR), safe, as_attachment=True)
+        attach = request.args.get("attachment", "1") == "1"
+        return send_from_directory(str(MANUAL_DIR), safe, as_attachment=attach)
     except Exception:
         current_app.logger.exception("download_manual_file failed")
         abort(404)
@@ -276,6 +301,7 @@ def manual_recorder():
         wav_file = MANUAL_DIR / f"{timestamp}_manual.wav"
         log_file = MANUAL_DIR / f"{timestamp}_manual.txt"
         meta_file = MANUAL_DIR / f"{timestamp}_manual.json"
+        png_file = MANUAL_DIR / f"{timestamp}_manual.png"
 
         if not sdr_device_connected():
             demo_file = MANUAL_DIR / f"{timestamp}_demo_manual.wav"
@@ -328,8 +354,22 @@ def manual_recorder():
             "wav": wav_file.name,
             "log": log_file.name
         }
-        try: meta_file.write_text(json.dumps(meta, indent=2))
-        except Exception as e: current_app.logger.warning(f"Failed to write meta: {e}")
+        try:
+            meta_file.write_text(json.dumps(meta, indent=2))
+        except Exception as e:
+            current_app.logger.warning(f"Failed to write meta: {e}")
+
+        # generate spectrogram image for the wav (best effort)
+        if success:
+            try:
+                subprocess.run(["sox", str(wav_file), "-n", "spectrogram", "-o", str(png_file)], check=True, timeout=20)
+                # update meta with png name if created
+                if png_file.exists():
+                    meta["png"] = png_file.name
+                    try: meta_file.write_text(json.dumps(meta, indent=2))
+                    except Exception: current_app.logger.debug("Could not update meta with png")
+            except Exception as e:
+                current_app.logger.debug("Spectrogram creation failed: %s", e)
 
         if success:
             flash(f"Recording complete: {wav_file.name} (Gain {gain_arg}, PPM {ppm_arg})", "success")

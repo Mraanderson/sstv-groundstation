@@ -4,7 +4,7 @@
 {% block content %}
 <div class="row">
   <div class="col-md-8">
-    <h3>Diagnostics</h3>
+    <h3>🔍 Diagnostics</h3>
 
     <div id="alerts"></div>
 
@@ -24,7 +24,7 @@
         <p>Free: <strong id="diskFree">…</strong> GB</p>
         <p>
           <span id="diskBadge" class="badge bg-secondary">Checking…</span>
-          <small class="text-muted ms-2">Requires at least 2 GB free</small>
+          <small class="text-muted ms-2">Requires at least 2 GB free for recordings</small>
         </p>
       </div>
     </div>
@@ -35,9 +35,16 @@
         <p>PPM: <span id="rtlPpm">{{ ppm }}</span></p>
         <p>Gain: <span id="rtlGain">{{ gain }}</span></p>
         <div class="d-flex gap-2">
-          <button id="btnResetPpm" class="btn btn-sm btn-outline-secondary">Reset PPM</button>
+          <div class="input-group input-group-sm me-2" style="max-width:220px;">
+            <span class="input-group-text">Calibrate freq</span>
+            <input id="calFreq" class="form-control" value="{{ cal_guess }}" />
+          </div>
           <button id="btnCalibrate" class="btn btn-sm btn-primary">Calibrate SDR</button>
+          <button id="btnResetPpm" class="btn btn-sm btn-outline-secondary">Reset PPM</button>
         </div>
+        <small class="form-text text-muted mt-2">
+          Calibrate will scan FM for a strong signal; you may enter a known local frequency to target instead.
+        </small>
       </div>
     </div>
 
@@ -46,7 +53,7 @@
         <h5 class="card-title">Manual Recorder</h5>
         <form id="manualForm" method="post" action="{{ url_for('diagnostics.manual_recorder') }}">
           <div class="row g-2">
-            <div class="col-md-4">
+            <div class="col-md-3">
               <label class="form-label">Frequency</label>
               <input name="frequency" class="form-control" value="145.800M">
             </div>
@@ -62,7 +69,7 @@
               <label class="form-label">PPM</label>
               <input name="ppm" class="form-control" value="{{ ppm }}">
             </div>
-            <div class="col-md-2 d-flex align-items-end">
+            <div class="col-md-3 d-flex align-items-end">
               <button id="btnRecord" type="submit" class="btn btn-success w-100">Record</button>
             </div>
           </div>
@@ -84,22 +91,22 @@
                 </div>
                 <p class="mb-1">
                   {% if e.png %}
-                    <img src="{{ url_for('static', filename='diagnostics/manual/' ~ e.png) }}" alt="preview" class="img-fluid" style="max-width:240px;">
+                    <img src="{{ url_for('diagnostics.download_manual_file', filename=e.png, attachment=0) }}" alt="spectrogram" class="img-fluid" style="max-width:240px;">
                   {% endif %}
                 </p>
                 <small class="text-muted">{{ e.log or '' }}</small>
               </div>
 
               <div class="d-flex flex-column align-items-end">
-                <a class="btn btn-sm btn-outline-primary mb-1" href="{{ url_for('diagnostics.download_manual_file', filename=e.wav) }}" target="_blank">WAV</a>
+                <a class="btn btn-sm btn-outline-primary mb-1" href="{{ url_for('diagnostics.download_manual_file', filename=e.wav, attachment=1) }}">WAV</a>
 
                 {% if e.meta_filename %}
-                  <a class="btn btn-sm btn-outline-secondary mb-1" href="{{ url_for('diagnostics.download_manual_file', filename=e.meta_filename) }}" target="_blank">JSON</a>
+                  <a class="btn btn-sm btn-outline-secondary mb-1" href="{{ url_for('diagnostics.download_manual_file', filename=e.meta_filename, attachment=1) }}">JSON</a>
                 {% else %}
                   <button class="btn btn-sm btn-outline-secondary mb-1" disabled>JSON</button>
                 {% endif %}
 
-                <form class="delete-form" method="post" action="{{ url_for('diagnostics.delete_manual') }}" onsubmit="return confirm('Delete this recording?');">
+                <form class="delete-form" method="post" action="{{ url_for('diagnostics.delete_manual') }}">
                   <input type="hidden" name="filename" value="{{ e.wav }}">
                   <button type="submit" class="btn btn-sm btn-danger">Delete</button>
                 </form>
@@ -200,12 +207,15 @@ document.getElementById("btnCalibrate").addEventListener("click", async () => {
   btn.disabled = true;
   btn.textContent = "Calibrating…";
   try {
-    const res = await fetch(calibrateUrl, {method: "POST"});
+    // include the user-specified frequency if present
+    const freqInput = document.getElementById("calFreq").value;
+    const form = new FormData();
+    if (freqInput) form.append("target_freq", freqInput);
+    const res = await fetch(calibrateUrl, {method: "POST", body: form});
     const data = await res.json();
     if (data.success) {
       showAlert("Calibration complete (PPM: " + data.ppm + ")", "success");
       document.getElementById("calPreview").textContent = (data.csv_preview || []).join("\n");
-      // update ppm shown
       document.getElementById("rtlPpm").textContent = data.ppm;
     } else {
       showAlert("Calibration failed: " + (data.error || "unknown"), "danger");
@@ -241,7 +251,6 @@ document.getElementById("manualForm").addEventListener("submit", (ev) => {
   if (!enoughSpace) {
     ev.preventDefault();
     if (confirm("Disk space is low. Proceed with recording anyway?")) {
-      // allow submission despite low space
       ev.target.submit();
     }
   }
