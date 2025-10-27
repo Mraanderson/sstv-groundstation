@@ -1,7 +1,6 @@
-import os, json, shutil, subprocess, psutil, datetime
+import os, json, shutil, subprocess, psutil, datetime, time
 from pathlib import Path
 from flask import render_template, jsonify, request, current_app, redirect, url_for, flash, send_from_directory, abort
-from app.utils.iq_cleanup import cleanup_orphan_iq
 from app.features.diagnostics import bp
 from app.utils import passes as passes_utils
 from app.utils.decoder import process_uploaded_wav
@@ -9,11 +8,9 @@ from app.utils.decoder import process_uploaded_wav
 # --- Paths & constants ---
 RECORDINGS_DIR = Path("recordings")
 SETTINGS_FILE  = Path("settings.json")
-IMAGES_DIR     = Path("images")
 LOW_SPACE_GB   = 2
 MANUAL_DIR     = RECORDINGS_DIR / "manual"
 MANUAL_DIR.mkdir(parents=True, exist_ok=True)
-IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
 # --- Settings helpers ---
 def load_settings():
@@ -47,21 +44,24 @@ def reset_ppm():
     s["rtl_ppm"] = 0
     save_settings(s)
 
-# --- Simple requirements checker used by diagnostics/status ---
 def check_system_requirements():
     tools = ["rtl_sdr", "rtl_fm", "rtl_power", "sox"]
     return {t: bool(shutil.which(t)) for t in tools}
 
-# --- SDR detection ---
 def sdr_present():
     return bool(shutil.which("rtl_sdr"))
 
 def sdr_device_connected():
     try:
-        res = subprocess.run(["rtl_test", "-t"], capture_output=True, text=True, timeout=3)
-        out = (res.stdout or "") + (res.stderr or "")
-        return any(k in out for k in ("Reading samples", "Found Rafael"))
-    except Exception:
+        for attempt in range(2):
+            res = subprocess.run(["rtl_test", "-t"], capture_output=True, text=True, timeout=3)
+            out = (res.stdout or "") + (res.stderr or "")
+            if "Reading samples" in out or "Found Rafael" in out:
+                return True
+        current_app.logger.warning("SDR not detected: %s", out)
+        return False
+    except Exception as e:
+        current_app.logger.exception("SDR detection error")
         return False
 
 def sdr_in_use():
@@ -74,7 +74,7 @@ def sdr_in_use():
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
     return False
-# --- Routes ---
+
 @bp.route("/")
 def diagnostics_page():
     files = sorted(MANUAL_DIR.glob("*.wav"), key=lambda p: p.stat().st_mtime, reverse=True)[:5]
@@ -92,14 +92,13 @@ def diagnostics_page():
                 md = {}
         entries.append({
             "wav": f.name,
-            "wav_path": str(f),
             "log": log.name if log.exists() else None,
             "png": png.name if png.exists() else None,
             "meta": md,
             "meta_filename": meta.name if meta.exists() else None
         })
 
-    # try to offer a calibration frequency guess from the last calibration CSV if present
+    # Calibration frequency guess (from last scan)
     cal_guess = "145.800M"
     try:
         cal_csv = RECORDINGS_DIR / "calibration" / "scan_fm.csv"
@@ -126,20 +125,16 @@ def diagnostics_page():
     return render_template("diagnostics/diagnostics.html",
                            files=entries, ppm=get_ppm(), gain=get_gain(), cal_guess=cal_guess)
 
-# new helper to serve manual files (inline for images if ?attachment=0, otherwise attachment)
 @bp.route("/manual/file/<path:filename>")
 def download_manual_file(filename):
     try:
         safe = Path(filename).name
         attach = request.args.get("attachment", "1") == "1"
-        # Redirect to the canonical recordings URL (preserve attachment flag)
-        target = f"/recordings/files/manual/{safe}?attachment={'1' if attach else '0'}"
-        return redirect(target)
+        return send_from_directory(str(MANUAL_DIR), safe, as_attachment=attach)
     except Exception:
-        current_app.logger.exception("download_manual_file redirect failed")
+        current_app.logger.exception("download_manual_file failed")
         abort(404)
 
-# delete manual recording (works with form POST or AJAX)
 @bp.route("/manual/delete", methods=["POST"])
 def delete_manual():
     fname = request.form.get("filename") or (request.json and request.json.get("filename"))
@@ -187,7 +182,6 @@ def reset_ppm_route():
 @bp.route("/status")
 def diagnostics_status():
     try:
-        # Query disk usage for the recordings path (falls back to project cwd)
         target_path = RECORDINGS_DIR.resolve() if RECORDINGS_DIR.exists() else Path(".").resolve()
         usage = shutil.disk_usage(str(target_path))
         free_gb = round(usage.free / (1024 ** 3), 2)
@@ -218,13 +212,11 @@ def calibrate():
         CAL_DIR.mkdir(parents=True, exist_ok=True)
         fm_csv = CAL_DIR / "scan_fm.csv"
 
-        # Scan FM band for strong signal
         subprocess.run(
             ["rtl_power", "-f", "88M:108M:100k", "-g", "20", "-e", "6", str(fm_csv)],
             check=True
         )
 
-        # Parse CSV for strongest peak
         best_freq, best_power = None, -1e9
         lines = fm_csv.read_text().splitlines()
         for line in lines:
@@ -250,32 +242,13 @@ def calibrate():
         settings["rtl_ppm"] = ppm
         save_settings(settings)
 
-        def nf_capture(label, ppm_arg=None):
-            rate, png = 48000, IMAGES_DIR / f"calibration_{label}.png"
-            ppm_opts = ["-p", str(ppm_arg)] if ppm_arg is not None else []
-            cmd = [
-                "timeout", "8", "rtl_fm", "-f", str(expected), "-M", "fm", "-s", str(rate),
-                "-g", "29.7", "-l", "0"
-            ] + ppm_opts
-            p1 = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-            p2 = subprocess.Popen(
-                ["sox", "-t", "raw", "-r", str(rate), "-e", "signed", "-b", "16", "-c", "1", "-",
-                 "-n", "spectrogram", "-o", str(png)],
-                stdin=p1.stdout
-            )
-            p1.stdout.close()
-            p2.wait()
-            return png.name
-
         return jsonify({
             "success": True,
             "timestamp": datetime.datetime.now().isoformat(),
             "measured_hz": int(best_freq),
             "expected_hz": int(expected),
             "ppm": ppm,
-            "csv_preview": lines[:5],
-            "png_before": nf_capture("before"),
-            "png_after": nf_capture("after", ppm)
+            "csv_preview": lines[:5]
         })
     except Exception as e:
         current_app.logger.exception("Calibration failed")
@@ -295,7 +268,7 @@ def manual_recorder():
     if request.method == "POST":
         duration = int(request.form.get("duration", 30))
         freq = request.form.get("frequency", "145.800M")
-        ppm_arg = request.form.get("ppm", str(ppm))  # use provided ppm or current setting
+        ppm_arg = request.form.get("ppm", str(ppm))
         gain_arg = request.form.get("gain", get_gain())
         set_gain(gain_arg)
 
@@ -323,7 +296,7 @@ def manual_recorder():
                 flash(f"Demo error: {e}", "danger")
             return redirect(url_for("diagnostics.manual_recorder"))
 
-        SAMPLE_RATE = 48000  # use integer and consistent formatting
+        SAMPLE_RATE = 48000
         flash(f"Recording to: {wav_file.name} (Gain {gain_arg}, PPM {ppm_arg})", "info")
 
         success = False
@@ -337,34 +310,27 @@ def manual_recorder():
                 p2 = subprocess.Popen(cmd2, stdin=p1.stdout, stderr=lf)
                 p1.stdout.close()
 
-                # wait up to duration + 10s for the pipeline to finish
                 try:
                     p2.wait(timeout=duration + 10)
                 except subprocess.TimeoutExpired:
                     current_app.logger.warning("Recording timed out; terminating processes")
                     if p1: p1.terminate()
                     if p2: p2.terminate()
-                # give a short grace for processes to exit
-                time_waited = 0
                 for _ in range(5):
                     if (p1 and p1.poll() is not None) and (p2 and p2.poll() is not None):
                         break
                     time.sleep(0.2)
-                    time_waited += 0.2
 
-                # log return codes
                 rc1 = p1.returncode if p1 else None
                 rc2 = p2.returncode if p2 else None
                 current_app.logger.debug("Recorder exit codes: rtl_fm=%s sox=%s file=%s", rc1, rc2, wav_file)
 
-                # verify produced file is non-trivial
                 if wav_file.exists():
                     size = wav_file.stat().st_size
-                    # WAV header is ~44 bytes, require > 1000 bytes for a valid short recording
                     if size > 1000:
                         success = True
                     else:
-                        current_app.logger.warning("Recorded wav exists but too small (%s bytes) — treating as failure", size)
+                        current_app.logger.warning("Recorded wav exists but too small (%s bytes)", size)
                         try:
                             wav_file.unlink()
                         except Exception:
@@ -390,14 +356,11 @@ def manual_recorder():
             "wav": wav_file.name,
             "log": log_file.name
         }
-        # write meta only if wav exists (or always write to keep trace)
         try:
             if wav_file.exists():
-                # attempt to compute actual wav duration (best-effort using file size)
                 try:
                     size = wav_file.stat().st_size
-                    # rough duration estimate: (size - 44 bytes header) / (sample_rate * bytes_per_sample)
-                    bytes_per_sample = 2  # 16-bit mono
+                    bytes_per_sample = 2
                     est_sec = max(0, (size - 44) / (SAMPLE_RATE * bytes_per_sample))
                     meta["actual_seconds"] = round(est_sec, 2)
                 except Exception:
@@ -406,11 +369,9 @@ def manual_recorder():
         except Exception as e:
             current_app.logger.warning(f"Failed to write meta: {e}")
 
-        # generate spectrogram image for the wav (best effort)
         if success:
             try:
                 subprocess.run(["sox", str(wav_file), "-n", "spectrogram", "-o", str(png_file)], check=True, timeout=60)
-                # update meta with png name if created
                 if png_file.exists():
                     meta["png"] = png_file.name
                     try:
