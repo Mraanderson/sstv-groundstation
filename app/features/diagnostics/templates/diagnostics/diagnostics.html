@@ -10,16 +10,6 @@
 
     <div class="card mb-3">
       <div class="card-body">
-        <h5 class="card-title">SDR Status</h5>
-        <p>
-          <span id="pageSdrLight" class="badge bg-secondary">Checking…</span>
-        </p>
-        <p id="sdrReason" class="text-muted small"></p>
-      </div>
-    </div>
-
-    <div class="card mb-3">
-      <div class="card-body">
         <h5 class="card-title">Disk</h5>
         <p>Free: <strong id="diskFree">…</strong> GB</p>
         <p>
@@ -130,7 +120,7 @@
 
 <script>
 const statusUrl = "{{ url_for('diagnostics.diagnostics_status') }}";
-const sdrStatusUrl = "{{ url_for('diagnostics.sdr_status') }}";
+//const sdrStatusUrl = "{{ url_for('diagnostics.sdr_status') }}";
 const calibrateUrl = "{{ url_for('diagnostics.calibrate') }}";
 const resetPpmUrl = "{{ url_for('diagnostics.reset_ppm_route') }}";
 
