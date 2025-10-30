@@ -180,27 +180,28 @@ async function updatePageStatus() {
   }
 }
 
-async function updateSdrLightLocal() {
-  try {
-    const res = await fetch(sdrStatusUrl, {cache: "no-store"});
-    const data = await res.json();
-    const el = document.getElementById("pageSdrLight");
-    const map = {
-      green: {cls: "badge bg-success", text: "🟢 SDR Ready"},
-      red:   {cls: "badge bg-danger", text: "🔴 SDR In Use"},
-      amber: {cls: "badge bg-warning text-dark", text: "🟠 SDR Scheduled"},
-      grey:  {cls: "badge bg-secondary", text: "⚪ SDR Missing"}
-    };
-    const st = map[data.status] || map.grey;
-    el.className = st.cls;
-    el.textContent = st.text;
-    document.getElementById("sdrReason").textContent = data.reason || "";
-  } catch (err) {
-    const el = document.getElementById("pageSdrLight");
-    el.className = "badge bg-warning";
-    el.textContent = "SDR Error";
-  }
-}
+//async function updateSdrLightLocal() {
+//  try {
+//    const res = await fetch(sdrStatusUrl, {cache: "no-store"});
+//    const data = await res.json();
+//    const el = document.getElementById("pageSdrLight");
+//    const map = {
+//      green: {cls: "badge bg-success", text: "🟢 SDR Ready"},
+//      red:   {cls: "badge bg-danger", text: "🔴 SDR In Use"},
+//      amber: {cls: "badge bg-warning text-dark", text: "🟠 SDR Scheduled"},
+//      grey:  {cls: "badge bg-secondary", text: "⚪ SDR Missing"}
+//    };
+//    const st = map[data.status] || map.grey;
+//    el.className = st.cls;
+//   el.textContent = st.text;
+//    document.getElementById("sdrReason").textContent = data.reason || "";
+//  } catch (err) {
+//    const el = document.getElementById("pageSdrLight");
+//    el.className = "badge bg-warning";
+//    el.textContent = "SDR Error";
+//  }
+//}
+//
 
 document.getElementById("btnCalibrate").addEventListener("click", async () => {
   const btn = document.getElementById("btnCalibrate");
@@ -258,9 +259,9 @@ document.getElementById("manualForm").addEventListener("submit", (ev) => {
 
 // initial update + polling
 updatePageStatus();
-updateSdrLightLocal();
+//updateSdrLightLocal();
 setInterval(updatePageStatus, 5000);
-setInterval(updateSdrLightLocal, 5000);
+//setInterval(updateSdrLightLocal, 5000);
 
 // wire up AJAX delete to remove DOM element without full refresh
 document.querySelectorAll(".delete-form").forEach(f => {
