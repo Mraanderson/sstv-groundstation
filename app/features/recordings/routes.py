@@ -1,4 +1,3 @@
-
 import json
 import wave
 import subprocess
@@ -8,7 +7,7 @@ from pathlib import Path
 from flask import render_template, jsonify, send_from_directory, request
 from werkzeug.utils import secure_filename
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from app.features.recordings import bp
 import app.utils.tle as tle_utils
 import app.utils.passes as passes_utils
@@ -71,7 +70,7 @@ import json
 import wave
 from pathlib import Path
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 
 # RECORDINGS_DIR → Path to your top-level recordings/ folder
 
@@ -108,9 +107,10 @@ def build_recordings_list():
 
         if ext == ".wav":
             ts = stat.st_mtime
+            # Always use UTC for timestamp
             rec["wav_file"]             = f
             rec["wav_path"]             = relpath
-            rec["meta"]["timestamp"]    = datetime.fromtimestamp(ts)
+            rec["meta"]["timestamp"]    = datetime.utcfromtimestamp(ts)
             rec["meta"]["timestamp_ts"] = ts
             rec["meta"]["file_mb"]      = size_mb
             try:
@@ -134,9 +134,15 @@ def build_recordings_list():
                     rec["meta"]["satellite"] = data["satellite"]
                 raw_ts = data.get("timestamp")
                 if isinstance(raw_ts, str):
-                    dt = datetime.fromisoformat(raw_ts)
-                    rec["meta"]["timestamp"]    = dt.replace(tzinfo=None)
-                    rec["meta"]["timestamp_ts"] = dt.timestamp()
+                    # Always parse as UTC, strip tz if present
+                    try:
+                        dt = datetime.fromisoformat(raw_ts)
+                        if dt.tzinfo:
+                            dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+                        rec["meta"]["timestamp"]    = dt
+                        rec["meta"]["timestamp_ts"] = dt.timestamp()
+                    except Exception:
+                        pass
                 for k, v in data.items():
                     if k not in ("timestamp", "satellite"):
                         rec["meta"][k] = v
@@ -320,4 +326,4 @@ def upload_wav():
             "success": False,
             "error": f"Decoding failed: {e}"
         })
-        
+

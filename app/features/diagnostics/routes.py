@@ -272,7 +272,7 @@ def manual_recorder():
         gain_arg = request.form.get("gain", get_gain())
         set_gain(gain_arg)
 
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         wav_file = MANUAL_DIR / f"{timestamp}_manual.wav"
         log_file = MANUAL_DIR / f"{timestamp}_manual.txt"
         meta_file = MANUAL_DIR / f"{timestamp}_manual.json"
