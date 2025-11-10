@@ -53,12 +53,17 @@ The launcher automatically sets up a Python virtual environment and installs dep
    python -m venv venv
    ```
 
-3. **Install dependencies**  
+3. **Run the virtual environment**  
+   ```bash
+   source venv/bin/activate
+   ```
+
+4. **Install dependencies**  
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **Run the application**  
+5. **Run the application**  
    ```bash
    python run.py
    ```
