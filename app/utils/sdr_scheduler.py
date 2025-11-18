@@ -167,10 +167,12 @@ def record_pass(sat, aos, los):
             "-o", str(RECORDINGS_DIR / f"{base_name}.png")
         ], check=True)
         size = wav.stat().st_size / (1024*1024) if wav.exists() else 0.0
-    except Exception as e:
+        except Exception as e:
         error = str(e)
+        log_and_print("error", f"[{sat}] Recording failed: {error}", plog)
 
     verdict = "PASS" if not error and size > 0 else "FAIL"
+    log_and_print("info", f"[{sat}] RESULT: {verdict} | Size: {size:.2f}MB | Error: {error or 'None'}", plog)
     print(f"{GREEN if verdict=='PASS' else RED}[{sat}] PASS COMPLETE — {verdict} — {size:.2f} MB{RESET}")
     write_metadata(start_str, sat, aos, los, freq, dur, size, verdict, error, base_name)
 
