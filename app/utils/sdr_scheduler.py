@@ -128,17 +128,40 @@ def record_pass(sat, aos, los):
     except Exception as e:
         logger.warning(f"Could not load ppm: {e}")
 
+    
     mark_pass_start(sat, wav, los)
+
+    # Log recording parameters and command before execution
+    log_recording_command(
+        satellite=sat,
+        frequency_hz=int(freq),
+        frequency_mhz=freq/1e6,
+        ppm=ppm,
+        duration_s=dur,
+        sample_rate=SAMPLE_RATE,
+        gain=GAIN,
+        output_wav=str(wav),
+        logger_obj=plog
+    )
 
     error = None; size = 0.0
     try:
         cmd = (
-            f"timeout {dur} rtl_fm -f {int(freq)} -M fm -s {SAMPLE_RATE} "
+            f"timeout {dur+10} rtl_fm -f {int(freq)} -M fm -s {SAMPLE_RATE} "
             f"-g {GAIN} -l 0 -p {ppm} "
             f"| sox -t raw -r {SAMPLE_RATE} -e signed -b 16 -c 1 - "
-            f" -c 1 {wav}"
+            f"-c 1 {wav}"
         )
         subprocess.run(cmd, shell=True, check=True)
+        
+        # Validate WAV file after recording
+        validation = validate_wav_file(wav)
+        if validation["valid"]:
+            log_and_print("info", f"[{sat}] WAV validated: {validation['format']}, {validation['duration_s']}s", plog)
+            size = validation["size_mb"]
+        else:
+            error = f"WAV validation failed: {validation['error']}"
+            log_and_print("error", f"[{sat}] {error}", plog)
         subprocess.run([
             "sox", str(wav), "-n", "spectrogram",
             "-o", str(RECORDINGS_DIR / f"{base_name}.png")
