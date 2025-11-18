@@ -2,9 +2,11 @@ import csv, datetime, time, subprocess, json, sys, threading, select, psutil, sc
 from pathlib import Path
 from zoneinfo import ZoneInfo
 from logging.handlers import RotatingFileHandler
-from app.utils import sdr, tle as tle_utils, passes as passes_utils
 from app.utils.iq_cleanup import periodic_cleanup
+from app.utils.sdr_diagnostics import log_recording_command, validate_wav_file
 from app import config_paths
+from app.utils import sdr, tle as tle_utils, passes as passes_utils
+
 
 # --- CONFIG ---
 SAT_FREQ = {"ISS": 145.800e6}
