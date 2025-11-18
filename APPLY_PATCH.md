@@ -2,21 +2,6 @@
 
 ## Apply These Changes to `app/utils/sdr_scheduler.py`
 
-### CHANGE 1: Add Import (Line 7)
-
-**FIND THIS:**
-```python
-from app.utils.iq_cleanup import periodic_cleanup
-from app import config_paths
-```
-
-**REPLACE WITH:**
-```python
-from app.utils.iq_cleanup import periodic_cleanup
-from app.utils.sdr_diagnostics import log_recording_command, validate_wav_file
-from app import config_paths
-```
-
 ---
 
 ### CHANGE 2: Add Logging Before Recording (Line ~132, after `mark_pass_start(sat, wav, los)`)
@@ -160,4 +145,5 @@ After applying the patch, you should see:
 ✅ No errors during execution  
 
 If you get `ModuleNotFoundError: sdr_diagnostics`, make sure `app/utils/sdr_diagnostics.py` exists.
+
 
