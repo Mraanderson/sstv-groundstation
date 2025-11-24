@@ -421,3 +421,50 @@ def sdr_status():
     except Exception as e:
         current_app.logger.exception("sdr_status failed")
         return jsonify({"status": "grey", "reason": f"Error: {e}"}), 500
+    
+@bp.route("/recorder/preview", methods=["POST"])
+def recorder_preview():
+    """Preview the command that will be executed."""
+    freq = request.form.get("frequency", "145.800M")
+    ppm = int(request.form.get("ppm", get_ppm()))
+    duration = int(request.form.get("duration", 30))
+    
+    from app.utils.sdr_diagnostics import build_rtl_fm_command, build_sox_command
+    
+    # Parse frequency
+    freq_hz = int(float(freq.replace("M", "")) * 1e6)
+    
+    rtl_cmd = build_rtl_fm_command(freq_hz, ppm, sample_rate=48000, gain=40, duration_s=duration)
+    sox_cmd = build_sox_command(48000, "output.wav")
+    full_cmd = f"{rtl_cmd} | {sox_cmd}"
+    
+    return jsonify({
+        "frequency_hz": freq_hz,
+        "ppm": ppm,
+        "duration_s": duration,
+        "rtl_fm_command": rtl_cmd,
+        "sox_command": sox_cmd,
+        "full_command": full_cmd
+    })
+
+@bp.route("/recorder", methods=["POST"])
+def manual_recorder():
+    # ... existing code ...
+    
+    # After successful recording:
+    if wav_file.exists():
+        from app.utils.sdr_diagnostics import validate_wav_file
+        validation = validate_wav_file(wav_file)
+        
+        if validation["valid"]:
+            flash(
+                f"✅ Recording OK: {validation['format']}, {validation['duration_s']}s, {validation['size_mb']}MB",
+                "success"
+            )
+        else:
+            flash(
+                f"⚠️ File created but validation failed: {validation['error']}",
+                "warning"
+            )
+    
+    # Continue with soxi analysis & decode...

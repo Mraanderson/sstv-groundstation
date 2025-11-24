@@ -118,162 +118,127 @@
   </div>
 </div>
 
+<form method="post" action="{{ url_for('diagnostics.manual_recorder') }}" class="row g-3 align-items-end mb-4">
+    <div class="col-md-3">
+        <label for="frequency" class="form-label">Frequency (e.g., 145.800M)</label>
+        <input type="text" class="form-control" id="frequency" name="frequency" value="145.800M" required>
+    </div>
+    <div class="col-md-3">
+        <label for="duration" class="form-label">Duration (seconds)</label>
+        <input type="number" class="form-control" id="duration" name="duration" value="30" required>
+    </div>
+    <div class="col-md-3">
+        <label for="ppm" class="form-label">PPM Correction</label>
+        <input type="number" class="form-control" id="ppm" name="ppm" value="{{ ppm }}" required>
+    </div>
+    <div class="col-md-3">
+        <button type="button" class="btn btn-info" id="previewBtn">👁️ Preview Command</button>
+        <button type="submit" class="btn btn-primary">🎙️ Record</button>
+    </div>
+</form>
+
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">🎙️ Manual Recorder</h5>
+    </div>
+    <div class="card-body">
+        <form method="post" action="{{ url_for('diagnostics.manual_recorder') }}" id="recorderForm">
+            <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                    <label for="frequency" class="form-label">Frequency (MHz)</label>
+                    <input type="text" class="form-control" id="frequency" name="frequency" 
+                           value="145.800M" placeholder="145.800M" required>
+                    <small class="text-muted">e.g., 145.800M or 420.0M</small>
+                </div>
+                <div class="col-md-2">
+                    <label for="duration" class="form-label">Duration (s)</label>
+                    <input type="number" class="form-control" id="duration" name="duration" 
+                           value="30" min="5" max="1800" required>
+                </div>
+                <div class="col-md-2">
+                    <label for="ppm" class="form-label">PPM Correction</label>
+                    <input type="number" class="form-control" id="ppm" name="ppm" 
+                           value="{{ ppm }}" readonly>
+                    <small class="text-muted d-block mt-1">From calibration</small>
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label d-block mb-2">&nbsp;</label>
+                    <button type="button" class="btn btn-sm btn-info me-2" id="previewBtn" onclick="showPreview()">
+                        👁️ Preview
+                    </button>
+                    <button type="submit" class="btn btn-sm btn-primary" onclick="startRecording()">
+                        🎙️ Start Recording
+                    </button>
+                </div>
+            </div>
+
+            <!-- Command Preview -->
+            <div id="commandPreview" class="alert alert-secondary d-none mb-3">
+                <h6>📋 Command Preview:</h6>
+                <pre id="previewCommand" style="max-height: 150px; overflow-y: auto;"><code></code></pre>
+                <button type="button" class="btn btn-sm btn-outline-secondary mt-2" 
+                        onclick="copyCommand()">📋 Copy</button>
+            </div>
+
+            <!-- Recording Status -->
+            <div id="recordingStatus" class="d-none">
+                <div class="progress">
+                    <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                         role="progressbar" style="width: 0%">Recording...</div>
+                </div>
+                <p class="mt-2 text-muted" id="statusText">Waiting to start...</p>
+            </div>
+        </form>
+
+        <!-- Recent Recordings -->
+        <hr>
+        <h6>Recent Manual Recordings:</h6>
+        <div class="list-group">
+            {% for f in files %}
+                <a href="{{ url_for('diagnostics.manual_recorder') }}" class="list-group-item list-group-item-action">
+                    <div class="d-flex w-100 justify-content-between">
+                        <strong>{{ f.name }}</strong>
+                        <small>{{ f.stat().st_size | filesizeformat }}</small>
+                    </div>
+                    <small class="text-muted">{{ f.stat().st_mtime | datetimeformat('%Y-%m-%d %H:%M:%S') }}</small>
+                </a>
+            {% else %}
+                <p class="text-muted">No recordings yet.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
 <script>
-const statusUrl = "{{ url_for('diagnostics.diagnostics_status') }}";
-//const sdrStatusUrl = "{{ url_for('diagnostics.sdr_status') }}";
-const calibrateUrl = "{{ url_for('diagnostics.calibrate') }}";
-const resetPpmUrl = "{{ url_for('diagnostics.reset_ppm_route') }}";
+function showPreview() {
+    const freq = document.getElementById('frequency').value;
+    const ppm = document.getElementById('ppm').value;
+    const duration = document.getElementById('duration').value;
 
-let enoughSpace = false;
-
-function showAlert(msg, cls="info", timeout=6000) {
-  const a = document.createElement("div");
-  a.className = `alert alert-${cls} alert-dismissible`;
-  a.role = "alert";
-  a.innerHTML = `${msg} <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>`;
-  document.getElementById("alerts").appendChild(a);
-  if (timeout) setTimeout(()=>{ try{ a.remove() }catch(e){} }, timeout);
+    fetch('{{ url_for("diagnostics.recorder_preview") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `frequency=${encodeURIComponent(freq)}&ppm=${ppm}&duration=${duration}`
+    })
+    .then(r => r.json())
+    .then(data => {
+        const preview = document.getElementById('commandPreview');
+        const cmd = document.getElementById('previewCommand').firstChild;
+        cmd.textContent = data.full_command;
+        preview.classList.remove('d-none');
+    })
+    .catch(err => alert('Error: ' + err));
 }
 
-async function updatePageStatus() {
-  try {
-    const res = await fetch(statusUrl, {cache: "no-store"});
-    const data = await res.json();
-    const df = document.getElementById("diskFree");
-    const db = document.getElementById("diskBadge");
-    df.textContent = data.disk_free_gb !== null ? data.disk_free_gb : "error";
-    enoughSpace = !!data.enough_space;
-    db.className = enoughSpace ? "badge bg-success" : "badge bg-danger";
-    db.textContent = enoughSpace ? "Enough space" : "Low space";
-    // requirements
-    const reqList = document.getElementById("reqList");
-    reqList.innerHTML = "";
-    if (data.requirements) {
-      for (const [k,v] of Object.entries(data.requirements)) {
-        const li = document.createElement("li");
-        li.className = "list-group-item d-flex justify-content-between align-items-center";
-        li.textContent = k;
-        const span = document.createElement("span");
-        span.className = v ? "badge bg-success" : "badge bg-danger";
-        span.textContent = v ? "OK" : "MISSING";
-        li.appendChild(span);
-        reqList.appendChild(li);
-      }
-    }
-    // rtl settings
-    if (data.rtl_ppm !== undefined) document.getElementById("rtlPpm").textContent = data.rtl_ppm;
-    if (data.rtl_gain !== undefined) document.getElementById("rtlGain").textContent = data.rtl_gain;
-  } catch (err) {
-    document.getElementById("diskFree").textContent = "error";
-    document.getElementById("diskBadge").className = "badge bg-warning";
-    document.getElementById("diskBadge").textContent = "Error";
-  }
+function copyCommand() {
+    const cmd = document.getElementById('previewCommand').textContent;
+    navigator.clipboard.writeText(cmd).then(() => {
+        alert('Command copied to clipboard');
+    });
 }
 
-//async function updateSdrLightLocal() {
-//  try {
-//    const res = await fetch(sdrStatusUrl, {cache: "no-store"});
-//    const data = await res.json();
-//    const el = document.getElementById("pageSdrLight");
-//    const map = {
-//      green: {cls: "badge bg-success", text: "🟢 SDR Ready"},
-//      red:   {cls: "badge bg-danger", text: "🔴 SDR In Use"},
-//      amber: {cls: "badge bg-warning text-dark", text: "🟠 SDR Scheduled"},
-//      grey:  {cls: "badge bg-secondary", text: "⚪ SDR Missing"}
-//    };
-//    const st = map[data.status] || map.grey;
-//    el.className = st.cls;
-//   el.textContent = st.text;
-//    document.getElementById("sdrReason").textContent = data.reason || "";
-//  } catch (err) {
-//    const el = document.getElementById("pageSdrLight");
-//    el.className = "badge bg-warning";
-//    el.textContent = "SDR Error";
-//  }
-//}
-//
-
-document.getElementById("btnCalibrate").addEventListener("click", async () => {
-  const btn = document.getElementById("btnCalibrate");
-  btn.disabled = true;
-  btn.textContent = "Calibrating…";
-  try {
-    // include the user-specified frequency if present
-    const freqInput = document.getElementById("calFreq").value;
-    const form = new FormData();
-    if (freqInput) form.append("target_freq", freqInput);
-    const res = await fetch(calibrateUrl, {method: "POST", body: form});
-    const data = await res.json();
-    if (data.success) {
-      showAlert("Calibration complete (PPM: " + data.ppm + ")", "success");
-      document.getElementById("calPreview").textContent = (data.csv_preview || []).join("\n");
-      document.getElementById("rtlPpm").textContent = data.ppm;
-    } else {
-      showAlert("Calibration failed: " + (data.error || "unknown"), "danger");
-    }
-  } catch (err) {
-    showAlert("Calibration error: " + err, "danger");
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Calibrate SDR";
-  }
-});
-
-document.getElementById("btnResetPpm").addEventListener("click", async () => {
-  const b = document.getElementById("btnResetPpm");
-  b.disabled = true;
-  try {
-    const res = await fetch(resetPpmUrl, {method: "POST"});
-    const data = await res.json();
-    if (data.success) {
-      document.getElementById("rtlPpm").textContent = data.ppm;
-      showAlert("PPM reset to 0", "success");
-    } else {
-      showAlert("Reset failed: " + (data.error || "unknown"), "danger");
-    }
-  } catch (err) {
-    showAlert("Reset error: " + err, "danger");
-  } finally {
-    b.disabled = false;
-  }
-});
-
-document.getElementById("manualForm").addEventListener("submit", (ev) => {
-  if (!enoughSpace) {
-    ev.preventDefault();
-    if (confirm("Disk space is low. Proceed with recording anyway?")) {
-      ev.target.submit();
-    }
-  }
-});
-
-// initial update + polling
-updatePageStatus();
-//updateSdrLightLocal();
-setInterval(updatePageStatus, 5000);
-//setInterval(updateSdrLightLocal, 5000);
-
-// wire up AJAX delete to remove DOM element without full refresh
-document.querySelectorAll(".delete-form").forEach(f => {
-  f.addEventListener("submit", async (ev) => {
-    ev.preventDefault();
-    if (!confirm("Delete this recording?")) return;
-    const form = ev.currentTarget;
-    const fd = new FormData(form);
-    try {
-      const res = await fetch(form.action, {method: "POST", body: fd, headers: {"X-Requested-With": "XMLHttpRequest"}});
-      const data = await res.json();
-      if (data.success) {
-        const wrapper = form.closest("[data-filename]");
-        if (wrapper) wrapper.remove();
-        showAlert("Recording deleted", "success");
-      } else {
-        showAlert("Delete failed: " + (data.error || "unknown"), "danger");
-      }
-    } catch (err) {
-      showAlert("Delete error: " + err, "danger");
-    }
-  });
-});
+function startRecording() {
+    document.getElementById('recordingStatus').classList.remove('d-none');
+    document.getElementById('previewCommand').classList.add('d-none');
+}
 </script>
-{% endblock %}
