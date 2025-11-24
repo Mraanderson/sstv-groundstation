@@ -162,14 +162,24 @@ def record_pass(sat, aos, los):
         else:
             error = f"WAV validation failed: {validation['error']}"
             log_and_print("error", f"[{sat}] {error}", plog)
+
         subprocess.run([
             "sox", str(wav), "-n", "spectrogram",
             "-o", str(RECORDINGS_DIR / f"{base_name}.png")
         ], check=True)
+
         size = wav.stat().st_size / (1024*1024) if wav.exists() else 0.0
-        except Exception as e:
+
+    except Exception as e:   # <-- aligned with try
         error = str(e)
         log_and_print("error", f"[{sat}] Recording failed: {error}", plog)
+
+    verdict = "PASS" if not error and size > 0 else "FAIL"
+    log_and_print("info", f"[{sat}] RESULT: {verdict} | Size: {size:.2f}MB | Error: {error or 'None'}", plog)
+    print(f"{GREEN if verdict=='PASS' else RED}[{sat}] PASS COMPLETE — {verdict} — {size:.2f} MB{RESET}")
+    write_metadata(start_str, sat, aos, los, freq, dur, size, verdict, error, base_name)
+
+
 
     verdict = "PASS" if not error and size > 0 else "FAIL"
     log_and_print("info", f"[{sat}] RESULT: {verdict} | Size: {size:.2f}MB | Error: {error or 'None'}", plog)
