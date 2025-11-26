@@ -14,7 +14,7 @@ numpy               # Foundational package for scientific computing (dependency 
 scipy               # Scientific and technical computing (dependency for skyfield)
 
 # --- Image & Audio Processing ---
-Pillow==10.2.0      # Python Imaging Library for handling image files
+Pillow      # Python Imaging Library for handling image files
 pydub               # Manipulate audio with a simple and high-level interface
 
 # --- System & Utilities ---
